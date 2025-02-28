@@ -1,7 +1,7 @@
 $input v_texcoord0
 
 /*
- * Copyright 2011-2024 Branimir Karadzic. All rights reserved.
+ * Copyright 2011-2025 Branimir Karadzic. All rights reserved.
  * License: https://github.com/bkaradzic/bgfx/blob/master/LICENSE
  */
 
@@ -20,5 +20,5 @@ void main()
    float mip = floor(MipLevel(v_texcoord0.xy, VirtualTextureSize) - MipBias);
    mip = clamp(mip, 0, mipCount);
    vec2 offset = floor(v_texcoord0.xy * PageTableSize);
-   gl_FragColor = vec4(floor(vec3(offset / exp2(mip), mip)) / 255.0, 1.0);   
+   gl_FragColor = vec4(floor(vec3(offset / exp2(mip), mip)) / 255.0, 1.0);
 }

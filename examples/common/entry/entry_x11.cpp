@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2024 Branimir Karadzic. All rights reserved.
+ * Copyright 2011-2025 Branimir Karadzic. All rights reserved.
  * License: https://github.com/bkaradzic/bgfx/blob/master/LICENSE
  */
 
@@ -81,7 +81,7 @@ namespace entry
 		{ Key::GamepadUp,   Key::GamepadDown  },
 		{ Key::None,        Key::None         },
 	};
-	BX_STATIC_ASSERT(BX_COUNTOF(s_translateAxis) == BX_COUNTOF(s_axisDpad) );
+	static_assert(BX_COUNTOF(s_translateAxis) == BX_COUNTOF(s_axisDpad) );
 
 	struct Joystick
 	{
@@ -336,7 +336,7 @@ namespace entry
 			m_display = XOpenDisplay(NULL);
 			if (NULL == m_display)
 			{
-				// Use `DISPLAY` enviroment variable to pick display. If `DISPLAY` is not set try ":0"
+				// Use `DISPLAY` environment variable to pick display. If `DISPLAY` is not set try ":0"
 				m_display = XOpenDisplay(":0");
 				if (NULL == m_display)
 				{

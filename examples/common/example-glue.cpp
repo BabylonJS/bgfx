@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2024 Branimir Karadzic. All rights reserved.
+ * Copyright 2011-2025 Branimir Karadzic. All rights reserved.
  * License: https://github.com/bkaradzic/bgfx/blob/master/LICENSE
  */
 
@@ -176,7 +176,7 @@ void showExampleDialog(entry::AppI* _app, const char* _errorText)
 
 	{
 		uint32_t num = entry::getNumApps();
-		const char** items = (const char**)alloca(num*sizeof(void*) );
+		const char** items = (const char**)BX_STACK_ALLOC(num*sizeof(void*) );
 
 		uint32_t ii = 0;
 		int32_t current = 0;
@@ -290,6 +290,8 @@ void showExampleDialog(entry::AppI* _app, const char* _errorText)
 			}
 		}
 	}
+#else
+	ImGui::Text("Renderer: %s", bgfx::getRendererName(bgfx::getRendererType()));
 #endif // 0
 
 	const bgfx::Stats* stats = bgfx::getStats();

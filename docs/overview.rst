@@ -34,7 +34,7 @@ Supported Platforms
 
 -  Android (14+)
 -  iOS/iPadOS/tvOS (16.0+)
--  Linux
+-  Linux (both X11 and Wayland)
 -  macOS (13.0+)
 -  PlayStation 4
 -  RaspberryPi
@@ -46,7 +46,7 @@ Supported Compilers
 ~~~~~~~~~~~~~~~~~~~
 
 -  Clang 11 and above
--  GCC 8 and above
+-  GCC 11 and above
 -  VS2019 and above
 -  Apple clang 12 and above
 

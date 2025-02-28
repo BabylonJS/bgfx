@@ -2,7 +2,7 @@ $input a_position, a_normal, a_tangent, a_texcoord0
 $output v_wpos, v_view, v_normal, v_tangent, v_bitangent, v_texcoord0
 
 /*
- * Copyright 2011-2024 Branimir Karadzic. All rights reserved.
+ * Copyright 2011-2025 Branimir Karadzic. All rights reserved.
  * License: https://github.com/bkaradzic/bgfx/blob/master/LICENSE
  */
 
@@ -14,7 +14,7 @@ void main()
 	v_wpos = wpos;
 
 	gl_Position = mul(u_viewProj, vec4(wpos, 1.0) );
-	
+
 	vec4 normal = a_normal * 2.0 - 1.0;
 	vec4 tangent = a_tangent * 2.0 - 1.0;
 
