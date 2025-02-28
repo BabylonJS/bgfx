@@ -1,5 +1,5 @@
 --
--- Copyright 2010-2024 Branimir Karadzic. All rights reserved.
+-- Copyright 2010-2025 Branimir Karadzic. All rights reserved.
 -- License: https://github.com/bkaradzic/bgfx/blob/master/LICENSE
 --
 
@@ -76,12 +76,6 @@ project ("example-common")
 	if _OPTIONS["with-glfw"] then
 		defines {
 			"ENTRY_CONFIG_USE_GLFW=1",
-		}
-	end
-
-	if _OPTIONS["with-wayland"] then
-		defines {
-			"ENTRY_CONFIG_USE_WAYLAND=1",
 		}
 	end
 

@@ -14,25 +14,25 @@ jobs:
       fail-fast: true
       matrix:
         include: [
-          { config: Debug, platform: Win32, bindir: 'win32_vs2019' },
-          { config: Debug, platform: x64, bindir: 'win64_vs2019' },
-          { config: Release, platform: Win32, bindir: 'win32_vs2019' },
-          { config: Release, platform: x64, bindir: 'win64_vs2019' },
+          { config: Debug, platform: Win32, bindir: 'win32_vs2022' },
+          { config: Debug, platform: x64, bindir: 'win64_vs2022' },
+          { config: Release, platform: Win32, bindir: 'win32_vs2022' },
+          { config: Release, platform: x64, bindir: 'win64_vs2022' },
         ]
     name: msvc-${{ matrix.config }}-${{ matrix.platform }}
-    runs-on: windows-2019
+    runs-on: windows-2022
     steps:
       - name: Checkout bgfx
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           path: bgfx
       - name: Checkout bx
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: bkaradzic/bx
           path: bx
       - name: Checkout bimg
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: bkaradzic/bimg
           path: bimg
@@ -42,8 +42,8 @@ jobs:
         shell: cmd
         run: |
           cd bgfx
-          ..\bx\tools\bin\windows\genie.exe --with-tools --with-combined-examples --with-shared-lib vs2019
-          msbuild ".build/projects/vs2019/bgfx.sln" /m /v:minimal /p:Configuration=${{ matrix.config }} /p:Platform=${{ matrix.platform }}
+          ..\bx\tools\bin\windows\genie.exe --with-tools --with-combined-examples --with-shared-lib vs2022
+          msbuild ".build/projects/vs2022/bgfx.sln" /m /v:minimal /p:Configuration=${{ matrix.config }} /p:Platform=${{ matrix.platform }}
       - name: Check
         shell: cmd
         run: |
@@ -58,22 +58,22 @@ jobs:
       matrix:
         include: [
           { msystem: MINGW64, project: 'mingw-gcc', bindir: 'win64_mingw-gcc' },
-          { msystem: CLANG64, project: 'mingw-clang', bindir: 'win64_mingw-clang' },
+#          { msystem: CLANG64, project: 'mingw-clang', bindir: 'win64_mingw-clang' },
         ]
     name: mingw-${{ matrix.msystem }}
-    runs-on: windows-latest
+    runs-on: windows-2022
     steps:
       - name: Checkout bgfx
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           path: bgfx
       - name: Checkout bx
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: bkaradzic/bx
           path: bx
       - name: Checkout bimg
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: bkaradzic/bimg
           path: bimg
@@ -105,20 +105,20 @@ jobs:
           { config: debug, binsuffix: Debug },
           { config: release, binsuffix: Release },
         ]
-    name: linux-${{ matrix.config }}64
-    runs-on: ubuntu-22.04
+    name: linux-gcc-${{ matrix.config }}64
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout bgfx
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           path: bgfx
       - name: Checkout bx
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: bkaradzic/bx
           path: bx
       - name: Checkout bimg
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: bkaradzic/bimg
           path: bimg
@@ -126,7 +126,7 @@ jobs:
         run: |
           sudo apt install libgl-dev
           cd bgfx
-          make -j$(nproc) linux-${{ matrix.config }}64
+          make -j$(nproc) linux-gcc-${{ matrix.config }}64
       - name: Check
         run: |
           cd bgfx
@@ -142,34 +142,34 @@ jobs:
           { config: debug, binsuffix: Debug },
           { config: release, binsuffix: Release },
         ]
-    name: osx-x64-${{ matrix.config }}
-    runs-on: macos-latest
+    name: osx-arm64-${{ matrix.config }}
+    runs-on: macos-14
     steps:
       - name: Checkout bgfx
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           path: bgfx
       - name: Checkout bx
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: bkaradzic/bx
           path: bx
       - name: Checkout bimg
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: bkaradzic/bimg
           path: bimg
       - name: Build
         run: |
           cd bgfx
-          make -j$(sysctl -n hw.physicalcpu) osx-x64-${{ matrix.config }}
+          make -j$(sysctl -n hw.physicalcpu) osx-arm64-${{ matrix.config }}
       - name: Check
         run: |
           cd bgfx
-          ls -lash ".build/osx-x64/bin"
-          ".build/osx-x64/bin/geometryc${{ matrix.binsuffix}}" --version
-          ".build/osx-x64/bin/shaderc${{ matrix.binsuffix}}" --version
-          ".build/osx-x64/bin/texturec${{ matrix.binsuffix}}" --version
+          ls -lash ".build/osx-arm64/bin"
+          ".build/osx-arm64/bin/geometryc${{ matrix.binsuffix}}" --version
+          ".build/osx-arm64/bin/shaderc${{ matrix.binsuffix}}" --version
+          ".build/osx-arm64/bin/texturec${{ matrix.binsuffix}}" --version
   android:
     strategy:
       fail-fast: true
@@ -178,7 +178,7 @@ jobs:
           { platform: arm64  },
         ]
     name: android-${{ matrix.platform }}
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: nttld/setup-ndk@v1
         id: setup-ndk
@@ -186,16 +186,16 @@ jobs:
           ndk-version: r25b
           add-to-path: false
       - name: Checkout bgfx
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           path: bgfx
       - name: Checkout bx
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: bkaradzic/bx
           path: bx
       - name: Checkout bimg
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: bkaradzic/bimg
           path: bimg

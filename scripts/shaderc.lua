@@ -1,5 +1,5 @@
 --
--- Copyright 2010-2024 Branimir Karadzic. All rights reserved.
+-- Copyright 2010-2025 Branimir Karadzic. All rights reserved.
 -- License: https://github.com/bkaradzic/bgfx/blob/master/LICENSE
 --
 
@@ -82,6 +82,8 @@ project "spirv-opt"
 		path.join(SPIRV_TOOLS, "source/text.h"),
 		path.join(SPIRV_TOOLS, "source/text_handler.cpp"),
 		path.join(SPIRV_TOOLS, "source/text_handler.h"),
+		path.join(SPIRV_TOOLS, "source/to_string.cpp"),
+		path.join(SPIRV_TOOLS, "source/to_string.h"),
 		path.join(SPIRV_TOOLS, "source/util/bit_vector.cpp"),
 		path.join(SPIRV_TOOLS, "source/util/bit_vector.h"),
 		path.join(SPIRV_TOOLS, "source/util/bitutils.h"),

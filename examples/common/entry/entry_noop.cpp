@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2024 Branimir Karadzic. All rights reserved.
+ * Copyright 2011-2025 Branimir Karadzic. All rights reserved.
  * License: https://github.com/bkaradzic/bgfx/blob/master/LICENSE
  */
 
@@ -80,7 +80,6 @@ namespace entry
 
 	bgfx::NativeWindowHandleType::Enum getNativeWindowHandleType()
 	{
-		BX_UNUSED(_handle);
 		return bgfx::NativeWindowHandleType::Default;
 	}
 
