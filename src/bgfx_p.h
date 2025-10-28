@@ -92,13 +92,13 @@ namespace bgfx
 		}                                             \
 	BX_MACRO_BLOCK_END
 
-#define _BGFX_ASSERT(_condition, _format, ...)                                                                 \
-	BX_MACRO_BLOCK_BEGIN                                                                                       \
-		if (!BX_IGNORE_C4127(_condition)                                                                       \
-		&&  bx::assertFunction(bx::Location::current(), "ASSERT " #_condition " -> " _format, ##__VA_ARGS__) ) \
-		{                                                                                                      \
-			bgfx::fatal(__FILE__, uint16_t(__LINE__), bgfx::Fatal::DebugCheck, _format, ##__VA_ARGS__);        \
-		}                                                                                                      \
+#define _BGFX_ASSERT(_condition, _format, ...)                                                                    \
+	BX_MACRO_BLOCK_BEGIN                                                                                          \
+		if (!BX_IGNORE_C4127(_condition)                                                                          \
+		&&  bx::assertFunction(bx::Location::current(), 0, "ASSERT " #_condition " -> " _format, ##__VA_ARGS__) ) \
+		{                                                                                                         \
+			bgfx::fatal(__FILE__, uint16_t(__LINE__), bgfx::Fatal::DebugCheck, _format, ##__VA_ARGS__);           \
+		}                                                                                                         \
 	BX_MACRO_BLOCK_END
 
 #define BGFX_FATAL(_condition, _err, _format, ...)                             \
@@ -427,6 +427,7 @@ namespace bgfx
 		};
 	};
 
+	void* findModule(const char* _name);
 	bool windowsVersionIs(Condition::Enum _op, uint32_t _version, uint32_t _build = UINT32_MAX);
 
 	constexpr bool isShaderType(uint32_t _magic, char _type)
@@ -566,8 +567,6 @@ namespace bgfx
 	extern CallbackI* g_callback;
 	extern bx::AllocatorI* g_allocator;
 	extern Caps g_caps;
-
-	typedef bx::StringT<&g_allocator> String;
 
 	struct ProfilerScope
 	{
@@ -843,6 +842,7 @@ namespace bgfx
 			InvViewProj,
 			Model,
 			ModelView,
+			InvModelView,
 			ModelViewProj,
 			AlphaRef,
 			Count
@@ -1876,14 +1876,14 @@ namespace bgfx
 
 	struct IndexBuffer
 	{
-		String   m_name;
+		bx::FixedString64 m_name;
 		uint32_t m_size;
 		uint16_t m_flags;
 	};
 
 	struct VertexBuffer
 	{
-		String   m_name;
+		bx::FixedString64 m_name;
 		uint32_t m_size;
 		uint16_t m_stride;
 	};
@@ -1933,7 +1933,7 @@ namespace bgfx
 	struct ShaderRef
 	{
 		UniformHandle* m_uniforms;
-		String   m_name;
+		bx::FixedString64 m_name;
 		uint32_t m_hashIn;
 		uint32_t m_hashOut;
 		uint16_t m_num;
@@ -1949,7 +1949,7 @@ namespace bgfx
 
 	struct UniformRef
 	{
-		String            m_name;
+		bx::FixedString64 m_name;
 		UniformType::Enum m_type;
 		uint16_t          m_num;
 		int16_t           m_refCount;
@@ -2014,7 +2014,7 @@ namespace bgfx
 			return 0 < m_depth;
 		}
 
-		String   m_name;
+		bx::FixedString64 m_name;
 		void*    m_ptr;
 		uint64_t m_flags;
 		uint32_t m_storageSize;
@@ -2034,7 +2034,7 @@ namespace bgfx
 
 	struct FrameBufferRef
 	{
-		String m_name;
+		bx::FixedString64 m_name;
 		uint16_t m_width;
 		uint16_t m_height;
 
@@ -3097,7 +3097,7 @@ namespace bgfx
 		virtual void updateTextureEnd() = 0;
 		virtual void readTexture(TextureHandle _handle, void* _data, uint8_t _mip) = 0;
 		virtual void resizeTexture(TextureHandle _handle, uint16_t _width, uint16_t _height, uint8_t _numMips, uint16_t _numLayers) = 0;
-		virtual void overrideInternal(TextureHandle _handle, uintptr_t _ptr) = 0;
+		virtual void overrideInternal(TextureHandle _handle, uintptr_t _ptr, uint16_t _layerIndex) = 0;
 		virtual uintptr_t getInternal(TextureHandle _handle) = 0;
 		virtual void destroyTexture(TextureHandle _handle) = 0;
 		virtual void createFrameBuffer(FrameBufferHandle _handle, uint8_t _num, const Attachment* _attachment) = 0;
@@ -3138,7 +3138,7 @@ namespace bgfx
 			, m_numFreeDynamicIndexBufferHandles(0)
 			, m_numFreeDynamicVertexBufferHandles(0)
 			, m_numFreeOcclusionQueryHandles(0)
-			, m_colorPaletteDirty(0)
+			, m_colorPaletteDirty(2)
 			, m_frames(0)
 			, m_debug(BGFX_DEBUG_NONE)
 			, m_rtMemoryUsed(0)
@@ -4975,7 +4975,7 @@ namespace bgfx
 			BGFX_CHECK_HANDLE("getUniformInfo", m_uniformHandle, _handle);
 
 			UniformRef& uniform = m_uniformRef[_handle.idx];
-			bx::strCopy(_info.name, sizeof(_info.name), uniform.m_name.getPtr() );
+			bx::strCopy(_info.name, sizeof(_info.name), uniform.m_name);
 			_info.type = uniform.m_type;
 			_info.num  = uniform.m_num;
 		}

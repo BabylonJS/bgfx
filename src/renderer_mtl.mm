@@ -1159,7 +1159,7 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 			release(mem);
 		}
 
-		void overrideInternal(TextureHandle _handle, uintptr_t _ptr) override
+		void overrideInternal(TextureHandle _handle, uintptr_t _ptr, uint16_t /*_layerIndex*/) override
 		{
 			m_textures[_handle.idx].overrideInternal(_ptr);
 		}
@@ -1612,7 +1612,7 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 
 				if (prevMetalLayerPixelFormat != getSwapChainPixelFormat(m_mainFrameBuffer.m_swapChain))
 				{
-					MTL_RELEASE(m_screenshotBlitRenderPipelineState)
+					MTL_RELEASE(m_screenshotBlitRenderPipelineState);
 					reset(m_renderPipelineDescriptor);
 
 					m_renderPipelineDescriptor.colorAttachments[0].pixelFormat = getSwapChainPixelFormat(m_mainFrameBuffer.m_swapChain);
@@ -3531,9 +3531,9 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 		else
 #endif // BX_PLATFORM_VISIONOS
 		{
-			if (m_metalLayer)
+			if (NULL != m_metalLayer)
 			{
-				release(m_metalLayer);
+				MTL_RELEASE(m_metalLayer);
 			}
 
 #if !BX_PLATFORM_VISIONOS
