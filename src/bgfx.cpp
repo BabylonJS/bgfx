@@ -19,7 +19,10 @@
 #		define WIN32_LEAN_AND_MEAN
 #	endif // WIN32_LEAN_AND_MEAN
 #	include <windows.h>
-#endif // BX_PLATFORM_OSX
+#	include <psapi.h>
+#elif BX_PLATFORM_LINUX
+#	include <link.h> // dl_iterate_phdr
+#endif // BX_PLATFORM_*
 
 BX_ERROR_RESULT(BGFX_ERROR_TEXTURE_VALIDATION,      BX_MAKEFOURCC('b', 'g', 0, 1) );
 BX_ERROR_RESULT(BGFX_ERROR_FRAME_BUFFER_VALIDATION, BX_MAKEFOURCC('b', 'g', 0, 2) );
@@ -262,51 +265,11 @@ namespace bgfx
 
 	Caps g_caps;
 
-#if BGFX_CONFIG_MULTITHREADED && !defined(BX_THREAD_LOCAL)
-	class ThreadData
-	{
-		BX_CLASS(ThreadData
-			, NO_DEFAULT_CTOR
-			, NO_COPY
-			);
-
-	public:
-		ThreadData(uintptr_t _rhs)
-		{
-			union { uintptr_t ui; void* ptr; } cast = { _rhs };
-			m_tls.set(cast.ptr);
-		}
-
-		operator uintptr_t() const
-		{
-			union { uintptr_t ui; void* ptr; } cast;
-			cast.ptr = m_tls.get();
-			return cast.ui;
-		}
-
-		uintptr_t operator=(uintptr_t _rhs)
-		{
-			union { uintptr_t ui; void* ptr; } cast = { _rhs };
-			m_tls.set(cast.ptr);
-			return _rhs;
-		}
-
-		bool operator==(uintptr_t _rhs) const
-		{
-			uintptr_t lhs = *this;
-			return lhs == _rhs;
-		}
-
-	private:
-		bx::TlsData m_tls;
-	};
-
-	static ThreadData s_threadIndex(0);
-#elif !BGFX_CONFIG_MULTITHREADED
-	static uint32_t s_threadIndex(0);
-#else
+#if BGFX_CONFIG_MULTITHREADED
 	static BX_THREAD_LOCAL uint32_t s_threadIndex(0);
-#endif
+#else
+	static uint32_t s_threadIndex(0);
+#endif // BGFX_CONFIG_MULTITHREADED
 
 	static Context* s_ctx = NULL;
 	static bool s_renderFrameCalled = false;
@@ -377,7 +340,7 @@ namespace bgfx
 		return &g_internalData;
 	}
 
-	uintptr_t overrideInternal(TextureHandle _handle, uintptr_t _ptr)
+	uintptr_t overrideInternal(TextureHandle _handle, uintptr_t _ptr, uint16_t _layerIndex)
 	{
 		BGFX_CHECK_RENDER_THREAD();
 		RendererContextI* rci = s_ctx->m_renderCtx;
@@ -386,7 +349,7 @@ namespace bgfx
 			return 0;
 		}
 
-		rci->overrideInternal(_handle, _ptr);
+		rci->overrideInternal(_handle, _ptr, _layerIndex);
 
 		return rci->getInternal(_handle);
 	}
@@ -668,9 +631,9 @@ namespace bgfx
 		}
 	}
 
-	static const uint32_t numCharsPerBatch = 1024;
-	static const uint32_t numBatchVertices = numCharsPerBatch*4;
-	static const uint32_t numBatchIndices  = numCharsPerBatch*6;
+	static constexpr uint32_t kNumCharsPerBatch = 1024;
+	static constexpr uint32_t kNumBatchVertices = kNumCharsPerBatch*4;
+	static constexpr uint32_t kNumBatchIndices  = kNumCharsPerBatch*6;
 
 	void TextVideoMemBlitter::init(uint8_t scale)
 	{
@@ -710,8 +673,8 @@ namespace bgfx
 
 		m_program = createProgram(vsh, fsh, true);
 
-		m_vb = s_ctx->createTransientVertexBuffer(numBatchVertices*m_layout.m_stride, &m_layout);
-		m_ib = s_ctx->createTransientIndexBuffer(numBatchIndices*2);
+		m_vb = s_ctx->createTransientVertexBuffer(kNumBatchVertices*m_layout.m_stride, &m_layout);
+		m_ib = s_ctx->createTransientIndexBuffer(kNumBatchIndices*2);
 		m_scale = bx::max<uint8_t>(scale, 1);
 	}
 
@@ -808,12 +771,12 @@ namespace bgfx
 			uint32_t startVertex = 0;
 			uint32_t numIndices = 0;
 
-			for (; yy < _mem.m_height && numIndices < numBatchIndices; ++yy)
+			for (; yy < _mem.m_height && numIndices < kNumBatchIndices; ++yy)
 			{
 				xx = xx < _mem.m_width ? xx : 0;
 				const TextVideoMem::MemSlot* line = &_mem.m_mem[yy*_mem.m_width+xx];
 
-				for (; xx < _mem.m_width && numIndices < numBatchIndices; ++xx)
+				for (; xx < _mem.m_width && numIndices < kNumBatchIndices; ++xx)
 				{
 					uint32_t ch = line->character;
 					const uint8_t attr = line->attribute;
@@ -856,7 +819,7 @@ namespace bgfx
 					line++;
 				}
 
-				if (numIndices >= numBatchIndices)
+				if (numIndices >= kNumBatchIndices)
 				{
 					break;
 				}
@@ -982,6 +945,7 @@ namespace bgfx
 		"u_invViewProj",
 		"u_model",
 		"u_modelView",
+		"u_invModelView",
 		"u_modelViewProj",
 		"u_alphaRef4",
 	};
@@ -1517,7 +1481,7 @@ namespace bgfx
 
 	void UniformBuffer::writeUniform(UniformType::Enum _type, uint16_t _loc, const void* _value, uint16_t _num)
 	{
-		const uint32_t opcode = encodeOpcode(_type, _loc, _num, true);
+		const uint32_t opcode = encodeOpcode(bx::narrowCast<uint8_t>(_type), _loc, _num, true);
 		write(opcode);
 		write(_value, g_uniformTypeSize[_type]*_num);
 	}
@@ -1812,12 +1776,12 @@ namespace bgfx
 
 	const char* getName(UniformHandle _handle)
 	{
-		return s_ctx->m_uniformRef[_handle.idx].m_name.getPtr();
+		return s_ctx->m_uniformRef[_handle.idx].m_name.getCPtr();
 	}
 
 	const char* getName(ShaderHandle _handle)
 	{
-		return s_ctx->m_shaderRef[_handle.idx].m_name.getPtr();
+		return s_ctx->m_shaderRef[_handle.idx].m_name.getCPtr();
 	}
 
 	static const char* s_topologyName[] =
@@ -2169,7 +2133,7 @@ namespace bgfx
 				BX_TRACE("\t%3d: %4d %s"                                              \
 					, ii                                                              \
 					, idx                                                             \
-					, ref.m_name.getPtr()                                             \
+					, ref.m_name.getCPtr()                                            \
 					);                                                                \
 			}                                                                         \
 		}                                                                             \
@@ -2191,7 +2155,7 @@ namespace bgfx
 				BX_TRACE("\t%3d: %4d %s (count %d)"                                   \
 					, ii                                                              \
 					, idx                                                             \
-					, ref.m_name.getPtr()                                             \
+					, ref.m_name.getCPtr()                                            \
 					, ref.m_refCount                                                  \
 					);                                                                \
 			}                                                                         \
@@ -2661,6 +2625,82 @@ namespace bgfx
 		{ vk::rendererCreate,     vk::rendererDestroy,     BGFX_RENDERER_VULKAN_NAME,     !!BGFX_CONFIG_RENDERER_VULKAN     }, // Vulkan
 	};
 	static_assert(BX_COUNTOF(s_rendererCreator) == RendererType::Count);
+
+	void* findModule(const char* _name)
+	{
+#if BX_PLATFORM_WINDOWS
+		// NOTE: there was some reason to do it this way instead of simply calling GetModuleHandleA,
+		// but not sure what it was.
+		HANDLE process = GetCurrentProcess();
+		DWORD size;
+		BOOL result = EnumProcessModules(process
+			, NULL
+			, 0
+			, &size
+			);
+		if (0 != result)
+		{
+			HMODULE* modules = (HMODULE*)BX_STACK_ALLOC(size);
+			result = EnumProcessModules(process
+				, modules
+				, size
+				, &size
+				);
+
+			if (0 != result)
+			{
+				char moduleName[MAX_PATH];
+
+				for (uint32_t ii = 0, num = uint32_t(size/sizeof(HMODULE) ); ii < num; ++ii)
+				{
+					result = GetModuleBaseNameA(process
+						, modules[ii]
+						, moduleName
+						, BX_COUNTOF(moduleName)
+						);
+
+					if (0 != result
+					&&  0 == bx::strCmpI(_name, moduleName) )
+					{
+						return (void*)modules[ii];
+					}
+				}
+			}
+		}
+
+		return NULL;
+#elif BX_PLATFORM_LINUX
+		struct DlIterateCallbackData
+		{
+			const char* name;
+			void* ptr;
+		} cbData =
+		{
+			.name = _name,
+			.ptr  = NULL,
+		};
+
+		auto dlIterateCb = [](struct dl_phdr_info* _info, size_t /* _size */, void* _data) -> int
+		{
+			DlIterateCallbackData& data = *(DlIterateCallbackData*)_data;
+
+			if (bx::hasSuffix(_info->dlpi_name, data.name) )
+			{
+				data.ptr = dlopen(_info->dlpi_name, RTLD_NOW | RTLD_NOLOAD);
+				return 1;
+			}
+
+			return 0;
+		};
+
+		dl_iterate_phdr(dlIterateCb, &cbData);
+
+		return cbData.ptr;
+#else
+		BX_UNUSED(_name);
+		return NULL;
+#endif // BX_PLATFORM_WINDOWS
+	}
 
 	bool windowsVersionIs(Condition::Enum _op, uint32_t _version, uint32_t _build)
 	{
@@ -4038,8 +4078,8 @@ namespace bgfx
 		uint32_t dstWidth  = bx::max<uint32_t>(1, dst.m_width  >> _dstMip);
 		uint32_t dstHeight = bx::max<uint32_t>(1, dst.m_height >> _dstMip);
 
-		uint32_t srcDepth  = src.isCubeMap() ? 6 : bx::max<uint32_t>(1, src.m_depth >> _srcMip);
-		uint32_t dstDepth  = dst.isCubeMap() ? 6 : bx::max<uint32_t>(1, dst.m_depth >> _dstMip);
+		uint32_t srcDepth  = src.isCubeMap() ? 6 * src.m_numLayers : src.m_numLayers > 1 ? src.m_numLayers : bx::max<uint32_t>(1, src.m_depth >> _srcMip);
+		uint32_t dstDepth  = dst.isCubeMap() ? 6 * dst.m_numLayers : dst.m_numLayers > 1 ? dst.m_numLayers : bx::max<uint32_t>(1, dst.m_depth >> _dstMip);
 
 		BX_ASSERT(_srcX < srcWidth && _srcY < srcHeight && _srcZ < srcDepth
 			, "Blit src coordinates out of range (%d, %d, %d) >= (%d, %d, %d)"

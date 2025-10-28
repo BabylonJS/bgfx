@@ -46,7 +46,7 @@ Supported rendering backends:
 
 Supported platforms:
 
- * Android (14+)
+ * Android (4.0+) - API 14 or later
  * iOS/iPadOS/tvOS (16.0+)
  * Linux
  * macOS (13.0+)
@@ -60,14 +60,15 @@ Supported compilers:
 
  * Clang 11 and above
  * GCC 11 and above
- * VS2019 and above
+ * VS2022 and above
  * Apple clang 12 and above
 
 Languages:
 
  * [C/C++ API documentation](https://bkaradzic.github.io/bgfx/bgfx.html)
  * [Beef API bindings](https://github.com/bkaradzic/bgfx/tree/master/bindings/bf)
- * [C# language API bindings #1](https://github.com/bkaradzic/bgfx/tree/master/bindings/cs)
+ * [C# language API bindings](https://github.com/bkaradzic/bgfx/tree/master/bindings/cs)
+ * [C3 language API bindings](https://github.com/bkaradzic/bgfx/tree/master/bindings/c3)
  * [D language API bindings](https://github.com/BindBC/bindbc-bgfx)
  * [Go language API bindings](https://github.com/james4k/go-bgfx)
  * [Haskell language API bindings](https://github.com/haskell-game/bgfx)
@@ -393,7 +394,7 @@ management and design sandbox game for railways you build in the real world.
 
 ## Minecraft
 
-https://www.minecraft.net/zh-hant/attribution/
+https://www.minecraft.net/en-us/attribution
 
 ![Minecraft screenshot](https://user-images.githubusercontent.com/814772/79185288-57050000-7dcb-11ea-87b4-2126fcd1545b.jpg)
 
@@ -670,6 +671,13 @@ It features a huge game world to explore (~256km2), land, air, sea vehicles to d
 <a href="http://www.youtube.com/watch?feature=player_embedded&v=LHmQBo_7f84"
 target="_blank"><img src="http://img.youtube.com/vi/LHmQBo_7f84/0.jpg"
 alt="Off The Road 2"
+width="640" height="480" border="0" /></a>
+
+## Minecraft Vibrant Visuals
+
+<a href="http://www.youtube.com/watch?feature=player_embedded&v=5zcZJcXRdw0"
+target="_blank"><img src="http://img.youtube.com/vi/5zcZJcXRdw0/0.jpg"
+alt="Minecraft Vibrant Visuals"
 width="640" height="480" border="0" /></a>
 
 [License (BSD 2-clause)](https://bkaradzic.github.io/bgfx/license.html)

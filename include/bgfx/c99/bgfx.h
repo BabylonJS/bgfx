@@ -2169,6 +2169,7 @@ BGFX_C_API void bgfx_destroy_frame_buffer(bgfx_frame_buffer_handle_t _handle);
  *      - `u_model mat4[BGFX_CONFIG_MAX_BONES]` - array of model matrices.
  *      - `u_modelView mat4` - concatenated model view matrix, only first
  *        model matrix from array is used.
+ *      - `u_invModelView mat4` - inverted concatenated model view matrix.
  *      - `u_modelViewProj mat4` - concatenated model view projection matrix.
  *      - `u_alphaRef float` - alpha reference value for alpha test.
  *
@@ -2954,12 +2955,13 @@ BGFX_C_API const bgfx_internal_data_t* bgfx_get_internal_data(void);
  *
  * @param[in] _handle Texture handle.
  * @param[in] _ptr Native API pointer to texture.
+ * @param[in] _layerIndex Layer index for texture arrays (only implemented for D3D11).
  *
  * @returns Native API pointer to texture. If result is 0, texture is not created
  *  yet from the main thread.
  *
  */
-BGFX_C_API uintptr_t bgfx_override_internal_texture_ptr(bgfx_texture_handle_t _handle, uintptr_t _ptr);
+BGFX_C_API uintptr_t bgfx_override_internal_texture_ptr(bgfx_texture_handle_t _handle, uintptr_t _ptr, uint16_t _layerIndex);
 
 /**
  * Override internal texture by creating new texture. Previously created
@@ -3845,7 +3847,7 @@ struct bgfx_interface_vtbl
     bgfx_render_frame_t (*render_frame)(int32_t _msecs);
     void (*set_platform_data)(const bgfx_platform_data_t * _data);
     const bgfx_internal_data_t* (*get_internal_data)(void);
-    uintptr_t (*override_internal_texture_ptr)(bgfx_texture_handle_t _handle, uintptr_t _ptr);
+    uintptr_t (*override_internal_texture_ptr)(bgfx_texture_handle_t _handle, uintptr_t _ptr, uint16_t _layerIndex);
     uintptr_t (*override_internal_texture)(bgfx_texture_handle_t _handle, uint16_t _width, uint16_t _height, uint8_t _numMips, bgfx_texture_format_t _format, uint64_t _flags);
     void (*set_marker)(const char* _name, int32_t _len);
     void (*set_state)(uint64_t _state, uint32_t _rgba);

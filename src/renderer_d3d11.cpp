@@ -1021,6 +1021,11 @@ namespace bgfx { namespace d3d11
 					}
 				}
 
+				if (NULL != findModule("Nvda.Graphics.Interception.dll") )
+				{
+					setGraphicsDebuggerPresent(true);
+				}
+
 				if (BGFX_PCI_ID_NVIDIA != m_dxgi.m_adapterDesc.VendorId)
 				{
 					m_nvapi.shutdown();
@@ -1632,10 +1637,9 @@ namespace bgfx { namespace d3d11
 				DX_RELEASE(m_annotation, 1);
 				DX_RELEASE_W(m_infoQueue, 0);
 				DX_RELEASE(m_msaaRt, 0);
-#if BX_PLATFORM_WINRT
-				// Remove swap chain from SwapChainPanel (nwh) if applicable
+
 				m_dxgi.removeSwapChain(m_scd);
-#endif
+
 				DX_RELEASE(m_swapChain, 0);
 				DX_RELEASE(m_deviceCtx, 0);
 				DX_RELEASE(m_device, 0);
@@ -1723,10 +1727,9 @@ namespace bgfx { namespace d3d11
 			DX_RELEASE(m_annotation, 1);
 			DX_RELEASE_W(m_infoQueue, 0);
 			DX_RELEASE(m_msaaRt, 0);
-#if BX_PLATFORM_WINRT
-			// Remove swap chain from SwapChainPanel (nwh) if applicable
+
 			m_dxgi.removeSwapChain(m_scd);
-#endif
+
 			DX_RELEASE(m_swapChain, 0);
 			DX_RELEASE(m_deviceCtx, 0);
 			DX_RELEASE(m_device, 0);
@@ -1914,12 +1917,12 @@ namespace bgfx { namespace d3d11
 			release(mem);
 		}
 
-		void overrideInternal(TextureHandle _handle, uintptr_t _ptr) override
+		void overrideInternal(TextureHandle _handle, uintptr_t _ptr, uint16_t _layerIndex) override
 		{
 			// Resource ref. counts might be messed up outside of bgfx.
 			// Disabling ref. count check once texture is overridden.
 			setGraphicsDebuggerPresent(true);
-			m_textures[_handle.idx].overrideInternal(_ptr);
+			m_textures[_handle.idx].overrideInternal(_ptr, _layerIndex);
 		}
 
 		uintptr_t getInternal(TextureHandle _handle) override
@@ -2410,7 +2413,7 @@ namespace bgfx { namespace d3d11
 #if BX_PLATFORM_WINRT
 			// SwapChainPanels can be dynamically updated
 			if (m_scd.ndt == reinterpret_cast<void*>(2)
-				&& (m_scd.nwh != g_platformData.nwh || m_scd.ndt != g_platformData.ndt))
+			&& (m_scd.nwh != g_platformData.nwh || m_scd.ndt != g_platformData.ndt) )
 			{
 				// Remove swap chain from SwapChainPanel (nwh) if applicable
 				m_dxgi.removeSwapChain(m_scd);
@@ -2526,10 +2529,8 @@ namespace bgfx { namespace d3d11
 						updateMsaa(m_scd.format);
 						m_scd.sampleDesc = s_msaa[(m_resolution.reset&BGFX_RESET_MSAA_MASK)>>BGFX_RESET_MSAA_SHIFT];
 
-#if BX_PLATFORM_WINRT
-						// Remove swap chain from SwapChainPanel (nwh) if applicable
 						m_dxgi.removeSwapChain(m_scd);
-#endif
+
 						DX_RELEASE(m_swapChain, 0);
 						HRESULT hr = m_dxgi.createSwapChain(m_device
 							, m_scd
@@ -4754,17 +4755,35 @@ namespace bgfx { namespace d3d11
 		}
 	}
 
-	void TextureD3D11::overrideInternal(uintptr_t _ptr)
+	void TextureD3D11::overrideInternal(uintptr_t _ptr, uint16_t _layerIndex)
 	{
 		D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc{};
 
-		const bool readable = (m_srv != NULL);
+		const bool readable = NULL != m_srv;
+
 		if (readable)
 		{
 			m_srv->GetDesc(&srvDesc);
 		}
 
+		switch (srvDesc.ViewDimension)
+		{
+		case D3D11_SRV_DIMENSION_TEXTURE2DARRAY:
+			srvDesc.Texture2DArray.FirstArraySlice = _layerIndex;
+			srvDesc.Texture2DArray.ArraySize = 1;
+			break;
+
+		case D3D11_SRV_DIMENSION_TEXTURE2DMSARRAY:
+			srvDesc.Texture2DMSArray.FirstArraySlice = _layerIndex;
+			srvDesc.Texture2DMSArray.ArraySize = 1;
+			break;
+
+		default:
+			break;
+		}
+
 		destroy();
+
 		m_flags |= BGFX_SAMPLER_INTERNAL_SHARED;
 		m_ptr = (ID3D11Resource*)_ptr;
 

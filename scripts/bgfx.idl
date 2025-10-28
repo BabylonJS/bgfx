@@ -1,7 +1,7 @@
 -- vim: syntax=lua
 -- bgfx interface
 
-version(129)
+version(130)
 
 typedef "bool"
 typedef "char"
@@ -1954,6 +1954,7 @@ func.destroy { cname = "destroy_frame_buffer" }
 ---      - `u_model mat4[BGFX_CONFIG_MAX_BONES]` - array of model matrices.
 ---      - `u_modelView mat4` - concatenated model view matrix, only first
 ---        model matrix from array is used.
+---      - `u_invModelView mat4` - inverted concatenated model view matrix.
 ---      - `u_modelViewProj mat4` - concatenated model view projection matrix.
 ---      - `u_alphaRef float` - alpha reference value for alpha test.
 ---
@@ -2700,10 +2701,12 @@ func.getInternalData
 --- @warning Must be called only on render thread.
 ---
 func.overrideInternal { cname = "override_internal_texture_ptr" }
-	"uintptr_t"             --- Native API pointer to texture. If result is 0, texture is not created
-	                        --- yet from the main thread.
-	.handle "TextureHandle" --- Texture handle.
-	.ptr    "uintptr_t"     --- Native API pointer to texture.
+	"uintptr_t"                  --- Native API pointer to texture. If result is 0, texture is not created
+	                             --- yet from the main thread.
+	.handle      "TextureHandle" --- Texture handle.
+	.ptr         "uintptr_t"     --- Native API pointer to texture.
+	.layerIndex  "uint16_t"      --- Layer index for texture arrays (only implemented for D3D11).
+	{ default = 0 }
 
 --- Override internal texture by creating new texture. Previously created
 --- internal texture will released.

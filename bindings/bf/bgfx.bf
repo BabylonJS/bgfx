@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2024 Branimir Karadzic. All rights reserved.
+ * Copyright 2011-2025 Branimir Karadzic. All rights reserved.
  * License: https://github.com/bkaradzic/bgfx/blob/master/LICENSE
  */
 
@@ -2282,8 +2282,8 @@ public static class bgfx
 		public uint16 numVertexLayouts;
 		public int64 textureMemoryUsed;
 		public int64 rtMemoryUsed;
-		public int transientVbUsed;
-		public int transientIbUsed;
+		public int32 transientVbUsed;
+		public int32 transientIbUsed;
 		public uint32[5] numPrims;
 		public int64 gpuMemoryMax;
 		public int64 gpuMemoryUsed;
@@ -2761,7 +2761,7 @@ public static class bgfx
 	/// <param name="_len">Static index buffer name length (if length is INT32_MAX, it's expected that _name is zero terminated string.</param>
 	///
 	[LinkName("bgfx_set_index_buffer_name")]
-	public static extern void set_index_buffer_name(IndexBufferHandle _handle, char8* _name, int _len);
+	public static extern void set_index_buffer_name(IndexBufferHandle _handle, char8* _name, int32 _len);
 	
 	/// <summary>
 	/// Destroy static index buffer.
@@ -2810,7 +2810,7 @@ public static class bgfx
 	/// <param name="_len">Static vertex buffer name length (if length is INT32_MAX, it's expected that _name is zero terminated string.</param>
 	///
 	[LinkName("bgfx_set_vertex_buffer_name")]
-	public static extern void set_vertex_buffer_name(VertexBufferHandle _handle, char8* _name, int _len);
+	public static extern void set_vertex_buffer_name(VertexBufferHandle _handle, char8* _name, int32 _len);
 	
 	/// <summary>
 	/// Destroy static vertex buffer.
@@ -3033,7 +3033,7 @@ public static class bgfx
 	/// <param name="_len">Shader name length (if length is INT32_MAX, it's expected that _name is zero terminated string).</param>
 	///
 	[LinkName("bgfx_set_shader_name")]
-	public static extern void set_shader_name(ShaderHandle _handle, char8* _name, int _len);
+	public static extern void set_shader_name(ShaderHandle _handle, char8* _name, int32 _len);
 	
 	/// <summary>
 	/// Destroy shader.
@@ -3262,7 +3262,7 @@ public static class bgfx
 	/// <param name="_len">Texture name length (if length is INT32_MAX, it's expected that _name is zero terminated string.</param>
 	///
 	[LinkName("bgfx_set_texture_name")]
-	public static extern void set_texture_name(TextureHandle _handle, char8* _name, int _len);
+	public static extern void set_texture_name(TextureHandle _handle, char8* _name, int32 _len);
 	
 	/// <summary>
 	/// Returns texture direct access pointer.
@@ -3356,7 +3356,7 @@ public static class bgfx
 	/// <param name="_len">Frame buffer name length (if length is INT32_MAX, it's expected that _name is zero terminated string.</param>
 	///
 	[LinkName("bgfx_set_frame_buffer_name")]
-	public static extern void set_frame_buffer_name(FrameBufferHandle _handle, char8* _name, int _len);
+	public static extern void set_frame_buffer_name(FrameBufferHandle _handle, char8* _name, int32 _len);
 	
 	/// <summary>
 	/// Obtain texture handle of frame buffer attachment.
@@ -3398,6 +3398,7 @@ public static class bgfx
 	///      - `u_model mat4[BGFX_CONFIG_MAX_BONES]` - array of model matrices.
 	///      - `u_modelView mat4` - concatenated model view matrix, only first
 	///        model matrix from array is used.
+	///      - `u_invModelView mat4` - inverted concatenated model view matrix.
 	///      - `u_modelViewProj mat4` - concatenated model view projection matrix.
 	///      - `u_alphaRef float` - alpha reference value for alpha test.
 	/// </summary>
@@ -3443,7 +3444,7 @@ public static class bgfx
 	/// <param name="_result">Number of pixels that passed test. This argument can be `NULL` if result of occlusion query is not needed.</param>
 	///
 	[LinkName("bgfx_get_result")]
-	public static extern OcclusionQueryResult get_result(OcclusionQueryHandle _handle, int* _result);
+	public static extern OcclusionQueryResult get_result(OcclusionQueryHandle _handle, int32* _result);
 	
 	/// <summary>
 	/// Destroy occlusion query.
@@ -3503,7 +3504,7 @@ public static class bgfx
 	/// <param name="_len">View name length (if length is INT32_MAX, it's expected that _name is zero terminated string.</param>
 	///
 	[LinkName("bgfx_set_view_name")]
-	public static extern void set_view_name(ViewId _id, char8* _name, int _len);
+	public static extern void set_view_name(ViewId _id, char8* _name, int32 _len);
 	
 	/// <summary>
 	/// Set view rectangle. Draw primitive outside view will be clipped.
@@ -3660,7 +3661,7 @@ public static class bgfx
 	/// <param name="_len">Marker name length (if length is INT32_MAX, it's expected that _name is zero terminated string.</param>
 	///
 	[LinkName("bgfx_encoder_set_marker")]
-	public static extern void encoder_set_marker(Encoder* _this, char8* _name, int _len);
+	public static extern void encoder_set_marker(Encoder* _this, char8* _name, int32 _len);
 	
 	/// <summary>
 	/// Set render states for draw primitive.
@@ -4164,7 +4165,7 @@ public static class bgfx
 	/// <param name="_msecs">Timeout in milliseconds.</param>
 	///
 	[LinkName("bgfx_render_frame")]
-	public static extern RenderFrame render_frame(int _msecs);
+	public static extern RenderFrame render_frame(int32 _msecs);
 	
 	/// <summary>
 	/// Set platform data.
@@ -4196,9 +4197,10 @@ public static class bgfx
 	///
 	/// <param name="_handle">Texture handle.</param>
 	/// <param name="_ptr">Native API pointer to texture.</param>
+	/// <param name="_layerIndex">Layer index for texture arrays (only implemented for D3D11).</param>
 	///
 	[LinkName("bgfx_override_internal_texture_ptr")]
-	public static extern void* override_internal_texture_ptr(TextureHandle _handle, void* _ptr);
+	public static extern void* override_internal_texture_ptr(TextureHandle _handle, void* _ptr, uint16 _layerIndex);
 	
 	/// <summary>
 	/// Override internal texture by creating new texture. Previously created
@@ -4229,7 +4231,7 @@ public static class bgfx
 	/// <param name="_len">Marker name length (if length is INT32_MAX, it's expected that _name is zero terminated string.</param>
 	///
 	[LinkName("bgfx_set_marker")]
-	public static extern void set_marker(char8* _name, int _len);
+	public static extern void set_marker(char8* _name, int32 _len);
 	
 	/// <summary>
 	/// Set render states for draw primitive.

@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2024 Branimir Karadzic. All rights reserved.
+ * Copyright 2011-2025 Branimir Karadzic. All rights reserved.
  * License: https://github.com/bkaradzic/bgfx/blob/master/LICENSE
  */
 
@@ -3353,6 +3353,7 @@ public static partial class bgfx
 	///      - `u_model mat4[BGFX_CONFIG_MAX_BONES]` - array of model matrices.
 	///      - `u_modelView mat4` - concatenated model view matrix, only first
 	///        model matrix from array is used.
+	///      - `u_invModelView mat4` - inverted concatenated model view matrix.
 	///      - `u_modelViewProj mat4` - concatenated model view projection matrix.
 	///      - `u_alphaRef float` - alpha reference value for alpha test.
 	/// </summary>
@@ -4151,9 +4152,10 @@ public static partial class bgfx
 	///
 	/// <param name="_handle">Texture handle.</param>
 	/// <param name="_ptr">Native API pointer to texture.</param>
+	/// <param name="_layerIndex">Layer index for texture arrays (only implemented for D3D11).</param>
 	///
 	[DllImport(DllName, EntryPoint="bgfx_override_internal_texture_ptr", CallingConvention = CallingConvention.Cdecl)]
-	public static extern unsafe UIntPtr override_internal_texture_ptr(TextureHandle _handle, UIntPtr _ptr);
+	public static extern unsafe UIntPtr override_internal_texture_ptr(TextureHandle _handle, UIntPtr _ptr, ushort _layerIndex);
 	
 	/// <summary>
 	/// Override internal texture by creating new texture. Previously created

@@ -7,6 +7,7 @@
 #define IMGUI_H_HEADER_GUARD
 
 #include <bgfx/bgfx.h>
+#include <bx/bx.h>
 #include <dear-imgui/imgui.h>
 #include <iconfontheaders/icons_kenney.h>
 #include <iconfontheaders/icons_font_awesome.h>
@@ -41,14 +42,26 @@ namespace ImGui
 #define IMGUI_FLAGS_NONE        UINT8_C(0x00)
 #define IMGUI_FLAGS_ALPHA_BLEND UINT8_C(0x01)
 
+	struct TextureBgfx
+	{
+		bgfx::TextureHandle handle;
+		uint8_t  flags;
+		uint8_t  mip;
+		uint32_t unused;
+	};
+
 	///
 	inline ImTextureID toId(bgfx::TextureHandle _handle, uint8_t _flags, uint8_t _mip)
 	{
-		union { struct { bgfx::TextureHandle handle; uint8_t flags; uint8_t mip; } s; ImTextureID id; } tex;
-		tex.s.handle = _handle;
-		tex.s.flags  = _flags;
-		tex.s.mip    = _mip;
-		return tex.id;
+		TextureBgfx tex
+		{
+			.handle = _handle,
+			.flags  = _flags,
+			.mip    = _mip,
+			.unused = 0,
+		};
+
+		return bx::bitCast<ImTextureID>(tex);
 	}
 
 	// Helper function for passing bgfx::TextureHandle to ImGui::Image.
@@ -62,7 +75,7 @@ namespace ImGui
 		, const ImVec4& _borderCol = ImVec4(0.0f, 0.0f, 0.0f, 0.0f)
 		)
 	{
-		Image(toId(_handle, _flags, _mip), _size, _uv0, _uv1, _tintCol, _borderCol);
+		ImageWithBg(toId(_handle, _flags, _mip), _size, _uv0, _uv1, _borderCol, _tintCol);
 	}
 
 	// Helper function for passing bgfx::TextureHandle to ImGui::Image.
@@ -119,12 +132,6 @@ namespace ImGui
 //			|| ImGuizmo::IsOver()
 			;
 	}
-
-	///
-	void PushEnabled(bool _enabled);
-
-	///
-	void PopEnabled();
 
 } // namespace ImGui
 

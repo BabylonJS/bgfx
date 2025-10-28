@@ -43,8 +43,6 @@ project "spirv-opt"
 		path.join(SPIRV_TOOLS, "source/disassemble.cpp"),
 		path.join(SPIRV_TOOLS, "source/disassemble.h"),
 		path.join(SPIRV_TOOLS, "source/enum_set.h"),
-		path.join(SPIRV_TOOLS, "source/enum_string_mapping.cpp"),
-		path.join(SPIRV_TOOLS, "source/enum_string_mapping.h"),
 		path.join(SPIRV_TOOLS, "source/ext_inst.cpp"),
 		path.join(SPIRV_TOOLS, "source/ext_inst.h"),
 		path.join(SPIRV_TOOLS, "source/extensions.cpp"),
@@ -78,6 +76,8 @@ project "spirv-opt"
 		path.join(SPIRV_TOOLS, "source/spirv_validator_options.h"),
 		path.join(SPIRV_TOOLS, "source/table.cpp"),
 		path.join(SPIRV_TOOLS, "source/table.h"),
+		path.join(SPIRV_TOOLS, "source/table2.cpp"),
+		path.join(SPIRV_TOOLS, "source/table2.h"),
 		path.join(SPIRV_TOOLS, "source/text.cpp"),
 		path.join(SPIRV_TOOLS, "source/text.h"),
 		path.join(SPIRV_TOOLS, "source/text_handler.cpp"),
@@ -448,6 +448,10 @@ project "glsl-optimizer"
 		path.join(GLSL_OPTIMIZER, "src/glsl/ir_set_program_inouts.cpp"),
 		path.join(GLSL_OPTIMIZER, "src/glsl/main.cpp"),
 		path.join(GLSL_OPTIMIZER, "src/glsl/builtin_stubs.cpp"),
+	}
+
+	removeflags {
+		"FloatFast",	-- clang 17 has issues errors originating in glsl-optimizer when float optimizations are enabled
 	}
 
 	configuration { "Release" }

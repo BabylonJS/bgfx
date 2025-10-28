@@ -76,13 +76,16 @@ newaction {
 
 			local dgen = require "bindings-d"
 			dgen.write(dgen.gen(), "../bindings/d/package.d")
-			dgen.write(dgen.fakeEnumFile, "../bindings/d/fakeenum.d")
+			dgen.write(dgen.implFile, "../bindings/d/impl.d")
 
 			local csgen = require "bindings-bf"
 			csgen.write(csgen.gen(), "../bindings/bf/bgfx.bf")
 
 			local ziggen = require "bindings-zig"
 			ziggen.write(ziggen.gen(), "../bindings/zig/bgfx.zig")
+
+			local c3gen = require "bindings-c3"
+			c3gen.write(c3gen.gen(), "../bindings/c3/bgfx.c3")
 		end
 
 		os.exit()

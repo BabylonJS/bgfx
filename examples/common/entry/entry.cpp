@@ -34,9 +34,7 @@ namespace entry
 	extern bx::AllocatorI* getDefaultAllocator();
 	bx::AllocatorI* g_allocator = getDefaultAllocator();
 
-	typedef bx::StringT<&g_allocator> String;
-
-	static String s_currentDir;
+	static bx::FilePath s_currentDir;
 
 	class FileReader : public bx::FileReader
 	{
@@ -45,9 +43,9 @@ namespace entry
 	public:
 		virtual bool open(const bx::FilePath& _filePath, bx::Error* _err) override
 		{
-			String filePath(s_currentDir);
-			filePath.append(_filePath);
-			return super::open(filePath.getPtr(), _err);
+			bx::FilePath filePath(s_currentDir);
+			filePath.join(_filePath);
+			return super::open(filePath.getCPtr(), _err);
 		}
 	};
 
@@ -58,9 +56,9 @@ namespace entry
 	public:
 		virtual bool open(const bx::FilePath& _filePath, bool _append, bx::Error* _err) override
 		{
-			String filePath(s_currentDir);
-			filePath.append(_filePath);
-			return super::open(filePath.getPtr(), _append, _err);
+			bx::FilePath filePath(s_currentDir);
+			filePath.join(_filePath);
+			return super::open(filePath.getCPtr(), _append, _err);
 		}
 	};
 
@@ -595,6 +593,7 @@ BX_PRAGMA_DIAGNOSTIC_POP();
 	int main(int _argc, const char* const* _argv)
 	{
 		//DBG(BX_COMPILER_NAME " / " BX_CPU_NAME " / " BX_ARCH_NAME " / " BX_PLATFORM_NAME);
+		bx::installExceptionHandler();
 
 		s_fileReader = BX_NEW(g_allocator, FileReader);
 		s_fileWriter = BX_NEW(g_allocator, FileWriter);
@@ -801,7 +800,7 @@ restart:
 		&&  needReset)
 		{
 			_reset = s_reset;
-			BX_TRACE("bgfx::reset(%d, %d, 0x%x)", _width, _height, _reset)
+			BX_TRACE("bgfx::reset(%d, %d, 0x%x)", _width, _height, _reset);
 			bgfx::reset(_width, _height, _reset);
 			inputSetMouseResolution(uint16_t(_width), uint16_t(_height) );
 		}
@@ -852,7 +851,7 @@ restart:
 			if (NULL != ev)
 			{
 				handle = ev->m_handle;
-				WindowState& win = s_window[handle.idx];
+				WindowState& win = s_window[isValid(handle) ? handle.idx : 0];
 
 				switch (ev->m_type)
 				{
@@ -981,7 +980,7 @@ restart:
 		if (needReset)
 		{
 			_reset = s_reset;
-			BX_TRACE("bgfx::reset(%d, %d, 0x%x)", s_window[0].m_width, s_window[0].m_height, _reset)
+			BX_TRACE("bgfx::reset(%d, %d, 0x%x)", s_window[0].m_width, s_window[0].m_height, _reset);
 			bgfx::reset(s_window[0].m_width, s_window[0].m_height, _reset);
 			inputSetMouseResolution(uint16_t(s_window[0].m_width), uint16_t(s_window[0].m_height) );
 		}

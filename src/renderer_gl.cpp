@@ -2971,12 +2971,14 @@ namespace bgfx { namespace gl
 					|| s_extension[Extension::EXT_shadow_samplers].m_supported
 					;
 
+				GLint numFormats = 0;
+				GL_CHECK(glGetIntegerv(GL_NUM_PROGRAM_BINARY_FORMATS, &numFormats) );
 				m_programBinarySupport = !BX_ENABLED(BX_PLATFORM_EMSCRIPTEN)
 					&& (m_gles3
 						|| s_extension[Extension::ARB_get_program_binary].m_supported
 						|| s_extension[Extension::OES_get_program_binary].m_supported
 						|| s_extension[Extension::IMG_shader_binary     ].m_supported
-						);
+						) && numFormats > 0;
 
 				m_textureSwizzleSupport = false
 					|| s_extension[Extension::ARB_texture_swizzle].m_supported
@@ -3169,7 +3171,10 @@ namespace bgfx { namespace gl
 
 				m_maxLabelLen = BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES >= 32) || BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGL >= 43) || s_extension[Extension::KHR_debug].m_supported ? uint16_t(glGet(GL_MAX_LABEL_LENGTH) ) : 0;
 
-				setGraphicsDebuggerPresent(s_extension[Extension::EXT_debug_tool].m_supported);
+				setGraphicsDebuggerPresent(false
+					|| s_extension[Extension::EXT_debug_tool].m_supported
+					|| NULL != findModule("Nvda.Graphics.Interception.dll")
+					);
 
 				if (NULL == glObjectLabel)
 				{
@@ -3498,7 +3503,7 @@ namespace bgfx { namespace gl
 			release(mem);
 		}
 
-		void overrideInternal(TextureHandle _handle, uintptr_t _ptr) override
+		void overrideInternal(TextureHandle _handle, uintptr_t _ptr, uint16_t /*_layerIndex*/) override
 		{
 			m_textures[_handle.idx].overrideInternal(_ptr);
 		}
@@ -5316,7 +5321,7 @@ namespace bgfx { namespace gl
 					}
 
 					UniformType::Enum type = convertGlType(gltype);
-					m_constantBuffer->writeUniformHandle(type, 0, info->m_handle, uint16_t(num) );
+					m_constantBuffer->writeUniformHandle(bx::narrowCast<uint8_t>(type), 0, info->m_handle, uint16_t(num) );
 					m_constantBuffer->write(loc);
 					BX_TRACE("store %s %d", name, info->m_handle);
 				}

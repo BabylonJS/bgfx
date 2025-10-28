@@ -1,7 +1,7 @@
 /**
  * cgltf_write - a single-file glTF 2.0 writer written in C99.
  *
- * Version: 1.14
+ * Version: 1.15
  *
  * Website: https://github.com/jkuhlmann/cgltf
  *
@@ -815,7 +815,7 @@ static void cgltf_write_material(cgltf_write_context* context, const cgltf_mater
 		{
 			cgltf_write_line(context, "\"KHR_materials_anisotropy\": {");
 			const cgltf_anisotropy* params = &material->anisotropy;
-			cgltf_write_floatprop(context, "anisotropyFactor", params->anisotropy_strength, 0.f);
+			cgltf_write_floatprop(context, "anisotropyStrength", params->anisotropy_strength, 0.f);
 			cgltf_write_floatprop(context, "anisotropyRotation", params->anisotropy_rotation, 0.f);
 			CGLTF_WRITE_TEXTURE_INFO("anisotropyTexture", params->anisotropy_texture);
 			cgltf_write_line(context, "}");

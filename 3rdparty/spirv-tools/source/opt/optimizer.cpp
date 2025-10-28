@@ -189,7 +189,7 @@ Optimizer& Optimizer::RegisterPerformancePasses(bool preserve_interface) {
       .RegisterPass(CreateLocalSingleBlockLoadStoreElimPass())
       .RegisterPass(CreateLocalSingleStoreElimPass())
       .RegisterPass(CreateAggressiveDCEPass(preserve_interface))
-      .RegisterPass(CreateScalarReplacementPass())
+      .RegisterPass(CreateScalarReplacementPass(0))
       .RegisterPass(CreateLocalAccessChainConvertPass())
       .RegisterPass(CreateLocalSingleBlockLoadStoreElimPass())
       .RegisterPass(CreateLocalSingleStoreElimPass())
@@ -203,7 +203,7 @@ Optimizer& Optimizer::RegisterPerformancePasses(bool preserve_interface) {
       .RegisterPass(CreateRedundancyEliminationPass())
       .RegisterPass(CreateCombineAccessChainsPass())
       .RegisterPass(CreateSimplificationPass())
-      .RegisterPass(CreateScalarReplacementPass())
+      .RegisterPass(CreateScalarReplacementPass(0))
       .RegisterPass(CreateLocalAccessChainConvertPass())
       .RegisterPass(CreateLocalSingleBlockLoadStoreElimPass())
       .RegisterPass(CreateLocalSingleStoreElimPass())
@@ -401,7 +401,7 @@ bool Optimizer::RegisterPassFromFlag(const std::string& flag,
     RegisterPass(CreateLoopUnswitchPass());
   } else if (pass_name == "scalar-replacement") {
     if (pass_args.size() == 0) {
-      RegisterPass(CreateScalarReplacementPass());
+      RegisterPass(CreateScalarReplacementPass(0));
     } else {
       int limit = -1;
       if (pass_args.find_first_not_of("0123456789") == std::string::npos) {
@@ -637,6 +637,12 @@ bool Optimizer::RegisterPassFromFlag(const std::string& flag,
     }
   } else if (pass_name == "trim-capabilities") {
     RegisterPass(CreateTrimCapabilitiesPass());
+  } else if (pass_name == "split-combined-image-sampler") {
+    RegisterPass(CreateSplitCombinedImageSamplerPass());
+  } else if (pass_name == "resolve-binding-conflicts") {
+    RegisterPass(CreateResolveBindingConflictsPass());
+  } else if (pass_name == "canonicalize-ids") {
+    RegisterPass(CreateCanonicalizeIdsPass());
   } else {
     Errorf(consumer(), nullptr, {},
            "Unknown flag '--%s'. Use --help for a list of valid flags",
@@ -1186,6 +1192,21 @@ Optimizer::PassToken CreateModifyMaximalReconvergencePass(bool add) {
 Optimizer::PassToken CreateOpExtInstWithForwardReferenceFixupPass() {
   return MakeUnique<Optimizer::PassToken::Impl>(
       MakeUnique<opt::OpExtInstWithForwardReferenceFixupPass>());
+}
+
+Optimizer::PassToken CreateSplitCombinedImageSamplerPass() {
+  return MakeUnique<Optimizer::PassToken::Impl>(
+      MakeUnique<opt::SplitCombinedImageSamplerPass>());
+}
+
+Optimizer::PassToken CreateResolveBindingConflictsPass() {
+  return MakeUnique<Optimizer::PassToken::Impl>(
+      MakeUnique<opt::ResolveBindingConflictsPass>());
+}
+
+Optimizer::PassToken CreateCanonicalizeIdsPass() {
+  return MakeUnique<Optimizer::PassToken::Impl>(
+      MakeUnique<opt::CanonicalizeIdsPass>());
 }
 
 }  // namespace spvtools
