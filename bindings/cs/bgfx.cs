@@ -2064,8 +2064,9 @@ public static partial class bgfx
 			public uint maxOcclusionQueries;
 			public uint maxEncoders;
 			public uint minResourceCbSize;
-			public uint transientVbSize;
-			public uint transientIbSize;
+			public uint maxTransientVbSize;
+			public uint maxTansientIbSize;
+			public uint minUniformBufferSize;
 		}
 	
 		public RendererType rendererType;
@@ -2098,7 +2099,8 @@ public static partial class bgfx
 	
 	public unsafe struct Resolution
 	{
-		public TextureFormat format;
+		public TextureFormat formatColor;
+		public TextureFormat formatDepthStencil;
 		public uint width;
 		public uint height;
 		public uint reset;
@@ -2113,8 +2115,9 @@ public static partial class bgfx
 		{
 			public ushort maxEncoders;
 			public uint minResourceCbSize;
-			public uint transientVbSize;
-			public uint transientIbSize;
+			public uint maxTransientVbSize;
+			public uint maxTransientIbSize;
+			public uint minUniformBufferSize;
 		}
 	
 		public RendererType type;

@@ -1651,8 +1651,9 @@ namespace bgfx
 		LIMITS(maxOcclusionQueries);
 		LIMITS(maxEncoders);
 		LIMITS(minResourceCbSize);
-		LIMITS(transientVbSize);
-		LIMITS(transientIbSize);
+		LIMITS(maxTransientVbSize);
+		LIMITS(maxTransientIbSize);
+		LIMITS(minUniformBufferSize);
 #undef LIMITS
 
 		BX_TRACE("");
@@ -1712,12 +1713,15 @@ namespace bgfx
 		BX_UNUSED(reset, msaa);
 
 		BX_TRACE("Reset back-buffer swap chain:");
-		BX_TRACE("\t%dx%d, format: %s, numBackBuffers: %d, maxFrameLatency: %d"
+		BX_TRACE("\t%dx%d, formatColor: %s, formatDepthStencil: %s, numBackBuffers: %d, maxFrameLatency: %d"
 			, _resolution.width
 			, _resolution.height
-			, TextureFormat::Count == _resolution.format
+			, TextureFormat::Count == _resolution.formatColor
 				? "*default*"
-				: bimg::getName(bimg::TextureFormat::Enum(_resolution.format) )
+				: bimg::getName(bimg::TextureFormat::Enum(_resolution.formatColor) )
+			, TextureFormat::Count == _resolution.formatDepthStencil
+				? "*default*"
+				: bimg::getName(bimg::TextureFormat::Enum(_resolution.formatDepthStencil) )
 			, _resolution.numBackBuffers
 			, _resolution.maxFrameLatency
 			);
@@ -2015,14 +2019,14 @@ namespace bgfx
 		m_textVideoMemBlitter.init(m_init.resolution.debugTextScale);
 		m_clearQuad.init();
 
-		m_submit->m_transientVb = createTransientVertexBuffer(_init.limits.transientVbSize);
-		m_submit->m_transientIb = createTransientIndexBuffer(_init.limits.transientIbSize);
+		m_submit->m_transientVb = createTransientVertexBuffer(_init.limits.maxTransientVbSize);
+		m_submit->m_transientIb = createTransientIndexBuffer(_init.limits.maxTransientIbSize);
 		frame();
 
 		if (BX_ENABLED(BGFX_CONFIG_MULTITHREADED) )
 		{
-			m_submit->m_transientVb = createTransientVertexBuffer(_init.limits.transientVbSize);
-			m_submit->m_transientIb = createTransientIndexBuffer(_init.limits.transientIbSize);
+			m_submit->m_transientVb = createTransientVertexBuffer(_init.limits.maxTransientVbSize);
+			m_submit->m_transientIb = createTransientIndexBuffer(_init.limits.maxTransientIbSize);
 			frame();
 		}
 
@@ -3496,7 +3500,8 @@ namespace bgfx
 	}
 
 	Resolution::Resolution()
-		: format(TextureFormat::RGBA8)
+		: formatColor(TextureFormat::RGBA8)
+		, formatDepthStencil(TextureFormat::D24S8)
 		, width(1280)
 		, height(720)
 		, reset(BGFX_RESET_NONE)
@@ -3509,8 +3514,9 @@ namespace bgfx
 	Init::Limits::Limits()
 		: maxEncoders(BGFX_CONFIG_DEFAULT_MAX_ENCODERS)
 		, minResourceCbSize(BGFX_CONFIG_MIN_RESOURCE_COMMAND_BUFFER_SIZE)
-		, transientVbSize(BGFX_CONFIG_TRANSIENT_VERTEX_BUFFER_SIZE)
-		, transientIbSize(BGFX_CONFIG_TRANSIENT_INDEX_BUFFER_SIZE)
+		, maxTransientVbSize(BGFX_CONFIG_MAX_TRANSIENT_VERTEX_BUFFER_SIZE)
+		, maxTransientIbSize(BGFX_CONFIG_MAX_TRANSIENT_INDEX_BUFFER_SIZE)
+		, minUniformBufferSize(BGFX_CONFIG_MIN_UNIFORM_BUFFER_SIZE)
 	{
 	}
 
@@ -3604,8 +3610,9 @@ namespace bgfx
 		g_caps.limits.maxFBAttachments        = 1;
 		g_caps.limits.maxEncoders             = init.limits.maxEncoders;
 		g_caps.limits.minResourceCbSize       = init.limits.minResourceCbSize;
-		g_caps.limits.transientVbSize         = init.limits.transientVbSize;
-		g_caps.limits.transientIbSize         = init.limits.transientIbSize;
+		g_caps.limits.maxTransientVbSize      = init.limits.maxTransientVbSize;
+		g_caps.limits.maxTransientIbSize      = init.limits.maxTransientIbSize;
+		g_caps.limits.minUniformBufferSize    = init.limits.minUniformBufferSize;
 
 		g_caps.vendorId = init.vendorId;
 		g_caps.deviceId = init.deviceId;
@@ -4590,13 +4597,13 @@ namespace bgfx
 				++depth;
 
 				BGFX_ERROR_CHECK(
-					// if BGFX_TEXTURE_RT_MSAA_X2 or greater than BGFX_TEXTURE_RT_WRITE_ONLY is required
-					// if BGFX_TEXTURE_RT with no MSSA then WRITE_ONLY is not required.
+					// if BGFX_TEXTURE_RT_MSAA_X2 or greater than either BGFX_TEXTURE_RT_WRITE_ONLY or BGFX_TEXTURE_MSAA_SAMPLE is required
+					// if BGFX_TEXTURE_RT with no MSSA then this is not required.
 					(1 == ((tr.m_flags & BGFX_TEXTURE_RT_MSAA_MASK) >> BGFX_TEXTURE_RT_MSAA_SHIFT))
-					|| (0 != (tr.m_flags & BGFX_TEXTURE_RT_WRITE_ONLY))
+					|| (0 != (tr.m_flags & (BGFX_TEXTURE_RT_WRITE_ONLY | BGFX_TEXTURE_MSAA_SAMPLE)))
 					, _err
 					, BGFX_ERROR_FRAME_BUFFER_VALIDATION
-					, "Frame buffer depth MSAA texture cannot be resolved. It must be created with `BGFX_TEXTURE_RT_WRITE_ONLY` flag."
+					, "Frame buffer depth MSAA texture cannot be resolved. It must be created with either `BGFX_TEXTURE_RT_WRITE_ONLY` or `BGFX_TEXTURE_MSAA_SAMPLE` flag."
 					, "Attachment %d, texture flags 0x%016" PRIx64 "."
 					, ii
 					, tr.m_flags

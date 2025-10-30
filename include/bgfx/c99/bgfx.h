@@ -540,8 +540,9 @@ typedef struct bgfx_caps_limits_s
     uint32_t             maxOcclusionQueries; /** Maximum number of occlusion query handles. */
     uint32_t             maxEncoders;        /** Maximum number of encoder threads.       */
     uint32_t             minResourceCbSize;  /** Minimum resource command buffer size.    */
-    uint32_t             transientVbSize;    /** Maximum transient vertex buffer size.    */
-    uint32_t             transientIbSize;    /** Maximum transient index buffer size.     */
+    uint32_t             maxTransientVbSize; /** Maximum transient vertex buffer size.    */
+    uint32_t             maxTansientIbSize;  /** Maximum transient index buffer size.     */
+    uint32_t             minUniformBufferSize; /** Mimimum uniform buffer size.             */
 
 } bgfx_caps_limits_t;
 
@@ -648,7 +649,8 @@ typedef struct bgfx_platform_data_s
  */
 typedef struct bgfx_resolution_s
 {
-    bgfx_texture_format_t format;            /** Backbuffer format.                       */
+    bgfx_texture_format_t formatColor;       /** Backbuffer color format.                 */
+    bgfx_texture_format_t formatDepthStencil; /** Backbuffer depth/stencil format.         */
     uint32_t             width;              /** Backbuffer width.                        */
     uint32_t             height;             /** Backbuffer height.                       */
     uint32_t             reset;              /** Reset parameters.                        */
@@ -666,8 +668,9 @@ typedef struct bgfx_init_limits_s
 {
     uint16_t             maxEncoders;        /** Maximum number of encoder threads.       */
     uint32_t             minResourceCbSize;  /** Minimum resource command buffer size.    */
-    uint32_t             transientVbSize;    /** Maximum transient vertex buffer size.    */
-    uint32_t             transientIbSize;    /** Maximum transient index buffer size.     */
+    uint32_t             maxTransientVbSize; /** Maximum transient vertex buffer size.    */
+    uint32_t             maxTransientIbSize; /** Maximum transient index buffer size.     */
+    uint32_t             minUniformBufferSize; /** Mimimum uniform buffer size.             */
 
 } bgfx_init_limits_t;
 
