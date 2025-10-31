@@ -367,8 +367,7 @@ namespace bgfx
 		Memory* mem = const_cast<Memory*>(alloc(size) );
 
 		bx::StaticMemoryBlockWriter writer(mem->data, mem->size);
-		uint32_t magic = BGFX_CHUNK_MAGIC_TEX;
-		bx::write(&writer, magic, bx::ErrorAssert{});
+		bx::write(&writer, kChunkMagicTex, bx::ErrorAssert{});
 
 		TextureCreate tc;
 		tc.m_width     = _width;
@@ -895,7 +894,7 @@ namespace bgfx
 				if (isValid(m_program[ii]) )
 				{
 					destroy(m_program[ii]);
-					m_program[ii].idx = kInvalidHandle;
+					m_program[ii] = BGFX_INVALID_HANDLE;
 				}
 			}
 
@@ -3199,7 +3198,7 @@ namespace bgfx
 					uint32_t magic;
 					bx::read(&reader, magic, &err);
 
-					if (BGFX_CHUNK_MAGIC_TEX == magic)
+					if (kChunkMagicTex == magic)
 					{
 						TextureCreate tc;
 						bx::read(&reader, tc, &err);
@@ -4937,8 +4936,7 @@ namespace bgfx
 		const Memory* mem = alloc(size);
 
 		bx::StaticMemoryBlockWriter writer(mem->data, mem->size);
-		uint32_t magic = BGFX_CHUNK_MAGIC_TEX;
-		bx::write(&writer, magic, bx::ErrorAssert{});
+		bx::write(&writer, kChunkMagicTex, bx::ErrorAssert{});
 
 		TextureCreate tc;
 		tc.m_width     = _width;
@@ -4994,8 +4992,7 @@ namespace bgfx
 		const Memory* mem = alloc(size);
 
 		bx::StaticMemoryBlockWriter writer(mem->data, mem->size);
-		uint32_t magic = BGFX_CHUNK_MAGIC_TEX;
-		bx::write(&writer, magic, bx::ErrorAssert{});
+		bx::write(&writer, kChunkMagicTex, bx::ErrorAssert{});
 
 		TextureCreate tc;
 		tc.m_width     = _width;
@@ -5040,8 +5037,7 @@ namespace bgfx
 		const Memory* mem = alloc(size);
 
 		bx::StaticMemoryBlockWriter writer(mem->data, mem->size);
-		uint32_t magic = BGFX_CHUNK_MAGIC_TEX;
-		bx::write(&writer, magic, bx::ErrorAssert{});
+		bx::write(&writer, kChunkMagicTex, bx::ErrorAssert{});
 
 		TextureCreate tc;
 		tc.m_width     = _size;

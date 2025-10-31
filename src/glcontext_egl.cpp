@@ -55,6 +55,7 @@ namespace bgfx { namespace gl
 	typedef EGLBoolean  (EGLAPIENTRY* PFNEGLSWAPINTERVALPROC)(EGLDisplay dpy, EGLint interval);
 	typedef EGLBoolean  (EGLAPIENTRY* PFNEGLTERMINATEPROC)(EGLDisplay dpy);
 	typedef const char* (EGLAPIENTRY* PGNEGLQUERYSTRINGPROC)(EGLDisplay dpy, EGLint name);
+	typedef EGLBoolean  (EGLAPIENTRY* PFNEGLGETCONFIGATTRIBPROC)(EGLDisplay dpy, EGLConfig config, EGLint attribute, EGLint *value);
 
 #define EGL_IMPORT                                                            \
 	EGL_IMPORT_FUNC(PGNEGLBINDAPIPROC,              eglBindAPI);              \
@@ -76,6 +77,7 @@ namespace bgfx { namespace gl
 	EGL_IMPORT_FUNC(PFNEGLSWAPINTERVALPROC,         eglSwapInterval);         \
 	EGL_IMPORT_FUNC(PFNEGLTERMINATEPROC,            eglTerminate);            \
 	EGL_IMPORT_FUNC(PGNEGLQUERYSTRINGPROC,          eglQueryString);          \
+	EGL_IMPORT_FUNC(PFNEGLGETCONFIGATTRIBPROC,      eglGetConfigAttrib);      \
 
 #define EGL_IMPORT_FUNC(_proto, _func) _proto _func
 EGL_IMPORT
@@ -319,42 +321,78 @@ WL_EGL_IMPORT
 				;
 
 			const uint32_t msaa = (_resolution.reset & BGFX_RESET_MSAA_MASK)>>BGFX_RESET_MSAA_SHIFT;
-			const uint32_t msaaSamples = msaa == 0 ? 0 : 1<<msaa;
-			m_msaaContext = true;
+			uint32_t msaaSamples = 0 == msaa ? 0 : 1<<msaa;
 
 			const bool headless = EGLNativeWindowType(0) == nwh;
 
 			const bimg::ImageBlockInfo& colorBlockInfo       = bimg::getBlockInfo(bimg::TextureFormat::Enum(_resolution.formatColor) );
 			const bimg::ImageBlockInfo& depthStecilBlockInfo = bimg::getBlockInfo(bimg::TextureFormat::Enum(_resolution.formatDepthStencil) );
 
-			EGLint attrs[] =
-			{
-				EGL_RENDERABLE_TYPE, !!BGFX_CONFIG_RENDERER_OPENGL
-					? EGL_OPENGL_BIT
-					: (glVersion >= 30) ? EGL_OPENGL_ES3_BIT_KHR : EGL_OPENGL_ES2_BIT
-					,
-
-				EGL_SURFACE_TYPE, headless ? EGL_PBUFFER_BIT : EGL_WINDOW_BIT,
-
-				EGL_BLUE_SIZE,    colorBlockInfo.bBits,
-				EGL_GREEN_SIZE,   colorBlockInfo.gBits,
-				EGL_RED_SIZE,     colorBlockInfo.rBits,
-				EGL_ALPHA_SIZE,   colorBlockInfo.aBits,
-				EGL_DEPTH_SIZE,   depthStecilBlockInfo.depthBits,
-				EGL_STENCIL_SIZE, depthStecilBlockInfo.stencilBits,
-
-				EGL_SAMPLES, (EGLint)msaaSamples,
-
-				// Android Recordable surface
-				hasEglAndroidRecordable ? EGL_RECORDABLE_ANDROID : EGL_NONE,
-				hasEglAndroidRecordable ? 1                      : EGL_NONE,
-
-				EGL_NONE
-			};
-
 			EGLint numConfig = 0;
-			success = eglChooseConfig(m_display, attrs, &m_config, 1, &numConfig);
-			BGFX_FATAL(success, Fatal::UnableToInitialize, "eglChooseConfig");
+
+			for (uint32_t retry = 0; retry < 2; ++retry)
+			{
+				EGLint attrs[16*2 + 1];
+				uint32_t numAttrs = 0;
+
+				attrs[numAttrs++] = EGL_RENDERABLE_TYPE;
+				attrs[numAttrs++] = !!BGFX_CONFIG_RENDERER_OPENGL
+						? EGL_OPENGL_BIT
+						: (glVersion >= 30) ? EGL_OPENGL_ES3_BIT_KHR : EGL_OPENGL_ES2_BIT
+						;
+
+				attrs[numAttrs++] = EGL_SURFACE_TYPE;
+				attrs[numAttrs++] = headless ? EGL_PBUFFER_BIT : EGL_WINDOW_BIT;
+
+				attrs[numAttrs++] = EGL_BLUE_SIZE;
+				attrs[numAttrs++] = colorBlockInfo.bBits;
+
+				attrs[numAttrs++] = EGL_GREEN_SIZE;
+				attrs[numAttrs++] = colorBlockInfo.gBits;
+
+				attrs[numAttrs++] = EGL_RED_SIZE;
+				attrs[numAttrs++] = colorBlockInfo.rBits;
+
+				attrs[numAttrs++] = EGL_ALPHA_SIZE;
+				attrs[numAttrs++] = colorBlockInfo.aBits;
+
+				attrs[numAttrs++] = EGL_DEPTH_SIZE;
+				attrs[numAttrs++] = depthStecilBlockInfo.depthBits;
+
+				attrs[numAttrs++] = EGL_STENCIL_SIZE;
+				attrs[numAttrs++] = depthStecilBlockInfo.stencilBits;
+
+				attrs[numAttrs++] = EGL_SAMPLES;
+				attrs[numAttrs++] = (EGLint)msaaSamples;
+
+				if (hasEglAndroidRecordable)
+				{
+					attrs[numAttrs++] = EGL_RECORDABLE_ANDROID;
+					attrs[numAttrs++] = 1;
+				}
+
+				attrs[numAttrs++] = EGL_NONE;
+
+				BX_ASSERT(numAttrs < BX_COUNTOF(attrs), "Out-of-bounds (numAttrs %d, max %d)."
+					, numAttrs
+					, BX_COUNTOF(attrs)
+					);
+
+				success = eglChooseConfig(m_display, attrs, &m_config, 1, &numConfig);
+
+				if (!success
+				||  0 == numConfig)
+				{
+					msaaSamples = 0;
+					continue;
+				}
+
+				break;
+			}
+
+			BGFX_FATAL(0 != numConfig, Fatal::UnableToInitialize, "eglChooseConfig");
+
+			m_msaaContext = 1 < msaaSamples;
 
 #	if BX_PLATFORM_ANDROID
 			EGLint format;
@@ -427,6 +465,7 @@ WL_EGL_IMPORT
 					nwh = (EGLNativeWindowType) m_eglWindow;
 				}
 #	endif // BX_PLATFORM_LINUX
+
 				m_surface = eglCreateWindowSurface(m_display, m_config, nwh, NULL);
 			}
 

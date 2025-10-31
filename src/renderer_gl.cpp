@@ -2282,7 +2282,7 @@ namespace bgfx { namespace gl
 				m_renderdocdll = loadRenderDoc();
 			}
 
-			m_fbh.idx = kInvalidHandle;
+			m_fbh = BGFX_INVALID_HANDLE;
 			bx::memSet(m_uniforms, 0, sizeof(m_uniforms) );
 			bx::memSet(&m_resolution, 0, sizeof(m_resolution) );
 
@@ -3483,8 +3483,7 @@ namespace bgfx { namespace gl
 			const Memory* mem = alloc(size);
 
 			bx::StaticMemoryBlockWriter writer(mem->data, mem->size);
-			uint32_t magic = BGFX_CHUNK_MAGIC_TEX;
-			bx::write(&writer, magic, bx::ErrorAssert{});
+			bx::write(&writer, kChunkMagicTex, bx::ErrorAssert{});
 
 			TextureCreate tc;
 			tc.m_width     = _width;
@@ -3980,8 +3979,8 @@ namespace bgfx { namespace gl
 							}
 						)";
 
-						const GLchar *const vs = msaa_blit_vs;
-						const GLchar *const fs = msaa_blit_fs;
+						const GLchar* vs = msaa_blit_vs;
+						const GLchar* fs = msaa_blit_fs;
 
 						GLuint shader_vs = glCreateShader(GL_VERTEX_SHADER);
 						{
@@ -4608,7 +4607,7 @@ namespace bgfx { namespace gl
 				program.bindAttributes(layout, 0);
 				program.bindAttributesEnd();
 
-				if (m_clearQuadColor.idx == kInvalidHandle)
+				if (!isValid(m_clearQuadColor) )
 				{
 					const UniformRegInfo* infoClearColor = m_uniformReg.find("bgfx_clear_color");
 					if (NULL != infoClearColor)
@@ -4617,7 +4616,7 @@ namespace bgfx { namespace gl
 					}
 				}
 
-				if (m_clearQuadDepth.idx == kInvalidHandle)
+				if (!isValid(m_clearQuadDepth) )
 				{
 					const UniformRegInfo* infoClearDepth = m_uniformReg.find("bgfx_clear_depth");
 					if (NULL != infoClearDepth)
@@ -7762,7 +7761,7 @@ namespace bgfx { namespace gl
 							{
 								if (isValid(currentState.m_indirectBuffer) )
 								{
-									currentState.m_indirectBuffer.idx = kInvalidHandle;
+									currentState.m_indirectBuffer = BGFX_INVALID_HANDLE;
 									GL_CHECK(glBindBuffer(GL_DISPATCH_INDIRECT_BUFFER, 0) );
 								}
 
@@ -8475,12 +8474,12 @@ namespace bgfx { namespace gl
 						{
 							if (isValid(currentState.m_indirectBuffer) )
 							{
-								currentState.m_indirectBuffer.idx = kInvalidHandle;
+								currentState.m_indirectBuffer = BGFX_INVALID_HANDLE;
 								GL_CHECK(glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0) );
 
 								if (isValid(currentState.m_numIndirectBuffer) )
 								{
-									currentState.m_numIndirectBuffer.idx = kInvalidHandle;
+									currentState.m_numIndirectBuffer = BGFX_INVALID_HANDLE;
 									GL_CHECK(glBindBuffer(GL_PARAMETER_BUFFER_ARB, 0) );
 								}
 							}
