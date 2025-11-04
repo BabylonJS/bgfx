@@ -841,7 +841,7 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 
 			if (NULL == m_mainFrameBuffer.m_swapChain->m_metalLayer)
 			{
-				MTL_RELEASE(m_device, 0);
+				MTL_RELEASE_W(m_device, 0);
 				return false;
 			}
 
@@ -3775,7 +3775,10 @@ BX_PRAGMA_DIAGNOSTIC_POP();
 		m_denseIdx  = _denseIdx;
 
 		m_swapChain->init(_nwh);
-		resizeSwapChain(_width, _height, _format, _depthFormat);
+		if (_width > 0 && _height > 0)
+		{
+			resizeSwapChain(_width, _height, _format, _depthFormat);
+		}
 	}
 
 	void FrameBufferMtl::postReset()
