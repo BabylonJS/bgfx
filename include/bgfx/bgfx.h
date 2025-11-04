@@ -412,16 +412,16 @@ namespace bgfx
 
 	struct NativeWindowHandleType
 	{
-		 enum Enum
-		 {
-		       Default = 0, //!< Platform default handle type (X11 on Linux).
-		       Wayland,     //!< Wayland.
+		enum Enum
+		{
+			Default = 0, //!< Platform default handle type (X11 on Linux).
+			Wayland,     //!< Wayland.
 
-		       Count
-		 };
+			Count
+		};
 	};
 
-	static const uint16_t kInvalidHandle = UINT16_MAX;
+	constexpr uint16_t kInvalidHandle = UINT16_MAX;
 
 	BGFX_HANDLE(DynamicIndexBufferHandle)
 	BGFX_HANDLE(DynamicVertexBufferHandle)
@@ -660,13 +660,14 @@ namespace bgfx
 	{
 		Resolution();
 
-		TextureFormat::Enum format; //!< Backbuffer format.
-		uint32_t width;             //!< Backbuffer width.
-		uint32_t height;            //!< Backbuffer height.
-		uint32_t reset;             //!< Reset parameters.
-		uint8_t  numBackBuffers;    //!< Number of back buffers.
-		uint8_t  maxFrameLatency;   //!< Maximum frame latency.
-		uint8_t  debugTextScale;    //!< Scale factor for debug text.
+		TextureFormat::Enum formatColor;        //!< Backbuffer color format.
+		TextureFormat::Enum formatDepthStencil; //!< Backbuffer depth/stencil format.
+		uint32_t width;                         //!< Backbuffer width.
+		uint32_t height;                        //!< Backbuffer height.
+		uint32_t reset;                         //!< Reset parameters.
+		uint8_t  numBackBuffers;                //!< Number of back buffers.
+		uint8_t  maxFrameLatency;               //!< Maximum frame latency.
+		uint8_t  debugTextScale;                //!< Scale factor for debug text.
 	};
 
 	/// Initialization parameters used by `bgfx::init`.
@@ -716,10 +717,11 @@ namespace bgfx
 		{
 			Limits();
 
-			uint16_t maxEncoders;       //!< Maximum number of encoder threads.
-			uint32_t minResourceCbSize; //!< Minimum resource command buffer size.
-			uint32_t transientVbSize;   //!< Maximum transient vertex buffer size.
-			uint32_t transientIbSize;   //!< Maximum transient index buffer size.
+			uint16_t maxEncoders;          //!< Maximum number of encoder threads.
+			uint32_t minResourceCbSize;    //!< Minimum resource command buffer size.
+			uint32_t maxTransientVbSize;   //!< Maximum transient vertex buffer size.
+			uint32_t maxTransientIbSize;   //!< Maximum transient index buffer size.
+			uint32_t minUniformBufferSize; //!< Mimimum uniform buffer size.
 		};
 
 		Limits limits; //!< Configurable runtime limits.
@@ -818,8 +820,9 @@ namespace bgfx
 			uint32_t maxOcclusionQueries;     //!< Maximum number of occlusion query handles.
 			uint32_t maxEncoders;             //!< Maximum number of encoder threads.
 			uint32_t minResourceCbSize;       //!< Minimum resource command buffer size.
-			uint32_t transientVbSize;         //!< Maximum transient vertex buffer size.
-			uint32_t transientIbSize;         //!< Maximum transient index buffer size.
+			uint32_t maxTransientVbSize;      //!< Maximum transient vertex buffer size.
+			uint32_t maxTransientIbSize;      //!< Maximum transient index buffer size.
+			uint32_t minUniformBufferSize;    //!< Mimimum uniform buffer size.
 		};
 
 		Limits limits; //!< Renderer runtime limits.

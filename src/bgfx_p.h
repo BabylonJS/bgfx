@@ -148,8 +148,6 @@ namespace bgfx
 #include "vertexlayout.h"
 #include "version.h"
 
-#define BGFX_CHUNK_MAGIC_TEX BX_MAKEFOURCC('T', 'E', 'X', 0x0)
-
 #define BGFX_CLEAR_COLOR_USE_PALETTE UINT16_C(0x8000)
 #define BGFX_CLEAR_MASK (0                 \
 			| BGFX_CLEAR_COLOR             \
@@ -287,6 +285,8 @@ namespace stl = std;
 
 namespace bgfx
 {
+	constexpr uint32_t kChunkMagicTex = BX_MAKEFOURCC('T', 'E', 'X', 0x0);
+
 	extern InternalData g_internalData;
 	extern PlatformData g_platformData;
 	extern bool g_platformDataChangedSinceReset;
@@ -816,7 +816,7 @@ namespace bgfx
 		{
 			for (uint32_t ii = 0; ii < BX_COUNTOF(m_program); ++ii)
 			{
-				m_program[ii].idx = kInvalidHandle;
+				m_program[ii] = BGFX_INVALID_HANDLE;
 			}
 		}
 
@@ -1478,7 +1478,7 @@ namespace bgfx
 	class UniformBuffer
 	{
 	public:
-		static UniformBuffer* create(uint32_t _size = 1<<20)
+		static UniformBuffer* create(uint32_t _size)
 		{
 			const uint32_t structSize = sizeof(UniformBuffer)-sizeof(UniformBuffer::m_buffer);
 
@@ -1493,13 +1493,16 @@ namespace bgfx
 			bx::free(g_allocator, _uniformBuffer);
 		}
 
-		static void update(UniformBuffer** _uniformBuffer, uint32_t _threshold = 64<<10, uint32_t _grow = 1<<20)
+		static void update(UniformBuffer** _uniformBuffer)
 		{
+			constexpr uint32_t kThreshold = BGFX_CONFIG_UNIFORM_BUFFER_RESIZE_THRESHOLD_SIZE;
+			constexpr uint32_t kIncrement = BGFX_CONFIG_UNIFORM_BUFFER_RESIZE_INCREMENT_SIZE;
+
 			UniformBuffer* uniformBuffer = *_uniformBuffer;
-			if (_threshold >= uniformBuffer->m_size - uniformBuffer->m_pos)
+			if (kThreshold >= uniformBuffer->m_size - uniformBuffer->m_pos)
 			{
 				const uint32_t structSize = sizeof(UniformBuffer)-sizeof(UniformBuffer::m_buffer);
-				uint32_t size = bx::alignUp(uniformBuffer->m_size + _grow, 16);
+				uint32_t size = bx::alignUp(uniformBuffer->m_size + kIncrement, 16);
 				void*    data = bx::realloc(g_allocator, uniformBuffer, size+structSize);
 				uniformBuffer = reinterpret_cast<UniformBuffer*>(data);
 				uniformBuffer->m_size = size;
@@ -1678,9 +1681,9 @@ namespace bgfx
 	{
 		void clear()
 		{
-			m_startVertex      = 0;
-			m_handle.idx       = kInvalidHandle;
-			m_layoutHandle.idx = kInvalidHandle;
+			m_startVertex  = 0;
+			m_handle       = BGFX_INVALID_HANDLE;
+			m_layoutHandle = BGFX_INVALID_HANDLE;
 		}
 
 		uint32_t           m_startVertex;
@@ -1737,7 +1740,7 @@ namespace bgfx
 				m_instanceDataOffset = 0;
 				m_instanceDataStride = 0;
 				m_numInstances       = 1;
-				m_instanceDataBuffer.idx = kInvalidHandle;
+				m_instanceDataBuffer = BGFX_INVALID_HANDLE;
 			}
 
 			if (0 != (_flags & BGFX_DISCARD_VERTEX_STREAMS) )
@@ -1749,22 +1752,22 @@ namespace bgfx
 
 			if (0 != (_flags & BGFX_DISCARD_INDEX_BUFFER) )
 			{
-				m_startIndex      = 0;
-				m_numIndices      = UINT32_MAX;
-				m_indexBuffer.idx = kInvalidHandle;
-				m_submitFlags     = 0;
+				m_startIndex  = 0;
+				m_numIndices  = UINT32_MAX;
+				m_indexBuffer = BGFX_INVALID_HANDLE;
+				m_submitFlags = 0;
 			}
 			else
 			{
 				m_submitFlags = isIndex16() ? 0 : BGFX_SUBMIT_INTERNAL_INDEX32;
 			}
 
-			m_startIndirect    = 0;
-			m_numIndirect      = UINT32_MAX;
-			m_numIndirectIndex = 0;
-			m_indirectBuffer.idx    = kInvalidHandle;
-			m_numIndirectBuffer.idx = kInvalidHandle;
-			m_occlusionQuery.idx    = kInvalidHandle;
+			m_startIndirect     = 0;
+			m_numIndirect       = UINT32_MAX;
+			m_numIndirectIndex  = 0;  
+			m_indirectBuffer    = BGFX_INVALID_HANDLE;
+			m_numIndirectBuffer = BGFX_INVALID_HANDLE;
+			m_occlusionQuery    = BGFX_INVALID_HANDLE;
 		}
 
 		bool setStreamBit(uint8_t _stream, VertexBufferHandle _handle)
@@ -1827,13 +1830,13 @@ namespace bgfx
 				m_numMatrices = 0;
 			}
 
-			m_numX               = 0;
-			m_numY               = 0;
-			m_numZ               = 0;
-			m_submitFlags        = 0;
-			m_indirectBuffer.idx = kInvalidHandle;
-			m_startIndirect      = 0;
-			m_numIndirect        = UINT32_MAX;
+			m_numX           = 0;
+			m_numY           = 0;
+			m_numZ           = 0;
+			m_submitFlags    = 0;
+			m_indirectBuffer = BGFX_INVALID_HANDLE;
+			m_startIndirect  = 0;
+			m_numIndirect    = UINT32_MAX;
 		}
 
 		uint32_t m_uniformBegin;
@@ -2191,7 +2194,7 @@ namespace bgfx
 
 				for (uint32_t ii = 0; ii < num; ++ii)
 				{
-					m_uniformBuffer[ii] = UniformBuffer::create();
+					m_uniformBuffer[ii] = UniformBuffer::create(g_caps.limits.minUniformBufferSize);
 				}
 			}
 
@@ -2247,7 +2250,7 @@ namespace bgfx
 		{
 			const uint32_t offset = bx::strideAlign(m_iboffset, _indexSize);
 			uint32_t iboffset = offset + _num*_indexSize;
-			iboffset = bx::min<uint32_t>(iboffset, g_caps.limits.transientIbSize);
+			iboffset = bx::min<uint32_t>(iboffset, g_caps.limits.maxTransientIbSize);
 			const uint32_t num = (iboffset-offset)/_indexSize;
 			return num;
 		}
@@ -2266,7 +2269,7 @@ namespace bgfx
 		{
 			uint32_t offset   = bx::strideAlign(m_vboffset, _stride);
 			uint32_t vboffset = offset + _num * _stride;
-			vboffset = bx::min<uint32_t>(vboffset, g_caps.limits.transientVbSize);
+			vboffset = bx::min<uint32_t>(vboffset, g_caps.limits.maxTransientVbSize);
 			uint32_t num = (vboffset-offset)/_stride;
 			return num;
 		}
@@ -2887,7 +2890,7 @@ namespace bgfx
 
 		void add(VertexBufferHandle _handle, VertexLayoutHandle _layoutHandle, uint32_t _hash)
 		{
-			BX_ASSERT(m_vertexBufferRef[_handle.idx].idx == kInvalidHandle, "");
+			BX_ASSERT(!isValid(m_vertexBufferRef[_handle.idx]), "");
 			m_vertexBufferRef[_handle.idx] = _layoutHandle;
 			m_refCount[_layoutHandle.idx]++;
 			m_vertexLayoutMap.insert(_hash, _layoutHandle.idx);
@@ -2895,7 +2898,7 @@ namespace bgfx
 
 		void add(DynamicVertexBufferHandle _handle, VertexLayoutHandle _layoutHandle, uint32_t _hash)
 		{
-			BX_ASSERT(m_dynamicVertexBufferRef[_handle.idx].idx == kInvalidHandle, "");
+			BX_ASSERT(!isValid(m_dynamicVertexBufferRef[_handle.idx]), "");
 			m_dynamicVertexBufferRef[_handle.idx] = _layoutHandle;
 			m_refCount[_layoutHandle.idx]++;
 			m_vertexLayoutMap.insert(_hash, _layoutHandle.idx);
@@ -2921,7 +2924,7 @@ namespace bgfx
 		{
 			VertexLayoutHandle layoutHandle = m_vertexBufferRef[_handle.idx];
 			layoutHandle = release(layoutHandle);
-			m_vertexBufferRef[_handle.idx].idx = kInvalidHandle;
+			m_vertexBufferRef[_handle.idx] = BGFX_INVALID_HANDLE;
 
 			return layoutHandle;
 		}
@@ -2930,7 +2933,7 @@ namespace bgfx
 		{
 			VertexLayoutHandle layoutHandle = m_dynamicVertexBufferRef[_handle.idx];
 			layoutHandle = release(layoutHandle);
-			m_dynamicVertexBufferRef[_handle.idx].idx = kInvalidHandle;
+			m_dynamicVertexBufferRef[_handle.idx] = BGFX_INVALID_HANDLE;
 
 			return layoutHandle;
 		}
@@ -3179,7 +3182,7 @@ namespace bgfx
 			return cmdbuf;
 		}
 
-		BGFX_API_FUNC(void reset(uint32_t _width, uint32_t _height, uint32_t _flags, TextureFormat::Enum _format) )
+		BGFX_API_FUNC(void reset(uint32_t _width, uint32_t _height, uint32_t _flags, TextureFormat::Enum _formatColor) )
 		{
 			BGFX_MUTEX_SCOPE(m_resourceApiLock);
 
@@ -3190,13 +3193,17 @@ namespace bgfx
 				, "Running in headless mode, resolution of non-existing backbuffer can't be larger than 0x0!"
 				);
 
-			const TextureFormat::Enum format = TextureFormat::Count != _format ? _format : m_init.resolution.format;
+			const TextureFormat::Enum formatColor = TextureFormat::Count != _formatColor
+				? _formatColor
+				: m_init.resolution.formatColor
+				;
 
 			if (!g_platformDataChangedSinceReset
-			&&  m_init.resolution.format == format
-			&&  m_init.resolution.width  == _width
-			&&  m_init.resolution.height == _height
-			&&  m_init.resolution.reset  == _flags)
+			&&  m_init.resolution.formatColor == formatColor
+			&&  m_init.resolution.width       == _width
+			&&  m_init.resolution.height      == _height
+			&&  m_init.resolution.reset       == _flags
+			   )
 			{
 				// Nothing changed, ignore request.
 				return;
@@ -3228,7 +3235,7 @@ namespace bgfx
 				, _width
 				, _height
 				);
-			m_init.resolution.format = format;
+			m_init.resolution.formatColor = formatColor;
 			m_init.resolution.width  = bx::clamp(_width,  1u, g_caps.limits.maxTextureSize);
 			m_init.resolution.height = bx::clamp(_height, 1u, g_caps.limits.maxTextureSize);
 			m_init.resolution.reset  = 0

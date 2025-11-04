@@ -9,7 +9,7 @@ import bindbc.common.types: c_int64, c_uint64, va_list;
 import bindbc.bgfx.config;
 static import bgfx.impl;
 
-enum uint apiVersion = 130;
+enum uint apiVersion = 132;
 
 alias ViewID = ushort;
 
@@ -1027,8 +1027,9 @@ extern(C++, "bgfx") struct Caps{
 		uint maxOcclusionQueries; ///Maximum number of occlusion query handles.
 		uint maxEncoders; ///Maximum number of encoder threads.
 		uint minResourceCBSize; ///Minimum resource command buffer size.
-		uint transientVBSize; ///Maximum transient vertex buffer size.
-		uint transientIBSize; ///Maximum transient index buffer size.
+		uint maxTransientVBSize; ///Maximum transient vertex buffer size.
+		uint maxTansientIBSize; ///Maximum transient index buffer size.
+		uint minUniformBufferSize; ///Mimimum uniform buffer size.
 	}
 	
 	RendererType rendererType; ///Renderer backend type. See: `bgfx::RendererType`
@@ -1112,7 +1113,8 @@ extern(C++, "bgfx") struct PlatformData{
 
 ///Backbuffer resolution and reset parameters.
 extern(C++, "bgfx") struct Resolution{
-	TextureFormat format; ///Backbuffer format.
+	TextureFormat formatColor; ///Backbuffer color format.
+	TextureFormat formatDepthStencil; ///Backbuffer depth/stencil format.
 	uint width; ///Backbuffer width.
 	uint height; ///Backbuffer height.
 	uint reset; ///Reset parameters.
@@ -1133,8 +1135,9 @@ extern(C++, "bgfx") struct Init{
 	extern(C++) struct Limits{
 		ushort maxEncoders; ///Maximum number of encoder threads.
 		uint minResourceCBSize; ///Minimum resource command buffer size.
-		uint transientVBSize; ///Maximum transient vertex buffer size.
-		uint transientIBSize; ///Maximum transient index buffer size.
+		uint maxTransientVBSize; ///Maximum transient vertex buffer size.
+		uint maxTransientIBSize; ///Maximum transient index buffer size.
+		uint minUniformBufferSize; ///Mimimum uniform buffer size.
 		extern(D) mixin(joinFnBinds((){
 			FnBind[] ret = [
 				{q{void}, q{this}, q{}, ext: `C++`},

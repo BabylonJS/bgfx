@@ -718,6 +718,7 @@ namespace bgfx { namespace d3d12
 			, m_winPixEvent(NULL)
 			, m_featureLevel(D3D_FEATURE_LEVEL(0) )
 			, m_swapChain(NULL)
+			, m_backBufferDepthStencil(NULL)
 			, m_wireframe(false)
 			, m_lost(false)
 			, m_maxAnisotropy(1)
@@ -779,7 +780,7 @@ namespace bgfx { namespace d3d12
 				|| NULL != findModule("Nvda.Graphics.Interception.dll")
 				);
 
-			m_fbh.idx = kInvalidHandle;
+			m_fbh = BGFX_INVALID_HANDLE;
 			bx::memSet(m_uniforms, 0, sizeof(m_uniforms) );
 			bx::memSet(&m_resolution, 0, sizeof(m_resolution) );
 
@@ -1242,7 +1243,7 @@ namespace bgfx { namespace d3d12
 				bx::memSet(&m_scd, 0, sizeof(m_scd) );
 				m_scd.width  = _init.resolution.width;
 				m_scd.height = _init.resolution.height;
-				m_scd.format = s_textureFormat[_init.resolution.format].m_fmt;
+				m_scd.format = s_textureFormat[_init.resolution.formatColor].m_fmt;
 				m_scd.stereo  = false;
 
 				updateMsaa(m_scd.format);
@@ -1302,8 +1303,9 @@ namespace bgfx { namespace d3d12
 						resourceDesc.Height     = m_scd.height;
 						resourceDesc.MipLevels  = 1;
 						resourceDesc.Format     = (m_resolution.reset & BGFX_RESET_SRGB_BACKBUFFER)
-													? s_textureFormat[m_resolution.format].m_fmtSrgb
-													: s_textureFormat[m_resolution.format].m_fmt;
+							? s_textureFormat[m_resolution.formatColor].m_fmtSrgb
+							: s_textureFormat[m_resolution.formatColor].m_fmt
+							;
 						resourceDesc.SampleDesc = m_scd.sampleDesc;
 						resourceDesc.Layout     = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 						resourceDesc.Flags      = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
@@ -2014,13 +2016,7 @@ namespace bgfx { namespace d3d12
 			uint8_t* src;
 			readback->Map(0, NULL, (void**)&src);
 
-			for (uint32_t yy = 0, height = srcHeight; yy < height; ++yy)
-			{
-				bx::memCopy(dst, src, pitch);
-
-				src += srcPitch;
-				dst += dstPitch;
-			}
+			bx::memCopy(dst, dstPitch, src, srcPitch, pitch, srcHeight);
 
 			D3D12_RANGE writeRange = { 0, 0 };
 			readback->Unmap(0, &writeRange);
@@ -2036,8 +2032,7 @@ namespace bgfx { namespace d3d12
 			const Memory* mem = alloc(size);
 
 			bx::StaticMemoryBlockWriter writer(mem->data, mem->size);
-			uint32_t magic = BGFX_CHUNK_MAGIC_TEX;
-			bx::write(&writer, magic, bx::ErrorAssert{});
+			bx::write(&writer, kChunkMagicTex, bx::ErrorAssert{});
 
 			TextureCreate tc;
 			tc.m_width     = _width;
@@ -2389,6 +2384,7 @@ namespace bgfx { namespace d3d12
 					DX_RELEASE(m_backBufferColor[ii], 1);
 #endif // BX_PLATFORM_WINDOWS || BX_PLATFORM_WINRT
 				}
+
 				DX_RELEASE(m_backBufferDepthStencil, 0);
 			}
 
@@ -2421,13 +2417,16 @@ namespace bgfx { namespace d3d12
 
 					D3D12_RENDER_TARGET_VIEW_DESC rtvDesc;
 					rtvDesc.Format = (m_resolution.reset & BGFX_RESET_SRGB_BACKBUFFER)
-						? s_textureFormat[m_resolution.format].m_fmtSrgb
-						: s_textureFormat[m_resolution.format].m_fmt;
+						? s_textureFormat[m_resolution.formatColor].m_fmtSrgb
+						: s_textureFormat[m_resolution.formatColor].m_fmt
+						;
 
 					if (1 < getResourceDesc(m_backBufferColor[ii]).DepthOrArraySize)
 					{
-						rtvDesc.ViewDimension = (NULL == m_msaaRt) ?
-							D3D12_RTV_DIMENSION_TEXTURE2DARRAY : D3D12_RTV_DIMENSION_TEXTURE2DMSARRAY;
+						rtvDesc.ViewDimension = (NULL == m_msaaRt)
+							? D3D12_RTV_DIMENSION_TEXTURE2DARRAY
+							: D3D12_RTV_DIMENSION_TEXTURE2DMSARRAY
+							;
 						rtvDesc.Texture2DArray.FirstArraySlice = 0;
 						rtvDesc.Texture2DArray.ArraySize = getResourceDesc(m_backBufferColor[ii]).DepthOrArraySize;
 						rtvDesc.Texture2DArray.MipSlice = 0;
@@ -2435,8 +2434,10 @@ namespace bgfx { namespace d3d12
 					}
 					else
 					{
-						rtvDesc.ViewDimension = (NULL == m_msaaRt) ?
-							D3D12_RTV_DIMENSION_TEXTURE2D : D3D12_RTV_DIMENSION_TEXTURE2DMS;
+						rtvDesc.ViewDimension = (NULL == m_msaaRt)
+							? D3D12_RTV_DIMENSION_TEXTURE2D
+							: D3D12_RTV_DIMENSION_TEXTURE2DMS
+							;
 						rtvDesc.Texture2D.MipSlice = 0;
 						rtvDesc.Texture2D.PlaneSlice = 0;
 					}
@@ -2464,33 +2465,36 @@ namespace bgfx { namespace d3d12
 				}
 			}
 
-			D3D12_RESOURCE_DESC resourceDesc;
-			resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-			resourceDesc.Alignment = 1 < m_scd.sampleDesc.Count ? D3D12_DEFAULT_MSAA_RESOURCE_PLACEMENT_ALIGNMENT : 0;
-			resourceDesc.Width     = bx::uint32_max(m_resolution.width,  1);
-			resourceDesc.Height    = bx::uint32_max(m_resolution.height, 1);
-			resourceDesc.DepthOrArraySize = 1;
-			resourceDesc.MipLevels        = 1;
-			resourceDesc.Format           = DXGI_FORMAT_D24_UNORM_S8_UINT;
-			resourceDesc.SampleDesc       = m_scd.sampleDesc;
-			resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-			resourceDesc.Flags  = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-
-			D3D12_CLEAR_VALUE clearValue;
-			clearValue.Format = resourceDesc.Format;
-			clearValue.DepthStencil.Depth   = 1.0f;
-			clearValue.DepthStencil.Stencil = 0;
-
 			m_commandList = m_cmd.alloc();
 
-			m_backBufferDepthStencil = createCommittedResource(m_device, HeapProperty::Default, &resourceDesc, &clearValue);
-			m_device->CreateDepthStencilView(m_backBufferDepthStencil, NULL, getCPUHandleHeapStart(m_dsvDescriptorHeap) );
+			if (bimg::isDepth(bimg::TextureFormat::Enum(m_resolution.formatDepthStencil) ) )
+			{
+				D3D12_RESOURCE_DESC resourceDesc;
+				resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+				resourceDesc.Alignment = 1 < m_scd.sampleDesc.Count ? D3D12_DEFAULT_MSAA_RESOURCE_PLACEMENT_ALIGNMENT : 0;
+				resourceDesc.Width     = bx::uint32_max(m_resolution.width,  1);
+				resourceDesc.Height    = bx::uint32_max(m_resolution.height, 1);
+				resourceDesc.DepthOrArraySize = 1;
+				resourceDesc.MipLevels        = 1;
+				resourceDesc.Format           = s_textureFormat[m_resolution.formatDepthStencil].m_fmtDsv;
+				resourceDesc.SampleDesc       = m_scd.sampleDesc;
+				resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+				resourceDesc.Flags  = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 
-			setResourceBarrier(m_commandList
-				, m_backBufferDepthStencil
-				, D3D12_RESOURCE_STATE_COMMON
-				, D3D12_RESOURCE_STATE_DEPTH_WRITE
-				);
+				D3D12_CLEAR_VALUE clearValue;
+				clearValue.Format = resourceDesc.Format;
+				clearValue.DepthStencil.Depth   = 1.0f;
+				clearValue.DepthStencil.Stencil = 0;
+
+				m_backBufferDepthStencil = createCommittedResource(m_device, HeapProperty::Default, &resourceDesc, &clearValue);
+				m_device->CreateDepthStencilView(m_backBufferDepthStencil, NULL, getCPUHandleHeapStart(m_dsvDescriptorHeap) );
+
+				setResourceBarrier(m_commandList
+					, m_backBufferDepthStencil
+					, D3D12_RESOURCE_STATE_COMMON
+					, D3D12_RESOURCE_STATE_DEPTH_WRITE
+					);
+			}
 
 			for (uint32_t ii = 0; ii < BX_COUNTOF(m_frameBuffers); ++ii)
 			{
@@ -2578,10 +2582,11 @@ namespace bgfx { namespace d3d12
 				| BGFX_RESET_SUSPEND
 				);
 
-			if (m_resolution.width            !=  _resolution.width
-			||  m_resolution.height           !=  _resolution.height
-			||  m_resolution.format           !=  _resolution.format
-			|| (m_resolution.reset&maskFlags) != (_resolution.reset&maskFlags) )
+			if (m_resolution.width              !=  _resolution.width
+			||  m_resolution.height             !=  _resolution.height
+			||  m_resolution.formatColor        !=  _resolution.formatColor
+			||  m_resolution.formatDepthStencil !=  _resolution.formatDepthStencil
+			|| (m_resolution.reset&maskFlags)   != (_resolution.reset&maskFlags) )
 			{
 				uint32_t flags = _resolution.reset & (~BGFX_RESET_INTERNAL_FORCE);
 
@@ -2598,7 +2603,7 @@ namespace bgfx { namespace d3d12
 
 				m_scd.width  = _resolution.width;
 				m_scd.height = _resolution.height;
-				m_scd.format = s_textureFormat[_resolution.format].m_fmt;
+				m_scd.format = s_textureFormat[_resolution.formatColor].m_fmt;
 
 				preReset();
 
@@ -2651,8 +2656,9 @@ namespace bgfx { namespace d3d12
 						resourceDesc.Height     = m_scd.height;
 						resourceDesc.MipLevels  = 1;
 						resourceDesc.Format     = (m_resolution.reset & BGFX_RESET_SRGB_BACKBUFFER)
-													? s_textureFormat[m_resolution.format].m_fmtSrgb
-													: s_textureFormat[m_resolution.format].m_fmt;
+							? s_textureFormat[m_resolution.formatColor].m_fmtSrgb
+							: s_textureFormat[m_resolution.formatColor].m_fmt
+							;
 						resourceDesc.SampleDesc = m_scd.sampleDesc;
 						resourceDesc.Layout     = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 						resourceDesc.Flags      = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
@@ -2794,7 +2800,11 @@ namespace bgfx { namespace d3d12
 					m_dsvHandle = getCPUHandleHeapStart(m_dsvDescriptorHeap);
 
 					m_currentColor        = &m_rtvHandle;
-					m_currentDepthStencil = &m_dsvHandle;
+					m_currentDepthStencil = NULL != m_backBufferDepthStencil
+						? &m_dsvHandle
+						: NULL
+						;
+
 					m_commandList->OMSetRenderTargets(1, m_currentColor, true, m_currentDepthStencil);
 				}
 			}

@@ -1481,7 +1481,7 @@ namespace bgfx { namespace gl
 				, _internalFormat
 				, _width
 				, _height
-				, false
+				, true
 				);
 		}
 		else
@@ -2282,11 +2282,11 @@ namespace bgfx { namespace gl
 				m_renderdocdll = loadRenderDoc();
 			}
 
-			m_fbh.idx = kInvalidHandle;
+			m_fbh = BGFX_INVALID_HANDLE;
 			bx::memSet(m_uniforms, 0, sizeof(m_uniforms) );
 			bx::memSet(&m_resolution, 0, sizeof(m_resolution) );
 
-			setRenderContextSize(_init.resolution.width, _init.resolution.height, _init.resolution.reset);
+			setRenderContextSize(_init.resolution);
 
 			m_vendor      = getGLString(GL_VENDOR);
 			m_renderer    = getGLString(GL_RENDERER);
@@ -3483,8 +3483,7 @@ namespace bgfx { namespace gl
 			const Memory* mem = alloc(size);
 
 			bx::StaticMemoryBlockWriter writer(mem->data, mem->size);
-			uint32_t magic = BGFX_CHUNK_MAGIC_TEX;
-			bx::write(&writer, magic, bx::ErrorAssert{});
+			bx::write(&writer, kChunkMagicTex, bx::ErrorAssert{});
 
 			TextureCreate tc;
 			tc.m_width     = _width;
@@ -3525,9 +3524,10 @@ namespace bgfx { namespace gl
 
 		void createFrameBuffer(FrameBufferHandle _handle, void* _nwh, uint32_t _width, uint32_t _height, TextureFormat::Enum _format, TextureFormat::Enum _depthFormat) override
 		{
+			BX_UNUSED(_format, _depthFormat);
 			uint16_t denseIdx = m_numWindows++;
 			m_windows[denseIdx] = _handle;
-			m_frameBuffers[_handle.idx].create(denseIdx, _nwh, _width, _height, _format, _depthFormat);
+			m_frameBuffers[_handle.idx].create(denseIdx, _nwh, _width, _height);
 		}
 
 		void destroyFrameBuffer(FrameBufferHandle _handle) override
@@ -3781,10 +3781,7 @@ namespace bgfx { namespace gl
 				m_textVideoMem.resize(false, _resolution.width, _resolution.height);
 				m_textVideoMem.clear();
 
-				setRenderContextSize(m_resolution.width
-						, m_resolution.height
-						, flags
-						);
+				setRenderContextSize(m_resolution);
 				updateCapture();
 
 				for (uint32_t ii = 0; ii < BX_COUNTOF(m_frameBuffers); ++ii)
@@ -3982,8 +3979,8 @@ namespace bgfx { namespace gl
 							}
 						)";
 
-						const GLchar *const vs = msaa_blit_vs;
-						const GLchar *const fs = msaa_blit_fs;
+						const GLchar* vs = msaa_blit_vs;
+						const GLchar* fs = msaa_blit_fs;
 
 						GLuint shader_vs = glCreateShader(GL_VERTEX_SHADER);
 						{
@@ -4159,22 +4156,22 @@ namespace bgfx { namespace gl
 			}
 		}
 
-		void setRenderContextSize(uint32_t _width, uint32_t _height, uint32_t _flags = 0)
+		void setRenderContextSize(const Resolution& _resolution)
 		{
 			if (!m_glctx.isValid() )
 			{
-				m_glctx.create(_width, _height, _flags);
+				m_glctx.create(_resolution);
 			}
 			else
 			{
 				destroyMsaaFbo();
 
-				m_glctx.resize(_width, _height, _flags);
+				m_glctx.resize(_resolution);
 
-				uint32_t msaa = (_flags&BGFX_RESET_MSAA_MASK)>>BGFX_RESET_MSAA_SHIFT;
+				uint32_t msaa = (_resolution.reset & BGFX_RESET_MSAA_MASK)>>BGFX_RESET_MSAA_SHIFT;
 				msaa = bx::uint32_min(m_maxMsaa, msaa == 0 ? 0 : 1<<msaa);
 
-				createMsaaFbo(_width, _height, msaa);
+				createMsaaFbo(_resolution.width, _resolution.height, msaa);
 			}
 
 			m_flip = true;
@@ -4610,7 +4607,7 @@ namespace bgfx { namespace gl
 				program.bindAttributes(layout, 0);
 				program.bindAttributesEnd();
 
-				if (m_clearQuadColor.idx == kInvalidHandle)
+				if (!isValid(m_clearQuadColor) )
 				{
 					const UniformRegInfo* infoClearColor = m_uniformReg.find("bgfx_clear_color");
 					if (NULL != infoClearColor)
@@ -4619,7 +4616,7 @@ namespace bgfx { namespace gl
 					}
 				}
 
-				if (m_clearQuadDepth.idx == kInvalidHandle)
+				if (!isValid(m_clearQuadDepth) )
 				{
 					const UniformRegInfo* infoClearDepth = m_uniformReg.find("bgfx_clear_depth");
 					if (NULL != infoClearDepth)
@@ -4814,7 +4811,8 @@ namespace bgfx { namespace gl
 		GLenum m_readPixelsFmt;
 		GLuint m_backBufferFbo;
 		GLuint m_msaaBackBufferFbo;
-		union {
+		union
+		{
 			GLuint m_msaaBackBufferRbos[2];
 			GLuint m_msaaBackBufferTextures[2];
 		};
@@ -7110,7 +7108,7 @@ namespace bgfx { namespace gl
 					{
 						const TextureGL& texture = s_renderGL->m_textures[at.handle.idx];
 
-						if (0 != texture.m_id)
+						if (0 != texture.m_rbo && 0 != texture.m_id)
 						{
 
 							GLenum attachment = GL_INVALID_ENUM;
@@ -7159,9 +7157,8 @@ namespace bgfx { namespace gl
 		}
 	}
 
-	void FrameBufferGL::create(uint16_t _denseIdx, void* _nwh, uint32_t _width, uint32_t _height, TextureFormat::Enum _format, TextureFormat::Enum _depthFormat)
+	void FrameBufferGL::create(uint16_t _denseIdx, void* _nwh, uint32_t _width, uint32_t _height)
 	{
-		BX_UNUSED(_format, _depthFormat);
 		m_swapChain = s_renderGL->m_glctx.createSwapChain(_nwh, _width, _height);
 		m_width     = _width;
 		m_height    = _height;
@@ -7764,7 +7761,7 @@ namespace bgfx { namespace gl
 							{
 								if (isValid(currentState.m_indirectBuffer) )
 								{
-									currentState.m_indirectBuffer.idx = kInvalidHandle;
+									currentState.m_indirectBuffer = BGFX_INVALID_HANDLE;
 									GL_CHECK(glBindBuffer(GL_DISPATCH_INDIRECT_BUFFER, 0) );
 								}
 
@@ -8477,12 +8474,12 @@ namespace bgfx { namespace gl
 						{
 							if (isValid(currentState.m_indirectBuffer) )
 							{
-								currentState.m_indirectBuffer.idx = kInvalidHandle;
+								currentState.m_indirectBuffer = BGFX_INVALID_HANDLE;
 								GL_CHECK(glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0) );
 
 								if (isValid(currentState.m_numIndirectBuffer) )
 								{
-									currentState.m_numIndirectBuffer.idx = kInvalidHandle;
+									currentState.m_numIndirectBuffer = BGFX_INVALID_HANDLE;
 									GL_CHECK(glBindBuffer(GL_PARAMETER_BUFFER_ARB, 0) );
 								}
 							}

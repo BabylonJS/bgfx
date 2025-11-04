@@ -715,7 +715,7 @@ namespace bgfx { namespace d3d11
 			, m_timerQuerySupport(false)
 			, m_directAccessSupport(false)
 		{
-			m_fbh.idx = kInvalidHandle;
+			m_fbh = BGFX_INVALID_HANDLE;
 			bx::memSet(&m_scd, 0, sizeof(m_scd) );
 			bx::memSet(&m_windows, 0xff, sizeof(m_windows) );
 		}
@@ -744,7 +744,7 @@ namespace bgfx { namespace d3d11
 				m_renderDocDll = loadRenderDoc();
 			}
 
-			m_fbh.idx = kInvalidHandle;
+			m_fbh = BGFX_INVALID_HANDLE;
 			bx::memSet(m_uniforms, 0, sizeof(m_uniforms) );
 			bx::memSet(&m_resolution, 0, sizeof(m_resolution) );
 
@@ -1061,7 +1061,7 @@ namespace bgfx { namespace d3d11
 					 * is incompatible with the flip presentation model, which is desirable for various reasons including
 					 * player embedding.
 					 */
-					m_scd.format = s_textureFormat[_init.resolution.format].m_fmt;
+					m_scd.format = s_textureFormat[_init.resolution.formatColor].m_fmt;
 
 					updateMsaa(m_scd.format);
 					m_scd.sampleDesc  = s_msaa[(_init.resolution.reset&BGFX_RESET_MSAA_MASK)>>BGFX_RESET_MSAA_SHIFT];
@@ -1138,7 +1138,10 @@ namespace bgfx { namespace d3d11
 							* ONLY the backbuffer from swapchain can be created without *_SRGB format, custom backbuffer should be created the same
 							* format as well as render target view.
 							*/
-							desc.Format     = (m_resolution.reset & BGFX_RESET_SRGB_BACKBUFFER) ? s_textureFormat[m_resolution.format].m_fmtSrgb : s_textureFormat[m_resolution.format].m_fmt;
+							desc.Format     = (m_resolution.reset & BGFX_RESET_SRGB_BACKBUFFER)
+								? s_textureFormat[m_resolution.formatColor].m_fmtSrgb
+								: s_textureFormat[m_resolution.formatColor].m_fmt
+								;
 							desc.SampleDesc = m_scd.sampleDesc;
 							desc.Usage      = D3D11_USAGE_DEFAULT;
 							desc.BindFlags  = D3D11_BIND_RENDER_TARGET;
@@ -1878,13 +1881,7 @@ namespace bgfx { namespace d3d11
 
 			uint32_t pitch = bx::uint32_min(srcPitch, dstPitch);
 
-			for (uint32_t yy = 0, height = srcHeight; yy < height; ++yy)
-			{
-				bx::memCopy(dst, src, pitch);
-
-				src += srcPitch;
-				dst += dstPitch;
-			}
+			bx::memCopy(dst, dstPitch, src, srcPitch, pitch, srcHeight);
 
 			m_deviceCtx->Unmap(texture.m_ptr, _mip);
 		}
@@ -1897,8 +1894,7 @@ namespace bgfx { namespace d3d11
 			const Memory* mem = alloc(size);
 
 			bx::StaticMemoryBlockWriter writer(mem->data, mem->size);
-			uint32_t magic = BGFX_CHUNK_MAGIC_TEX;
-			bx::write(&writer, magic, bx::ErrorAssert{});
+			bx::write(&writer, kChunkMagicTex, bx::ErrorAssert{});
 
 			TextureCreate tc;
 			tc.m_width     = _width;
@@ -2265,7 +2261,10 @@ namespace bgfx { namespace d3d11
 				 * with the srgb version. this is OK because of this:
 				 * https://docs.microsoft.com/en-us/windows/win32/direct3ddxgi/converting-data-color-space
 				 */
-				desc.Format = (m_resolution.reset & BGFX_RESET_SRGB_BACKBUFFER) ? s_textureFormat[m_resolution.format].m_fmtSrgb : s_textureFormat[m_resolution.format].m_fmt;
+				desc.Format = (m_resolution.reset & BGFX_RESET_SRGB_BACKBUFFER)
+					? s_textureFormat[m_resolution.formatColor].m_fmtSrgb
+					: s_textureFormat[m_resolution.formatColor].m_fmt
+					;
 
 				DX_CHECK(m_device->CreateRenderTargetView(NULL == m_msaaRt ? backBufferColor : m_msaaRt, &desc, &m_backBufferColor) );
 				DX_RELEASE(backBufferColor, 0);
@@ -2275,16 +2274,17 @@ namespace bgfx { namespace d3d11
 			{
 				m_gpuTimer.postReset();
 			}
+
 			m_occlusionQuery.postReset();
 
-			if (NULL == m_backBufferDepthStencil)
+			if (bimg::isDepth(bimg::TextureFormat::Enum(m_resolution.formatDepthStencil) ) )
 			{
 				D3D11_TEXTURE2D_DESC dsd;
 				dsd.Width  = bx::uint32_max(m_scd.width,  1);
 				dsd.Height = bx::uint32_max(m_scd.height,  1);
 				dsd.MipLevels  = 1;
 				dsd.ArraySize  = 1;
-				dsd.Format     = DXGI_FORMAT_D24_UNORM_S8_UINT;
+				dsd.Format     = s_textureFormat[m_resolution.formatDepthStencil].m_fmtDsv;
 				dsd.SampleDesc = m_scd.sampleDesc;
 				dsd.Usage      = D3D11_USAGE_DEFAULT;
 				dsd.BindFlags  = D3D11_BIND_DEPTH_STENCIL;
@@ -2479,10 +2479,12 @@ namespace bgfx { namespace d3d11
 				| BGFX_RESET_SUSPEND
 				);
 
-			if (m_resolution.width            !=  _resolution.width
-			||  m_resolution.height           !=  _resolution.height
-			||  m_resolution.format           !=  _resolution.format
-			|| (m_resolution.reset&maskFlags) != (_resolution.reset&maskFlags) )
+			if (m_resolution.width              != _resolution.width
+			||  m_resolution.height             != _resolution.height
+			||  m_resolution.formatColor        != _resolution.formatColor
+			||  m_resolution.formatDepthStencil != _resolution.formatDepthStencil
+			|| (m_resolution.reset&maskFlags)   != (_resolution.reset&maskFlags)
+			   )
 			{
 				uint32_t flags = _resolution.reset & (~BGFX_RESET_INTERNAL_FORCE);
 
@@ -2500,8 +2502,7 @@ namespace bgfx { namespace d3d11
 				m_scd.width  = _resolution.width;
 				m_scd.height = _resolution.height;
 				// see comment in init() about why we don't worry about BGFX_RESET_SRGB_BACKBUFFER here
-				m_scd.format = s_textureFormat[_resolution.format].m_fmt
-					;
+				m_scd.format = s_textureFormat[_resolution.formatColor].m_fmt;
 
 				preReset();
 
@@ -2546,7 +2547,10 @@ namespace bgfx { namespace d3d11
 						desc.Height     = m_scd.height;
 						desc.MipLevels  = 1;
 						desc.ArraySize  = 1;
-						desc.Format     = (m_resolution.reset & BGFX_RESET_SRGB_BACKBUFFER) ? s_textureFormat[m_resolution.format].m_fmtSrgb : s_textureFormat[m_resolution.format].m_fmt;
+						desc.Format     = (m_resolution.reset & BGFX_RESET_SRGB_BACKBUFFER)
+							? s_textureFormat[m_resolution.formatColor].m_fmtSrgb
+							: s_textureFormat[m_resolution.formatColor].m_fmt
+							;
 						desc.SampleDesc = m_scd.sampleDesc;
 						desc.Usage      = D3D11_USAGE_DEFAULT;
 						desc.BindFlags  = D3D11_BIND_RENDER_TARGET;
