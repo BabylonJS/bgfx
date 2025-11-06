@@ -532,65 +532,65 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 
 			retain(m_device);
 
+			if (m_device.supportsFamily(kMtlGPUFamilyApple4) )
 			{
-				if ([m_device respondsToSelector: @selector(supportsFamily:)])
-				{
-					if ([m_device supportsFamily: MTLGPUFamilyApple4])
-					{
-						g_caps.vendorId = BGFX_PCI_ID_APPLE;
+				g_caps.vendorId = BGFX_PCI_ID_APPLE;
+				g_caps.deviceId = 1004;
 
-						if ([m_device supportsFamily: MTLGPUFamilyApple8])
-						{
-							g_caps.deviceId = 1008;
-						}
-						else if ([m_device supportsFamily: MTLGPUFamilyApple7])
-						{
-							g_caps.deviceId = 1007;
-						}
-						else if ([m_device supportsFamily: MTLGPUFamilyApple6])
-						{
-							g_caps.deviceId = 1006;
-						}
-						else if ([m_device supportsFamily: MTLGPUFamilyApple5])
-						{
-							g_caps.deviceId = 1005;
-						}
-						else
-						{
-							g_caps.deviceId = 1004;
-						}
-					}
+				if (m_device.supportsFamily(kMtlGPUFamilyApple10) )
+				{
+					g_caps.deviceId = 1010;
 				}
+				else if (m_device.supportsFamily(kMtlGPUFamilyApple9) )
+				{
+					g_caps.deviceId = 1009;
+				}
+				else if (m_device.supportsFamily(kMtlGPUFamilyApple8) )
+				{
+					g_caps.deviceId = 1008;
+				}
+				else if (m_device.supportsFamily(kMtlGPUFamilyApple7) )
+				{
+					g_caps.deviceId = 1007;
+				}
+				else if (m_device.supportsFamily(kMtlGPUFamilyApple6) )
+				{
+					g_caps.deviceId = 1006;
+				}
+				else if (m_device.supportsFamily(kMtlGPUFamilyApple5) )
+				{
+					g_caps.deviceId = 1005;
+				}
+			}
 
 #if BX_PLATFORM_OSX
-				if (0 == g_caps.vendorId)
+			if (0 == g_caps.vendorId)
+			{
+				io_registry_entry_t entry;
+
+				uint64_t registryId = getRegistryId(m_device);
+
+				if (0 != registryId)
 				{
-					io_registry_entry_t entry;
+					entry = IOServiceGetMatchingService(mach_port_t(NULL), IORegistryEntryIDMatching(registryId) );
 
-					uint64_t registryId = getRegistryId(m_device);
-
-					if (0 != registryId)
+					if (0 != entry)
 					{
-						entry = IOServiceGetMatchingService(mach_port_t(NULL), IORegistryEntryIDMatching(registryId) );
+						io_registry_entry_t parent;
 
-						if (0 != entry)
+						if (kIOReturnSuccess == IORegistryEntryGetParentEntry(entry, kIOServicePlane, &parent) )
 						{
-							io_registry_entry_t parent;
+							g_caps.vendorId = getEntryProperty(parent, CFSTR("vendor-id") );
+							g_caps.deviceId = getEntryProperty(parent, CFSTR("device-id") );
 
-							if (kIOReturnSuccess == IORegistryEntryGetParentEntry(entry, kIOServicePlane, &parent) )
-							{
-								g_caps.vendorId = getEntryProperty(parent, CFSTR("vendor-id") );
-								g_caps.deviceId = getEntryProperty(parent, CFSTR("device-id") );
-
-								IOObjectRelease(parent);
-							}
-
-							IOObjectRelease(entry);
+							IOObjectRelease(parent);
 						}
+
+						IOObjectRelease(entry);
 					}
 				}
-#endif // BX_PLATFORM_OSX
 			}
+#endif // BX_PLATFORM_OSX
 
 			g_caps.numGPUs = 1;
 			g_caps.gpu[0].vendorId = g_caps.vendorId;
@@ -616,7 +616,7 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 				| BGFX_CAPS_VERTEX_ID
 				);
 
-			g_caps.supported |= m_device.supportsFamily(MTLGPUFamilyApple7)
+			g_caps.supported |= m_device.supportsFamily(kMtlGPUFamilyApple7)
 				? BGFX_CAPS_PRIMITIVE_ID
 				: 0
 				;
@@ -624,7 +624,7 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 			// Reference(s):
 			// - Metal feature set tables
 			//   https://web.archive.org/web/20230330111145/https://developer.apple.com/metal/Metal-Feature-Set-Tables.pdf
-			g_caps.limits.maxTextureSize = m_device.supportsFamily(MTLGPUFamilyApple3) ? 16384 : 8192;
+			g_caps.limits.maxTextureSize = m_device.supportsFamily(kMtlGPUFamilyApple3) ? 16384 : 8192;
 			g_caps.limits.maxFBAttachments = 8;
 			g_caps.supported |= m_device.supportsFamily(MTLGPUFamilyCommon2)
 				? BGFX_CAPS_DRAW_INDIRECT
@@ -826,23 +826,30 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 			m_vertexDescriptor           = newVertexDescriptor();
 			m_samplerDescriptor          = newSamplerDescriptor();
 
-			m_mainFrameBuffer.create(
-				  0
-				, g_platformData.nwh
-				, m_resolution.width
-				, m_resolution.height
-				, m_resolution.formatColor
-				, m_resolution.formatDepthStencil
-				);
-			m_textVideoMem.resize(false, m_resolution.width, m_resolution.height);
-			m_textVideoMem.clear();
-
-			m_numWindows = 1;
-
-			if (NULL == m_mainFrameBuffer.m_swapChain->m_metalLayer)
+			if (NULL == g_platformData.nwh)
 			{
-				MTL_RELEASE(m_device, 0);
-				return false;
+				BX_TRACE("Headless.");
+			}
+			else
+			{
+				m_mainFrameBuffer.create(
+					  0
+					, g_platformData.nwh
+					, m_resolution.width
+					, m_resolution.height
+					, m_resolution.formatColor
+					, m_resolution.formatDepthStencil
+					);
+				m_textVideoMem.resize(false, m_resolution.width, m_resolution.height);
+				m_textVideoMem.clear();
+
+				m_numWindows = 1;
+
+				if (NULL == m_mainFrameBuffer.m_swapChain->m_metalLayer)
+				{
+					MTL_RELEASE(m_device, 0);
+					return false;
+				}
 			}
 
 			m_cmd.init(m_device);
@@ -1082,9 +1089,12 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 		{
 		}
 
-		MTLPixelFormat getSwapChainPixelFormat(SwapChainMtl *swapChain)
+		static MTLPixelFormat getSwapChainPixelFormat(SwapChainMtl* _swapChain)
 		{
-			return swapChain->m_metalLayer.pixelFormat;
+			return NULL != _swapChain
+				? _swapChain->m_metalLayer.pixelFormat
+				: kMtlPixelFormatInvalid
+				;
 		}
 
 		void readTexture(TextureHandle _handle, void* _data, uint8_t _mip) override
@@ -1484,10 +1494,15 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 
 		void updateResolution(const Resolution& _resolution)
 		{
-			m_mainFrameBuffer.m_swapChain->m_maxAnisotropy = !!(_resolution.reset & BGFX_RESET_MAXANISOTROPY)
-				? 16
-				: 1
-				;
+			SwapChainMtl* swapChain = m_mainFrameBuffer.m_swapChain;
+
+			if (NULL != swapChain)
+			{
+				swapChain->m_maxAnisotropy = !!(_resolution.reset & BGFX_RESET_MAXANISOTROPY)
+					? 16
+					: 1
+					;
+			}
 
 			const uint32_t maskFlags = ~(0
 				| BGFX_RESET_MAXANISOTROPY
@@ -1499,18 +1514,22 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 			||  m_resolution.height           !=  _resolution.height
 			|| (m_resolution.reset&maskFlags) != (_resolution.reset&maskFlags) )
 			{
-				MTLPixelFormat prevMetalLayerPixelFormat = getSwapChainPixelFormat(m_mainFrameBuffer.m_swapChain);
 				m_resolution = _resolution;
 
-				if (m_resolution.reset & BGFX_RESET_INTERNAL_FORCE
-				&&  m_mainFrameBuffer.m_swapChain->m_nwh != g_platformData.nwh)
+				const MTLPixelFormat prevPixelFormat = getSwapChainPixelFormat(swapChain);
+
+				if (NULL != swapChain)
 				{
-					m_mainFrameBuffer.m_swapChain->init(g_platformData.nwh);
+					if (m_resolution.reset & BGFX_RESET_INTERNAL_FORCE
+					&&  swapChain->m_nwh != g_platformData.nwh)
+					{
+						swapChain->init(g_platformData.nwh);
+					}
+
+					m_mainFrameBuffer.resizeSwapChain(_resolution.width, _resolution.height);
 				}
 
 				m_resolution.reset &= ~BGFX_RESET_INTERNAL_FORCE;
-
-				m_mainFrameBuffer.resizeSwapChain(_resolution.width, _resolution.height);
 
 				for (uint32_t ii = 0; ii < BX_COUNTOF(m_frameBuffers); ++ii)
 				{
@@ -1522,12 +1541,14 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 				m_textVideoMem.resize(false, _resolution.width, _resolution.height);
 				m_textVideoMem.clear();
 
-				if (prevMetalLayerPixelFormat != getSwapChainPixelFormat(m_mainFrameBuffer.m_swapChain) )
+				const MTLPixelFormat pixelFormat = getSwapChainPixelFormat(swapChain);
+
+				if (prevPixelFormat != pixelFormat)
 				{
 					MTL_RELEASE_I(m_screenshotBlitRenderPipelineState);
 					reset(m_renderPipelineDescriptor);
 
-					m_renderPipelineDescriptor.colorAttachments[0].pixelFormat = getSwapChainPixelFormat(m_mainFrameBuffer.m_swapChain);
+					m_renderPipelineDescriptor.colorAttachments[0].pixelFormat = pixelFormat;
 					m_renderPipelineDescriptor.vertexFunction   = m_screenshotBlitProgram.m_vsh->m_function;
 					m_renderPipelineDescriptor.fragmentFunction = m_screenshotBlitProgram.m_fsh->m_function;
 					m_screenshotBlitRenderPipelineState = m_device.newRenderPipelineStateWithDescriptor(m_renderPipelineDescriptor);
