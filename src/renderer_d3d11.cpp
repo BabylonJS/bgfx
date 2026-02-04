@@ -5685,8 +5685,11 @@ namespace bgfx { namespace d3d11
 		Rect viewScissorRect;
 		viewScissorRect.clear();
 
-		const uint32_t maxComputeBindings = g_caps.limits.maxComputeBindings;
-		const uint32_t maxTextureSamplers = g_caps.limits.maxTextureSamplers;
+		BX_ASSERT(g_caps.limits.maxComputeBindings < 255u, "Limits::maxComputeBindings must be smaller than 255");
+		const uint8_t maxComputeBindings = static_cast<uint8_t>(g_caps.limits.maxComputeBindings);
+
+		BX_ASSERT(g_caps.limits.maxTextureSamplers < 255u, "Limits::maxTextureSamplers must be smaller than 255");
+        const uint8_t maxTextureSamplers = static_cast<uint8_t>(g_caps.limits.maxTextureSamplers);
 
 		uint32_t statsNumPrimsSubmitted[BX_COUNTOF(s_primInfo)] = {};
 		uint32_t statsNumPrimsRendered[BX_COUNTOF(s_primInfo)] = {};
