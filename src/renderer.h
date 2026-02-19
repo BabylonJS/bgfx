@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2025 Branimir Karadzic. All rights reserved.
+ * Copyright 2011-2026 Branimir Karadzic. All rights reserved.
  * License: https://github.com/bkaradzic/bgfx/blob/master/LICENSE
  */
 
@@ -10,23 +10,6 @@
 
 namespace bgfx
 {
-	inline constexpr uint32_t toAbgr8(uint8_t _r, uint8_t _g, uint8_t _b, uint8_t _a = 0xff)
-	{
-		return 0
-			| (uint32_t(_r)<<24)
-			| (uint32_t(_g)<<16)
-			| (uint32_t(_b)<< 8)
-			| (uint32_t(_a)    )
-			;
-	}
-
-	constexpr uint32_t kColorFrame    = toAbgr8(0xff, 0xd7, 0xc9);
-	constexpr uint32_t kColorView     = toAbgr8(0xe4, 0xb4, 0x8e);
-	constexpr uint32_t kColorDraw     = toAbgr8(0xc6, 0xe5, 0xb9);
-	constexpr uint32_t kColorCompute  = toAbgr8(0xa7, 0xdb, 0xd8);
-	constexpr uint32_t kColorMarker   = toAbgr8(0xff, 0x00, 0x00);
-	constexpr uint32_t kColorResource = toAbgr8(0xff, 0x40, 0x20);
-
 	struct BlitState
 	{
 		BlitState(const Frame* _frame)
@@ -56,6 +39,49 @@ namespace bgfx
 		const Frame* m_frame;
 		BlitKey  m_key;
 		uint16_t m_item;
+	};
+
+	struct UniformCacheItem
+	{
+		uint32_t m_offset;
+		uint16_t m_size;
+		uint16_t m_handle;
+	};
+
+	struct UniformCacheState
+	{
+		UniformCacheState(const Frame* _frame)
+			: m_frame(_frame)
+			, m_item(0)
+		{
+			m_key.decode(_frame->m_uniformCacheFrame.m_keys[0]);
+		}
+
+		bool hasItem(uint16_t _view) const
+		{
+			return m_item < m_frame->m_uniformCacheFrame.m_numItems
+				&& m_key.m_view <= _view
+				;
+		}
+
+		const UniformCacheItem advance()
+		{
+			UniformCacheItem item =
+			{
+				.m_offset = m_key.m_offset,
+				.m_size   = m_key.m_size,
+				.m_handle = m_key.m_handle,
+			};
+
+			++m_item;
+			m_key.decode(m_frame->m_uniformCacheFrame.m_keys[m_item]);
+
+			return item;
+		}
+
+		const Frame*    m_frame;
+		UniformCacheKey m_key;
+		uint16_t        m_item;
 	};
 
 	struct ViewState
@@ -477,14 +503,9 @@ namespace bgfx
 			return true;
 		}
 
-		for (uint32_t idx = 0, streamMask = _new.m_streamMask
-			; 0 != streamMask
-			; streamMask >>= 1, idx += 1
-			)
+		for (BitMaskToIndexIteratorT it(_new.m_streamMask); !it.isDone(); it.next() )
 		{
-			const uint32_t ntz = bx::uint32_cnttz(streamMask);
-			streamMask >>= ntz;
-			idx         += ntz;
+			const uint8_t idx = it.idx;
 
 			if (_current.m_stream[idx].m_handle.idx  != _new.m_stream[idx].m_handle.idx
 			||  _current.m_stream[idx].m_startVertex != _new.m_stream[idx].m_startVertex)
@@ -518,7 +539,7 @@ namespace bgfx
 		{
 			if (m_enabled)
 			{
-				ViewStats& viewStats = m_frame->m_perfStats.viewStats[m_numViews];
+				ViewStats& viewStats   = m_frame->m_perfStats.viewStats[m_numViews];
 				viewStats.cpuTimeBegin = bx::getHPCounter();
 
 				m_queryIdx = m_gpuTimer.begin(_view, m_frame->m_frameNum);
@@ -541,10 +562,10 @@ namespace bgfx
 				ViewStats& viewStats = m_frame->m_perfStats.viewStats[m_numViews];
 				const typename Ty::Result& result = m_gpuTimer.m_result[viewStats.view];
 
-				viewStats.cpuTimeEnd = bx::getHPCounter();
+				viewStats.cpuTimeEnd   = bx::getHPCounter();
 				viewStats.gpuTimeBegin = result.m_begin;
-				viewStats.gpuTimeEnd = result.m_end;
-				viewStats.gpuFrameNum = result.m_frameNum;
+				viewStats.gpuTimeEnd   = result.m_end;
+				viewStats.gpuFrameNum  = result.m_frameNum;
 
 				++m_numViews;
 				m_queryIdx = UINT32_MAX;

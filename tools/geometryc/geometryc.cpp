@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2025 Branimir Karadzic. All rights reserved.
+ * Copyright 2011-2026 Branimir Karadzic. All rights reserved.
  * License: https://github.com/bkaradzic/bgfx/blob/master/LICENSE
  */
 
@@ -925,7 +925,7 @@ void help(const char* _error = NULL)
 
 	bx::printf(
 		  "geometryc, bgfx geometry compiler tool, version %d.%d.%d.\n"
-		  "Copyright 2011-2025 Branimir Karadzic. All rights reserved.\n"
+		  "Copyright 2011-2026 Branimir Karadzic. All rights reserved.\n"
 		  "License: https://github.com/bkaradzic/bgfx/blob/master/LICENSE\n\n"
 		, BGFX_GEOMETRYC_VERSION_MAJOR
 		, BGFX_GEOMETRYC_VERSION_MINOR
@@ -1076,7 +1076,7 @@ int main(int _argc, const char* _argv[])
 
 	delete [] data;
 
-	int64_t now = bx::getHPCounter();
+	const int64_t now = bx::getHPCounter();
 	parseElapsed += now;
 	int64_t convertElapsed = -now;
 
@@ -1443,8 +1443,7 @@ int main(int _argc, const char* _argv[])
 	delete [] indexData;
 	delete [] vertexData;
 
-	now = bx::getHPCounter();
-	convertElapsed += now;
+	convertElapsed += bx::getHPCounter();
 
 	bx::printf("parse %f [s]\ntri reorder %f [s]\nconvert %f [s]\ng %d, p %d, v %d, i %d\n"
 		, double(parseElapsed)/bx::getHPFrequency()

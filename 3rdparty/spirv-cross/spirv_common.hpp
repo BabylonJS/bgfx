@@ -27,8 +27,17 @@
 #ifndef SPV_ENABLE_UTILITY_CODE
 #define SPV_ENABLE_UTILITY_CODE
 #endif
-#include "spirv.hpp"
 
+// Pragmatic hack to avoid symbol conflicts when including both hpp11 and hpp headers in same translation unit.
+// This is an unfortunate SPIRV-Headers issue that we cannot easily deal with ourselves.
+#ifdef SPIRV_CROSS_SPV_HEADER_NAMESPACE_OVERRIDE
+#define spv SPIRV_CROSS_SPV_HEADER_NAMESPACE_OVERRIDE
+#define SPIRV_CROSS_SPV_HEADER_NAMESPACE SPIRV_CROSS_SPV_HEADER_NAMESPACE_OVERRIDE
+#else
+#define SPIRV_CROSS_SPV_HEADER_NAMESPACE spv
+#endif
+
+#include "spirv.hpp"
 #include "spirv_cross_containers.hpp"
 #include "spirv_cross_error_handling.hpp"
 #include <functional>
@@ -368,6 +377,7 @@ enum Types
 	TypeAccessChain,
 	TypeUndef,
 	TypeString,
+	TypeDebugLocalVariable,
 	TypeCount
 };
 
@@ -495,6 +505,18 @@ struct SPIRString : IVariant
 	std::string str;
 
 	SPIRV_CROSS_DECLARE_CLONE(SPIRString)
+};
+
+struct SPIRDebugLocalVariable : IVariant
+{
+	enum
+	{
+		type = TypeDebugLocalVariable
+	};
+
+	uint32_t name_id;
+
+	SPIRV_CROSS_DECLARE_CLONE(SPIRDebugLocalVariable)
 };
 
 // This type is only used by backends which need to access the combined image and sampler IDs separately after
@@ -1154,6 +1176,9 @@ struct SPIRVariable : IVariant
 	// Temporaries which can remain forwarded as long as this variable is not modified.
 	SmallVector<ID> dependees;
 
+	// ShaderDebugInfo local variables attached to this variable via DebugDeclare
+	SmallVector<ID> debug_local_variables;
+
 	bool deferred_declaration = false;
 	bool phi_variable = false;
 
@@ -1346,7 +1371,7 @@ struct SPIRConstant : IVariant
 
 	inline float scalar_bf8(uint32_t col = 0, uint32_t row = 0) const
 	{
-		return f16_to_f32(scalar_u8(col, row) << 8);
+		return f16_to_f32(uint16_t(scalar_u8(col, row) << 8));
 	}
 
 	inline float scalar_f32(uint32_t col = 0, uint32_t row = 0) const
@@ -1781,7 +1806,7 @@ struct Meta
 	{
 		std::string alias;
 		std::string qualified_alias;
-		std::string hlsl_semantic;
+		std::string user_semantic;
 		std::string user_type;
 		Bitset decoration_flags;
 		spv::BuiltIn builtin_type = spv::BuiltInMax;
@@ -2041,4 +2066,7 @@ struct hash<SPIRV_CROSS_NAMESPACE::TypedID<type>>
 };
 } // namespace std
 
+#ifdef SPIRV_CROSS_SPV_HEADER_NAMESPACE_OVERRIDE
+#undef spv
+#endif
 #endif

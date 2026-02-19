@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2025 Branimir Karadzic. All rights reserved.
+ * Copyright 2011-2026 Branimir Karadzic. All rights reserved.
  * License: http://www.opensource.org/licenses/BSD-2-Clause
  */
 
@@ -221,6 +221,7 @@ int _main_(int _argc, char** _argv)
 		}
 
 		bimg::imageWriteTga(&writer, kWidth, kHeight, kWidth*4, data, false, false, &err);
+		bx::close(&writer);
 
 		bx::free(&allocator, data);
 	}

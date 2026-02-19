@@ -123,7 +123,7 @@ typedef enum VUIDError_ {
   VUIDErrorMax,
 } VUIDError;
 
-const static uint32_t NumVUIDBuiltins = 40;
+const static uint32_t NumVUIDBuiltins = 41;
 
 typedef struct {
   spv::BuiltIn builtIn;
@@ -170,6 +170,7 @@ std::array<BuiltinVUIDMapping, NumVUIDBuiltins> builtinVUIDInfo = {{
     {spv::BuiltIn::CullMaskKHR,               {6735, 6736, 6737}},
     {spv::BuiltIn::BaryCoordKHR,              {4154, 4155, 4156}},
     {spv::BuiltIn::BaryCoordNoPerspKHR,       {4160, 4161, 4162}},
+    {spv::BuiltIn::LocalInvocationIndex,      {4284, 4285, 4286}},
     {spv::BuiltIn::PrimitivePointIndicesEXT,  {7041, 7043, 7044}},
     {spv::BuiltIn::PrimitiveLineIndicesEXT,   {7047, 7049, 7050}},
     {spv::BuiltIn::PrimitiveTriangleIndicesEXT, {7053, 7055, 7056}},
@@ -367,6 +368,9 @@ class BuiltInsValidator {
 
   spv_result_t ValidateShadingRateAtDefinition(const Decoration& decoration,
                                                const Instruction& inst);
+
+  spv_result_t ValidateDescriptorHeapAtDefinition(const Decoration& decoration,
+                                                  const Instruction& inst);
 
   spv_result_t ValidateRayTracingBuiltinsAtDefinition(
       const Decoration& decoration, const Instruction& inst);
@@ -2829,14 +2833,69 @@ spv_result_t BuiltInsValidator::ValidateVertexIdAtDefinition(
 
 spv_result_t BuiltInsValidator::ValidateLocalInvocationIndexAtDefinition(
     const Decoration& decoration, const Instruction& inst) {
+  if (spvIsVulkanEnv(_.context()->target_env)) {
+    if (spv_result_t error = ValidateI32(
+            decoration, inst,
+            [this, &inst](const std::string& message) -> spv_result_t {
+              uint32_t vuid = GetVUIDForBuiltin(
+                  spv::BuiltIn::LocalInvocationIndex, VUIDErrorType);
+              return _.diag(SPV_ERROR_INVALID_DATA, &inst)
+                     << _.VkErrorID(vuid)
+                     << "According to the Vulkan spec BuiltIn "
+                        "LocalInvocationIndex variable needs to be a 32-bit "
+                        "int scalar. "
+                     << message;
+            })) {
+      return error;
+    }
+  }
+
   // Seed at reference checks with this built-in.
   return ValidateLocalInvocationIndexAtReference(decoration, inst, inst, inst);
 }
 
 spv_result_t BuiltInsValidator::ValidateLocalInvocationIndexAtReference(
     const Decoration& decoration, const Instruction& built_in_inst,
-    const Instruction&,
+    const Instruction& referenced_inst,
     const Instruction& referenced_from_inst) {
+  if (spvIsVulkanEnv(_.context()->target_env)) {
+    const spv::StorageClass storage_class =
+        GetStorageClass(referenced_from_inst);
+    if (storage_class != spv::StorageClass::Max &&
+        storage_class != spv::StorageClass::Input) {
+      uint32_t vuid = GetVUIDForBuiltin(spv::BuiltIn::LocalInvocationIndex,
+                                        VUIDErrorStorageClass);
+      return _.diag(SPV_ERROR_INVALID_DATA, &referenced_from_inst)
+             << _.VkErrorID(vuid)
+             << "Vulkan spec allows BuiltIn LocalInvocationIndex to be only "
+                "used for variables with Input storage class. "
+             << GetReferenceDesc(decoration, built_in_inst, referenced_inst,
+                                 referenced_from_inst)
+             << " " << GetStorageClassDesc(referenced_from_inst);
+    }
+
+    for (const spv::ExecutionModel execution_model : execution_models_) {
+      bool has_vulkan_model =
+          execution_model == spv::ExecutionModel::GLCompute ||
+          execution_model == spv::ExecutionModel::TaskNV ||
+          execution_model == spv::ExecutionModel::MeshNV ||
+          execution_model == spv::ExecutionModel::TaskEXT ||
+          execution_model == spv::ExecutionModel::MeshEXT;
+
+      if (spvIsVulkanEnv(_.context()->target_env) && !has_vulkan_model) {
+        uint32_t vuid = GetVUIDForBuiltin(spv::BuiltIn::LocalInvocationIndex,
+                                          VUIDErrorExecutionModel);
+        return _.diag(SPV_ERROR_INVALID_DATA, &referenced_from_inst)
+               << _.VkErrorID(vuid)
+               << "Vulkan spec allows BuiltIn LocalInvocationIndex to be used "
+                  "only with GLCompute, MeshNV, TaskNV, MeshEXT or"
+               << " TaskEXT execution model. "
+               << GetReferenceDesc(decoration, built_in_inst, referenced_inst,
+                                   referenced_from_inst, execution_model);
+      }
+    }
+  }
+
   if (function_id_ == 0) {
     // Propagate this rule to all dependant ids in the global scope.
     id_to_at_reference_checks_[referenced_from_inst.id()].push_back(
@@ -2899,9 +2958,24 @@ spv_result_t BuiltInsValidator::ValidateMeshBuiltinInterfaceRules(
     const Decoration& decoration, const Instruction& inst, spv::Op scalar_type,
     const Instruction& referenced_from_inst) {
   if (function_id_) {
-    if (execution_models_.count(spv::ExecutionModel::MeshEXT)) {
+    if (!execution_models_.count(spv::ExecutionModel::MeshEXT)) {
+      return SPV_SUCCESS;
+    }
+
+    const spv::BuiltIn builtin = decoration.builtin();
+    const bool is_topology =
+        builtin == spv::BuiltIn::PrimitiveTriangleIndicesEXT ||
+        builtin == spv::BuiltIn::PrimitiveLineIndicesEXT ||
+        builtin == spv::BuiltIn::PrimitivePointIndicesEXT;
+
+    // These builtin have the ability to be an array with MeshEXT
+    // When an array, we need to make sure the array size lines up
+    std::map<uint32_t, uint32_t> entry_interface_id_map;
+    const bool is_interface_var =
+        IsMeshInterfaceVar(inst, entry_interface_id_map);
+
+    if (!is_topology) {
       bool is_block = false;
-      const spv::BuiltIn builtin = decoration.builtin();
 
       static const std::unordered_map<spv::BuiltIn, MeshBuiltinVUIDs>
           mesh_vuid_map = {{
@@ -2941,12 +3015,7 @@ spv_result_t BuiltInsValidator::ValidateMeshBuiltinInterfaceRules(
                << " within the MeshEXT Execution Model must also be "
                << "decorated with the PerPrimitiveEXT decoration. ";
       }
-
-      // These builtin have the ability to be an array with MeshEXT
-      // When an array, we need to make sure the array size lines up
-      std::map<uint32_t, uint32_t> entry_interface_id_map;
-      bool found = IsMeshInterfaceVar(inst, entry_interface_id_map);
-      if (found) {
+      if (is_interface_var) {
         for (const auto& id : entry_interface_id_map) {
           uint32_t entry_point_id = id.first;
           uint32_t interface_var_id = id.second;
@@ -2965,6 +3034,86 @@ spv_result_t BuiltInsValidator::ValidateMeshBuiltinInterfaceRules(
                    << ") must match the value specified by OutputPrimitivesEXT "
                       "("
                    << output_prim_size << "). ";
+          }
+        }
+      }
+    }
+
+    if (is_interface_var && is_topology) {
+      for (const auto& id : entry_interface_id_map) {
+        uint32_t entry_point_id = id.first;
+
+        uint64_t max_output_primitives =
+            _.GetOutputPrimitivesEXT(entry_point_id);
+        uint32_t underlying_type = 0;
+        if (spv_result_t error =
+                GetUnderlyingType(_, decoration, inst, &underlying_type)) {
+          return error;
+        }
+
+        uint64_t primitive_array_dim = 0;
+        if (_.GetIdOpcode(underlying_type) == spv::Op::OpTypeArray) {
+          underlying_type = _.FindDef(underlying_type)->word(3u);
+          if (!_.EvalConstantValUint64(underlying_type, &primitive_array_dim)) {
+            assert(0 && "Array type definition is corrupt");
+          }
+        }
+
+        const auto* modes = _.GetExecutionModes(entry_point_id);
+        if (builtin == spv::BuiltIn::PrimitiveTriangleIndicesEXT) {
+          if (!modes || !modes->count(spv::ExecutionMode::OutputTrianglesEXT)) {
+            return _.diag(SPV_ERROR_INVALID_DATA, &inst)
+                   << _.VkErrorID(7054)
+                   << "The PrimitiveTriangleIndicesEXT decoration must be used "
+                      "with the OutputTrianglesEXT Execution Mode. ";
+          }
+          if (primitive_array_dim &&
+              primitive_array_dim != max_output_primitives) {
+            return _.diag(SPV_ERROR_INVALID_DATA, &inst)
+                   << _.VkErrorID(7058)
+                   << "The size of the array decorated with "
+                      "PrimitiveTriangleIndicesEXT ("
+                   << primitive_array_dim
+                   << ") must match the value specified "
+                      "by OutputPrimitivesEXT ("
+                   << max_output_primitives << "). ";
+          }
+        } else if (builtin == spv::BuiltIn::PrimitiveLineIndicesEXT) {
+          if (!modes || !modes->count(spv::ExecutionMode::OutputLinesEXT)) {
+            return _.diag(SPV_ERROR_INVALID_DATA, &inst)
+                   << _.VkErrorID(7048)
+                   << "The PrimitiveLineIndicesEXT decoration must be used "
+                      "with the OutputLinesEXT Execution Mode. ";
+          }
+          if (primitive_array_dim &&
+              primitive_array_dim != max_output_primitives) {
+            return _.diag(SPV_ERROR_INVALID_DATA, &inst)
+                   << _.VkErrorID(7052)
+                   << "The size of the array decorated with "
+                      "PrimitiveLineIndicesEXT ("
+                   << primitive_array_dim
+                   << ") must match the value specified "
+                      "by OutputPrimitivesEXT ("
+                   << max_output_primitives << "). ";
+          }
+
+        } else if (builtin == spv::BuiltIn::PrimitivePointIndicesEXT) {
+          if (!modes || !modes->count(spv::ExecutionMode::OutputPoints)) {
+            return _.diag(SPV_ERROR_INVALID_DATA, &inst)
+                   << _.VkErrorID(7042)
+                   << "The PrimitivePointIndicesEXT decoration must be used "
+                      "with the OutputPoints Execution Mode. ";
+          }
+          if (primitive_array_dim &&
+              primitive_array_dim != max_output_primitives) {
+            return _.diag(SPV_ERROR_INVALID_DATA, &inst)
+                   << _.VkErrorID(7046)
+                   << "The size of the array decorated with "
+                      "PrimitivePointIndicesEXT ("
+                   << primitive_array_dim
+                   << ") must match the value specified "
+                      "by OutputPrimitivesEXT ("
+                   << max_output_primitives << "). ";
           }
         }
       }
@@ -4361,6 +4510,18 @@ spv_result_t BuiltInsValidator::ValidateShadingRateAtReference(
   return SPV_SUCCESS;
 }
 
+spv_result_t BuiltInsValidator::ValidateDescriptorHeapAtDefinition(
+    const Decoration& decoration, const Instruction& inst) {
+  if (decoration.struct_member_index() != Decoration::kInvalidMember) {
+    return _.diag(SPV_ERROR_INVALID_DATA, &inst)
+           << "BuiltIn "
+           << _.grammar().lookupOperandName(SPV_OPERAND_TYPE_BUILT_IN,
+                                            (uint32_t)decoration.builtin())
+           << " cannot be used as a member decoration ";
+  }
+  return SPV_SUCCESS;
+}
+
 spv_result_t BuiltInsValidator::ValidateRayTracingBuiltinsAtDefinition(
     const Decoration& decoration, const Instruction& inst) {
   if (spvIsVulkanEnv(_.context()->target_env)) {
@@ -4594,12 +4755,6 @@ spv_result_t BuiltInsValidator::ValidateMeshShadingEXTBuiltinsAtDefinition(
         }
         break;
       case spv::BuiltIn::CullPrimitiveEXT: {
-        // We know this only allowed for Mesh Execution Model
-        if (spv_result_t error = ValidateMeshBuiltinInterfaceRules(
-                decoration, inst, spv::Op::OpTypeBool, inst)) {
-          return error;
-        }
-
         for (const uint32_t entry_point : _.entry_points()) {
           auto* models = _.GetExecutionModels(entry_point);
           if (models->find(spv::ExecutionModel::MeshEXT) == models->end() &&
@@ -4627,88 +4782,19 @@ spv_result_t BuiltInsValidator::ValidateMeshShadingEXTBuiltinsAtDefinition(
       default:
         assert(0 && "Unexpected mesh EXT builtin");
     }
-    for (const uint32_t entry_point : _.entry_points()) {
-      // execution modes and builtin are both global, so only check these
-      // buildit definitions if we know the entrypoint is Mesh
-      auto* models = _.GetExecutionModels(entry_point);
-      if (models->find(spv::ExecutionModel::MeshEXT) == models->end() &&
-          models->find(spv::ExecutionModel::MeshNV) == models->end()) {
-        continue;
-      }
 
-      const auto* modes = _.GetExecutionModes(entry_point);
-      uint64_t max_output_primitives = _.GetOutputPrimitivesEXT(entry_point);
-      uint32_t underlying_type = 0;
-      if (spv_result_t error =
-              GetUnderlyingType(_, decoration, inst, &underlying_type)) {
-        return error;
-      }
-
-      uint64_t primitive_array_dim = 0;
-      if (_.GetIdOpcode(underlying_type) == spv::Op::OpTypeArray) {
-        underlying_type = _.FindDef(underlying_type)->word(3u);
-        if (!_.EvalConstantValUint64(underlying_type, &primitive_array_dim)) {
-          assert(0 && "Array type definition is corrupt");
-        }
-      }
-      switch (builtin) {
-        case spv::BuiltIn::PrimitivePointIndicesEXT:
-          if (!modes || !modes->count(spv::ExecutionMode::OutputPoints)) {
-            return _.diag(SPV_ERROR_INVALID_DATA, &inst)
-                   << _.VkErrorID(7042)
-                   << "The PrimitivePointIndicesEXT decoration must be used "
-                      "with "
-                      "the OutputPoints Execution Mode. ";
-          }
-          if (primitive_array_dim &&
-              primitive_array_dim != max_output_primitives) {
-            return _.diag(SPV_ERROR_INVALID_DATA, &inst)
-                   << _.VkErrorID(7046)
-                   << "The size of the array decorated with "
-                      "PrimitivePointIndicesEXT must match the value specified "
-                      "by OutputPrimitivesEXT. ";
-          }
-          break;
-        case spv::BuiltIn::PrimitiveLineIndicesEXT:
-          if (!modes || !modes->count(spv::ExecutionMode::OutputLinesEXT)) {
-            return _.diag(SPV_ERROR_INVALID_DATA, &inst)
-                   << _.VkErrorID(7048)
-                   << "The PrimitiveLineIndicesEXT decoration must be used "
-                      "with "
-                      "the OutputLinesEXT Execution Mode. ";
-          }
-          if (primitive_array_dim &&
-              primitive_array_dim != max_output_primitives) {
-            return _.diag(SPV_ERROR_INVALID_DATA, &inst)
-                   << _.VkErrorID(7052)
-                   << "The size of the array decorated with "
-                      "PrimitiveLineIndicesEXT must match the value specified "
-                      "by OutputPrimitivesEXT. ";
-          }
-          break;
-        case spv::BuiltIn::PrimitiveTriangleIndicesEXT:
-          if (!modes || !modes->count(spv::ExecutionMode::OutputTrianglesEXT)) {
-            return _.diag(SPV_ERROR_INVALID_DATA, &inst)
-                   << _.VkErrorID(7054)
-                   << "The PrimitiveTriangleIndicesEXT decoration must be used "
-                      "with "
-                      "the OutputTrianglesEXT Execution Mode. ";
-          }
-          if (primitive_array_dim &&
-              primitive_array_dim != max_output_primitives) {
-            return _.diag(SPV_ERROR_INVALID_DATA, &inst)
-                   << _.VkErrorID(7058)
-                   << "The size of the array decorated with "
-                      "PrimitiveTriangleIndicesEXT must match the value "
-                      "specified "
-                      "by OutputPrimitivesEXT. ";
-          }
-          break;
-        default:
-          break;  // no validation rules
-      }
+    // - We know this only allowed for Mesh Execution Model.
+    // - The Scalar type is is boolean for CullPrimitiveEXT, the other 3 builtin
+    // (topology) don't need this type.
+    // - It is possible to have multiple mesh
+    // shaders (https://github.com/KhronosGroup/SPIRV-Tools/issues/6320) and we
+    // need to validate these at reference time.
+    if (spv_result_t error = ValidateMeshBuiltinInterfaceRules(
+            decoration, inst, spv::Op::OpTypeBool, inst)) {
+      return error;
     }
   }
+
   // Seed at reference checks with this built-in.
   return ValidateMeshShadingEXTBuiltinsAtReference(decoration, inst, inst,
                                                    inst);
@@ -4948,6 +5034,10 @@ spv_result_t BuiltInsValidator::ValidateSingleBuiltInAtDefinitionVulkan(
     }
     case spv::BuiltIn::ShadingRateKHR: {
       return ValidateShadingRateAtDefinition(decoration, inst);
+    }
+    case spv::BuiltIn::SamplerHeapEXT:
+    case spv::BuiltIn::ResourceHeapEXT: {
+      return ValidateDescriptorHeapAtDefinition(decoration, inst);
     }
     default:
       // No validation rules (for the moment).

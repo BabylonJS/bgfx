@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2025 Branimir Karadzic. All rights reserved.
+ * Copyright 2011-2026 Branimir Karadzic. All rights reserved.
  * License: https://github.com/bkaradzic/bgfx/blob/master/LICENSE
  */
 
@@ -209,7 +209,7 @@ public:
 		// Create program from shaders.
 		m_program = loadProgram("vs_cubes", "fs_cubes");
 
-		m_timeOffset = bx::getHPCounter();
+		m_frameTime.reset();
 
 		imguiCreate();
 	}
@@ -237,6 +237,9 @@ public:
 	{
 		if (!entry::processEvents(m_width, m_height, m_debug, m_reset, &m_mouseState) )
 		{
+			m_frameTime.frame();
+			const float time = bx::toSeconds<float>(m_frameTime.getDurationTime() );
+
 			imguiBeginFrame(m_mouseState.m_mx
 				,  m_mouseState.m_my
 				, (m_mouseState.m_buttons[entry::MouseButton::Left  ] ? IMGUI_MBUT_LEFT   : 0)
@@ -273,8 +276,6 @@ public:
 			ImGui::End();
 
 			imguiEndFrame();
-
-			float time = (float)( (bx::getHPCounter()-m_timeOffset)/double(bx::getHPFrequency() ) );
 
 			const bx::Vec3 at  = { 0.0f, 0.0f,   0.0f };
 			const bx::Vec3 eye = { 0.0f, 0.0f, -35.0f };
@@ -354,7 +355,9 @@ public:
 	bgfx::VertexBufferHandle m_vbh;
 	bgfx::IndexBufferHandle m_ibh[BX_COUNTOF(s_ptState)];
 	bgfx::ProgramHandle m_program;
-	int64_t m_timeOffset;
+
+	FrameTime m_frameTime;
+
 	int32_t m_pt;
 
 	bool m_r;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2025 Branimir Karadzic. All rights reserved.
+ * Copyright 2011-2026 Branimir Karadzic. All rights reserved.
  * License: https://github.com/bkaradzic/bgfx/blob/master/LICENSE
  */
 
@@ -385,31 +385,31 @@ enum DebugFlags : const uint
 
 enum BufferFlags : const ushort
 {
-	// 1 8-bit value
+	// 1 x 8-bit value
 	COMPUTEFORMAT8X1       = 0x0001,
 
-	// 2 8-bit values
+	// 2 x 8-bit values
 	COMPUTEFORMAT8X2       = 0x0002,
 
-	// 4 8-bit values
+	// 4 x 8-bit values
 	COMPUTEFORMAT8X4       = 0x0003,
 
-	// 1 16-bit value
+	// 1 x 16-bit value
 	COMPUTEFORMAT16X1      = 0x0004,
 
-	// 2 16-bit values
+	// 2 x 16-bit values
 	COMPUTEFORMAT16X2      = 0x0005,
 
-	// 4 16-bit values
+	// 4 x 16-bit values
 	COMPUTEFORMAT16X4      = 0x0006,
 
-	// 1 32-bit value
+	// 1 x 32-bit value
 	COMPUTEFORMAT32X1      = 0x0007,
 
-	// 2 32-bit values
+	// 2 x 32-bit values
 	COMPUTEFORMAT32X2      = 0x0008,
 
-	// 4 32-bit values
+	// 4 x 32-bit values
 	COMPUTEFORMAT32X4      = 0x0009,
 	COMPUTEFORMATSHIFT     = 0,
 	COMPUTEFORMATMASK      = 0x000f,
@@ -464,6 +464,9 @@ enum TextureFlags : const ulong
 
 	// Texture will be used for read back from GPU.
 	READBACK               = 0x0000800000000000,
+
+	// Texture is shared with other device or other process.
+	EXTERNALSHARED         = 0x0001000000000000,
 
 	// Render target MSAAx2 mode.
 	RTMSAAX2               = 0x0000002000000000,
@@ -711,29 +714,38 @@ enum CapsFlags : const ulong
 	// CPU direct access to GPU texture memory.
 	TEXTUREDIRECTACCESS    = 0x0000000000400000,
 
+	// External texture is supported.
+	TEXTUREEXTERNAL        = 0x0000000000800000,
+
+	// External shared texture is supported.
+	TEXTUREEXTERNALSHARED  = 0x0000000001000000,
+
 	// Read-back texture is supported.
-	TEXTUREREADBACK        = 0x0000000000800000,
+	TEXTUREREADBACK        = 0x0000000002000000,
 
 	// 2D texture array is supported.
-	TEXTURE_2DARRAY        = 0x0000000001000000,
+	TEXTURE_2DARRAY        = 0x0000000004000000,
 
 	// 3D textures are supported.
-	TEXTURE_3D             = 0x0000000002000000,
+	TEXTURE_3D             = 0x0000000008000000,
 
 	// Transparent back buffer supported.
-	TRANSPARENTBACKBUFFER  = 0x0000000004000000,
+	TRANSPARENTBACKBUFFER  = 0x0000000010000000,
+
+	// Variable Rate Shading
+	VARIABLERATESHADING    = 0x0000000020000000,
 
 	// Vertex attribute half-float is supported.
-	VERTEXATTRIBHALF       = 0x0000000008000000,
+	VERTEXATTRIBHALF       = 0x0000000040000000,
 
 	// Vertex attribute 10_10_10_2 is supported.
-	VERTEXATTRIBUINT10     = 0x0000000010000000,
+	VERTEXATTRIBUINT10     = 0x0000000080000000,
 
 	// Rendering with VertexID only is supported.
-	VERTEXID               = 0x0000000020000000,
+	VERTEXID               = 0x0000000100000000,
 
 	// Viewport layer is available in vertex shader.
-	VIEWPORTLAYERARRAY     = 0x0000000040000000,
+	VIEWPORTLAYERARRAY     = 0x0000000200000000,
 
 	// All texture compare modes are supported.
 	TEXTURECOMPAREALL      = 0x0000000000180000,
@@ -850,6 +862,18 @@ enum CubeMapFlags : const uint
 	NEGATIVEZ              = 0x00000005,
 }
 
+enum FrameFlags : const uint
+{
+	// No frame flags.
+	NONE                   = 0x00000000,
+
+	// Capture frame with graphics debugger.
+	DEBUGCAPTURE           = 0x00000001,
+
+	// Discard all draw calls.
+	DISCARD                = 0x00000002,
+}
+
 enum Fatal : uint
 {
 	DEBUGCHECK,
@@ -892,6 +916,9 @@ enum RendererType : uint
 
 	// Vulkan
 	VULKAN,
+
+	// WebGPU
+	WEBGPU,
 
 	COUNT
 }
@@ -1023,6 +1050,18 @@ enum TextureFormat : uint
 
 	// ETC2 RGB8A1
 	ETC2A1,
+
+	// EAC R11 UNORM
+	EACR11,
+
+	// EAC R11 SNORM
+	EACR11S,
+
+	// EAC RG11 UNORM
+	EACRG11,
+
+	// EAC RG11 SNORM
+	EACRG11S,
 
 	// PVRTC1 RGB 2BPP
 	PTC12,
@@ -1182,6 +1221,20 @@ enum UniformType : uint
 	COUNT
 }
 
+enum UniformFreq : uint
+{
+	// Changing per draw call.
+	DRAW,
+
+	// Changing per view.
+	VIEW,
+
+	// Changing per frame.
+	FRAME,
+
+	COUNT
+}
+
 enum BackbufferRatio : uint
 {
 	// Equal to backbuffer.
@@ -1290,6 +1343,32 @@ enum ViewMode : uint
 
 	// Sort draw call depth in descending order.
 	DEPTHDESCENDING,
+
+	COUNT
+}
+
+enum ShadingRate : uint
+{
+	// 1x1
+	RATE1X1,
+
+	// 1x2
+	RATE1X2,
+
+	// 2x1
+	RATE2X1,
+
+	// 2x2
+	RATE2X2,
+
+	// 2x4
+	RATE2X4,
+
+	// 4x2
+	RATE4X2,
+
+	// 4x4
+	RATE4X4,
 
 	COUNT
 }
@@ -1431,7 +1510,7 @@ struct Caps
 	//   - `BGFX_CAPS_FORMAT_TEXTURE_MSAA` - Texture can be sampled as MSAA.
 	//   - `BGFX_CAPS_FORMAT_TEXTURE_MIP_AUTOGEN` - Texture format supports auto-generated
 	//     mips.
-	ushort[96] formats;
+	ushort[100] formats;
 }
 
 // Internal data.
@@ -1454,6 +1533,8 @@ struct PlatformData
 	// GL context, D3D device, or Vulkan device. If `NULL`, bgfx
 	// will create context/device.
 	void* context;
+	// D3D12 Queue. If `NULL` bgfx will create queue.
+	void* queue;
 	// GL back-buffer, or D3D render target view. If `NULL` bgfx will
 	// create back-buffer color surface.
 	void* backBuffer;
@@ -1526,6 +1607,8 @@ struct Init
 	bool debug;
 	// Enable device for profiling.
 	bool profile;
+	// Enable fallback to next available renderer.
+	bool fallback;
 	// Platform data.
 	PlatformData platformData;
 	// Backbuffer resolution and reset parameters. See: `bgfx::Resolution`.
@@ -1965,8 +2048,8 @@ extern fn void reset(uint _width, uint _height, uint _flags, TextureFormat _form
 // Advance to next frame. When using multithreaded renderer, this call
 // just swaps internal buffers, kicks render thread, and returns. In
 // singlethreaded renderer this call does frame rendering.
-// _capture : `Capture frame with graphics debugger.`
-extern fn uint frame(bool _capture) @extern("bgfx_frame");
+// _flags : `Frame flags. See: `BGFX_FRAME_*` for more info.   - `BGFX_FRAME_NONE` - No frame flag.   - `BGFX_FRAME_DEBUG_CAPTURE` - Capture frame with graphics debugger.   - `BGFX_FRAME_DISCARD` - Discard all draw calls.`
+extern fn uint frame(char _flags) @extern("bgfx_frame");
 
 // Returns current renderer backend API type.
 // @remarks
@@ -2261,7 +2344,8 @@ extern fn TextureHandle create_texture(Memory* _mem, ulong _flags, char _skip, T
 // _format : `Texture format. See: `TextureFormat::Enum`.`
 // _flags : `Texture creation (see `BGFX_TEXTURE_*`.), and sampler (see `BGFX_SAMPLER_*`) flags. Default texture sampling mode is linear, and wrap mode is repeat. - `BGFX_SAMPLER_[U/V/W]_[MIRROR/CLAMP]` - Mirror or clamp to edge wrap   mode. - `BGFX_SAMPLER_[MIN/MAG/MIP]_[POINT/ANISOTROPIC]` - Point or anisotropic   sampling.`
 // _mem : `Texture data. If `_mem` is non-NULL, created texture will be immutable. If `_mem` is NULL content of the texture is uninitialized. When `_numLayers` is more than 1, expected memory layout is texture and all mips together for each array element.`
-extern fn TextureHandle create_texture_2d(ushort _width, ushort _height, bool _hasMips, ushort _numLayers, TextureFormat _format, ulong _flags, Memory* _mem) @extern("bgfx_create_texture_2d");
+// _external : `Native API pointer to texture.`
+extern fn TextureHandle create_texture_2d(ushort _width, ushort _height, bool _hasMips, ushort _numLayers, TextureFormat _format, ulong _flags, Memory* _mem, ulong _external) @extern("bgfx_create_texture_2d");
 
 // Create texture with size based on back-buffer ratio. Texture will maintain ratio
 // if back buffer resolution changes.
@@ -2280,7 +2364,8 @@ extern fn TextureHandle create_texture_2d_scaled(BackbufferRatio _ratio, bool _h
 // _format : `Texture format. See: `TextureFormat::Enum`.`
 // _flags : `Texture creation (see `BGFX_TEXTURE_*`.), and sampler (see `BGFX_SAMPLER_*`) flags. Default texture sampling mode is linear, and wrap mode is repeat. - `BGFX_SAMPLER_[U/V/W]_[MIRROR/CLAMP]` - Mirror or clamp to edge wrap   mode. - `BGFX_SAMPLER_[MIN/MAG/MIP]_[POINT/ANISOTROPIC]` - Point or anisotropic   sampling.`
 // _mem : `Texture data. If `_mem` is non-NULL, created texture will be immutable. If `_mem` is NULL content of the texture is uninitialized. When `_numLayers` is more than 1, expected memory layout is texture and all mips together for each array element.`
-extern fn TextureHandle create_texture_3d(ushort _width, ushort _height, ushort _depth, bool _hasMips, TextureFormat _format, ulong _flags, Memory* _mem) @extern("bgfx_create_texture_3d");
+// _external : `Native API pointer to texture.`
+extern fn TextureHandle create_texture_3d(ushort _width, ushort _height, ushort _depth, bool _hasMips, TextureFormat _format, ulong _flags, Memory* _mem, ulong _external) @extern("bgfx_create_texture_3d");
 
 // Create Cube texture.
 // _size : `Cube side size.`
@@ -2288,8 +2373,9 @@ extern fn TextureHandle create_texture_3d(ushort _width, ushort _height, ushort 
 // _numLayers : `Number of layers in texture array. Must be 1 if caps `BGFX_CAPS_TEXTURE_2D_ARRAY` flag is not set.`
 // _format : `Texture format. See: `TextureFormat::Enum`.`
 // _flags : `Texture creation (see `BGFX_TEXTURE_*`.), and sampler (see `BGFX_SAMPLER_*`) flags. Default texture sampling mode is linear, and wrap mode is repeat. - `BGFX_SAMPLER_[U/V/W]_[MIRROR/CLAMP]` - Mirror or clamp to edge wrap   mode. - `BGFX_SAMPLER_[MIN/MAG/MIP]_[POINT/ANISOTROPIC]` - Point or anisotropic   sampling.`
-// _mem : `Texture data. If `_mem` is non-NULL, created texture will be immutable. If `_mem` is NULL content of the texture is uninitialized. When `_numLayers` is more than 1, expected memory layout is texture and all mips together for each array element.`
-extern fn TextureHandle create_texture_cube(ushort _size, bool _hasMips, ushort _numLayers, TextureFormat _format, ulong _flags, Memory* _mem) @extern("bgfx_create_texture_cube");
+// _mem : `Texture data. If `_mem` is non-NULL, created texture will be immutable. If `_mem` is NULL content of the texture is uninitialized. When `_numLayers` is more than`
+// _external : `Native API pointer to texture.`
+extern fn TextureHandle create_texture_cube(ushort _size, bool _hasMips, ushort _numLayers, TextureFormat _format, ulong _flags, Memory* _mem, ulong _external) @extern("bgfx_create_texture_cube");
 
 // Update 2D texture.
 // @attention It's valid to update only mutable texture. See `bgfx::createTexture2D` for more info.
@@ -2436,6 +2522,36 @@ extern fn void destroy_frame_buffer(FrameBufferHandle _handle) @extern("bgfx_des
 // _num : `Number of elements in array.`
 extern fn UniformHandle create_uniform(ZString _name, UniformType _type, ushort _num) @extern("bgfx_create_uniform");
 
+// Create shader uniform parameter.
+// @remarks
+//   1. Uniform names are unique. It's valid to call `bgfx::createUniform`
+//      multiple times with the same uniform name. The library will always
+//      return the same handle, but the handle reference count will be
+//      incremented. This means that the same number of `bgfx::destroyUniform`
+//      must be called to properly destroy the uniform.
+//   2. Predefined uniforms (declared in `bgfx_shader.sh`):
+//      - `u_viewRect vec4(x, y, width, height)` - view rectangle for current
+//        view, in pixels.
+//      - `u_viewTexel vec4(1.0/width, 1.0/height, undef, undef)` - inverse
+//        width and height
+//      - `u_view mat4` - view matrix
+//      - `u_invView mat4` - inverted view matrix
+//      - `u_proj mat4` - projection matrix
+//      - `u_invProj mat4` - inverted projection matrix
+//      - `u_viewProj mat4` - concatenated view projection matrix
+//      - `u_invViewProj mat4` - concatenated inverted view projection matrix
+//      - `u_model mat4[BGFX_CONFIG_MAX_BONES]` - array of model matrices.
+//      - `u_modelView mat4` - concatenated model view matrix, only first
+//        model matrix from array is used.
+//      - `u_invModelView mat4` - inverted concatenated model view matrix.
+//      - `u_modelViewProj mat4` - concatenated model view projection matrix.
+//      - `u_alphaRef float` - alpha reference value for alpha test.
+// _name : `Uniform name in shader.`
+// _freq : `Uniform change frequency (See: `bgfx::UniformFreq`).`
+// _type : `Type of uniform (See: `bgfx::UniformType`).`
+// _num : `Number of elements in array.`
+extern fn UniformHandle create_uniform_with_freq(ZString _name, UniformFreq _freq, UniformType _type, ushort _num) @extern("bgfx_create_uniform_with_freq");
+
 // Retrieve uniform info.
 // _handle : `Handle to uniform object.`
 // _info : `Uniform info.`
@@ -2564,7 +2680,14 @@ extern fn void set_view_transform(ushort _id, void* _view, void* _proj) @extern(
 // _order : `View remap id table. Passing `NULL` will reset view ids to default state.`
 extern fn void set_view_order(ushort _id, ushort _num, ushort* _order) @extern("bgfx_set_view_order");
 
+// Set view shading rate.
+// @attention Availability depends on: `BGFX_CAPS_VARIABLE_RATE_SHADING`.
+// _id : `View id.`
+// _shadingRate : `Shading rate.`
+extern fn void set_view_shading_rate(ushort _id, ShadingRate _shadingRate) @extern("bgfx_set_view_shading_rate");
+
 // Reset all view settings to default.
+// _id : `_id View id.`
 extern fn void reset_view(ushort _id) @extern("bgfx_reset_view");
 
 // Begin submitting draw calls from thread.
@@ -2643,6 +2766,21 @@ extern fn uint encoder_alloc_transform(Encoder* _this, Transform* _transform, us
 // _value : `Pointer to uniform data.`
 // _num : `Number of elements. Passing `UINT16_MAX` will use the _num passed on uniform creation.`
 extern fn void encoder_set_uniform(Encoder* _this, UniformHandle _handle, void* _value, ushort _num) @extern("bgfx_encoder_set_uniform");
+
+// Set shader uniform parameter for view.
+// @attention Uniform must be created with `bgfx::UniformFreq::View` argument.
+// _id : `View id.`
+// _handle : `Uniform.`
+// _value : `Pointer to uniform data.`
+// _num : `Number of elements. Passing `UINT16_MAX` will use the _num passed on uniform creation.`
+extern fn void set_view_uniform(ushort _id, UniformHandle _handle, void* _value, ushort _num) @extern("bgfx_set_view_uniform");
+
+// Set shader uniform parameter for frame.
+// @attention Uniform must be created with `bgfx::UniformFreq::View` argument.
+// _handle : `Uniform.`
+// _value : `Pointer to uniform data.`
+// _num : `Number of elements. Passing `UINT16_MAX` will use the _num passed on uniform creation.`
+extern fn void set_frame_uniform(UniformHandle _handle, void* _value, ushort _num) @extern("bgfx_set_frame_uniform");
 
 // Set index buffer for draw primitive.
 // _handle : `Index buffer.`
@@ -2728,6 +2866,7 @@ extern fn void encoder_set_instance_data_from_dynamic_vertex_buffer(Encoder* _th
 // Set number of instances for auto generated instances use in conjunction
 // with gl_InstanceID.
 // @attention Availability depends on: `BGFX_CAPS_VERTEX_ID`.
+// _numInstances : `Number of instances.`
 extern fn void encoder_set_instance_count(Encoder* _this, uint _numInstances) @extern("bgfx_encoder_set_instance_count");
 
 // Set texture stage for draw primitive.
@@ -3080,6 +3219,7 @@ extern fn void set_instance_data_from_dynamic_vertex_buffer(DynamicVertexBufferH
 // Set number of instances for auto generated instances use in conjunction
 // with gl_InstanceID.
 // @attention Availability depends on: `BGFX_CAPS_VERTEX_ID`.
+// _numInstances : `Number of instances.`
 extern fn void set_instance_count(uint _numInstances) @extern("bgfx_set_instance_count");
 
 // Set texture stage for draw primitive.

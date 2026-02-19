@@ -43,6 +43,7 @@ Supported rendering backends:
  * Vulkan
  * WebGL 1.0
  * WebGL 2.0
+ * WebGPU (Dawn Native only)
 
 Supported platforms:
 
@@ -102,11 +103,10 @@ tool.
 
 ## Crown
 
-https://github.com/dbartolini/crown - Crown is a general purpose data-driven
-game engine, written from scratch with a minimalistic and data-oriented design
-philosophy in mind.
+https://github.com/crownengine/crown - Crown is a complete and cross-platform
+game engine designed for flexibility, performance, and fast-iterations.
 
-![Crown screenshot](https://raw.githubusercontent.com/dbartolini/crown/master/docs/shots/level-editor.png)
+![Crown screenshot](https://raw.githubusercontent.com/crownengine/crown/master/docs/shots/level-editor.png)
 
 ## Offroad Legends 2
 
@@ -359,16 +359,13 @@ native applications with the power of the Babylon.js JavaScript framework.
 
 ## Nira
 
-https://nira.app/ - Instantly load and view assets on any device. All you need
-is a web browser.
+https://nira.app/ - Nira is a collaborative platform for rendering massive
+3D models in real time, enabling interactive, web-based visualization and
+inspection on any device, including smartphones and tablets.
 
-SIGGRAPH 2019: Project Nira: Instant Interactive Real-Time Access to
-Multi-Gigabyte Sized 3D Assets on Any Device:
-https://s2019.siggraph.org/presentation/?sess=sess104&id=real_130#038;id=real_130
-
-<a href="http://www.youtube.com/watch?feature=player_embedded&v=Gz9weuemhDA&t=3350"
-target="_blank"><img src="http://img.youtube.com/vi/Gz9weuemhDA/0.jpg"
-alt="Heroes of Hammerwatch"
+<a href="https://www.youtube.com/watch?v=U4lv_nQ4PUY"
+target="_blank"><img src="http://img.youtube.com/vi/U4lv_nQ4PUY/0.jpg"
+alt="Nira 2025"
 width="640" height="480" border="0" /></a>
 
 ## openblack
@@ -687,6 +684,26 @@ target="_blank"><img src="http://img.youtube.com/vi/ow_QU4K217w/0.jpg"
 alt="Match Engine | Football Manager 2024"
 width="640" height="480" border="0" /></a>
 
+## Unity's Project Tiny
+
+Unity's Project Tiny used bgfx for rendering. While project is discontinued,
+there are still [some](https://docs.unity3d.com/Packages/com.unity.tiny.rendering@0.29/api/Bgfx.html) [references](https://docs.google.com/document/d/1A8hen2hLFY5FLkC5gd3JP2Z-IpHfnAX-CpYLK3aOdwA/edit?tab=t.0) [about](https://github.com/Unity-Technologies/ProjectTinySamples) [it](https://docs.unity3d.com/Packages/com.unity.tiny@0.16/manual/index.html).
+
+![Unity Project Tiny](https://github.com/Unity-Technologies/ProjectTinySamples/raw/master/res/TinyRacingTrailer.gif)
+
+## Land of Heroes
+
+Land of Heroes EU is a 3D online MMORPG featuring immersive worlds, fast-paced combat, and endless adventures.
+
+![Screenshot](https://i.imgur.com/MCscwt7.jpeg)
+
+## Unravel Engine
+
+Unravel Engine is a cutting-edge, cross-platform game engine and WYSIWYG (What You See Is What You Get) editor, crafted in modern C++20. It empowers developers to create high-performance, immersive games with ease.
+
+<img width="2560" height="1380" alt="Screenshot 2026-02-08 211236" src="https://github.com/user-attachments/assets/a4e95c51-5e2b-4453-9fae-e80e8305366d" />
+
+
 [License (BSD 2-clause)](https://bkaradzic.github.io/bgfx/license.html)
 -----------------------------------------------------------------------
 
@@ -694,7 +711,7 @@ width="640" height="480" border="0" /></a>
 <img align="right" src="https://opensource.org/wp-content/uploads/2022/10/osi-badge-dark.svg" width="100" height="137">
 </a>
 
-	Copyright 2010-2025 Branimir Karadzic
+	Copyright 2010-2026 Branimir Karadzic
 
 	Redistribution and use in source and binary forms, with or without modification,
 	are permitted provided that the following conditions are met:
