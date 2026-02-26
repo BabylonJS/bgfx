@@ -379,6 +379,7 @@ namespace bgfx { namespace wgpu
 		{ LANGUAGE_FEATURE(PointerCompositeAccess),               true, false },
 		{ LANGUAGE_FEATURE(UniformBufferStandardLayout),          true, false },
 		{ LANGUAGE_FEATURE(SubgroupId),                           true, false },
+		{ LANGUAGE_FEATURE(TextureAndSamplerLet),                 true, false },
 		{ LANGUAGE_FEATURE(ChromiumTestingUnimplemented),         true, false },
 		{ LANGUAGE_FEATURE(ChromiumTestingUnsafeExperimental),    true, false },
 		{ LANGUAGE_FEATURE(ChromiumTestingExperimental),          true, false },
@@ -390,7 +391,6 @@ namespace bgfx { namespace wgpu
 		{ LANGUAGE_FEATURE(FragmentDepth),                        true, false },
 		{ LANGUAGE_FEATURE(ImmediateAddressSpace),                true, false },
 		{ LANGUAGE_FEATURE(SubgroupUniformity),                   true, false },
-		{ LANGUAGE_FEATURE(TextureAndSamplerLet),                 true, false },
 
 #undef LANGUAGE_FEATURE
 	};
@@ -1178,6 +1178,8 @@ WGPU_IMPORT
 //								| BGFX_CAPS_FORMAT_TEXTURE_MIP_AUTOGEN
 								;
 						}
+
+						g_caps.formats[TextureFormat::BGRA8] |= BGFX_CAPS_FORMAT_TEXTURE_BACKBUFFER;
 
 						g_caps.formats[TextureFormat::ETC1] = 0
 							| BGFX_CAPS_FORMAT_TEXTURE_2D_EMULATED
@@ -3354,8 +3356,15 @@ WGPU_IMPORT
 		_outSbo.offsets[0] = offset0;
 		_outSbo.offsets[1] = offset1;
 
-		bx::memCopy(&sbc.data[offset0], _vsData, _vsSize);
-		bx::memCopy(&sbc.data[offset1], _fsData, _fsSize);
+		if (NULL != _vsData)
+		{
+			bx::memCopy(&sbc.data[offset0], _vsData, _vsSize);
+		}
+
+		if (NULL != _fsData)
+		{
+			bx::memCopy(&sbc.data[offset1], _fsData, _fsSize);
+		}
 	}
 
 	void ChunkedScratchBufferWGPU::begin()

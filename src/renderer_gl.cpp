@@ -2743,7 +2743,7 @@ namespace bgfx { namespace gl
 				{
 					const TextureFormat::Enum fmt = TextureFormat::Enum(ii);
 
-					uint16_t supported = BGFX_CAPS_FORMAT_TEXTURE_NONE;
+					uint32_t supported = BGFX_CAPS_FORMAT_TEXTURE_NONE;
 					supported |= s_textureFormat[ii].m_supported
 						? BGFX_CAPS_FORMAT_TEXTURE_2D
 						| BGFX_CAPS_FORMAT_TEXTURE_3D
@@ -2812,6 +2812,8 @@ namespace bgfx { namespace gl
 
 					g_caps.formats[ii] = supported;
 				}
+
+				g_caps.formats[TextureFormat::BGRA8] |= BGFX_CAPS_FORMAT_TEXTURE_BACKBUFFER;
 
 				g_caps.supported |= !!(BGFX_CONFIG_RENDERER_OPENGL || m_gles3)
 					|| s_extension[Extension::OES_texture_3D].m_supported
@@ -3603,15 +3605,18 @@ namespace bgfx { namespace gl
 				, data
 				) );
 
+			TextureFormat::Enum format = TextureFormat::BGRA8;
+
 			if (GL_RGBA == m_readPixelsFmt)
 			{
-				bimg::imageSwizzleBgra8(data, width*4, width, height, data, width*4);
+				format = TextureFormat::RGBA8;
 			}
 
 			g_callback->screenShot(_filePath
 				, width
 				, height
 				, width*4
+				, format
 				, data
 				, length
 				, true

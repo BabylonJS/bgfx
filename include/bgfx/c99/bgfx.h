@@ -495,7 +495,7 @@ typedef struct bgfx_callback_vtbl_s
     uint32_t (*cache_read_size)(bgfx_callback_interface_t* _this, uint64_t _id);
     bool (*cache_read)(bgfx_callback_interface_t* _this, uint64_t _id, void* _data, uint32_t _size);
     void (*cache_write)(bgfx_callback_interface_t* _this, uint64_t _id, const void* _data, uint32_t _size);
-    void (*screen_shot)(bgfx_callback_interface_t* _this, const char* _filePath, uint32_t _width, uint32_t _height, uint32_t _pitch, const void* _data, uint32_t _size, bool _yflip);
+    void (*screen_shot)(bgfx_callback_interface_t* _this, const char* _filePath, uint32_t _width, uint32_t _height, uint32_t _pitch, bgfx_texture_format_t _format, const void* _data, uint32_t _size, bool _yflip);
     void (*capture_begin)(bgfx_callback_interface_t* _this, uint32_t _width, uint32_t _height, uint32_t _pitch, bgfx_texture_format_t _format, bool _yflip);
     void (*capture_end)(bgfx_callback_interface_t* _this);
     void (*capture_frame)(bgfx_callback_interface_t* _this, const void* _data, uint32_t _size);
@@ -628,8 +628,9 @@ typedef struct bgfx_caps_s
      *   - `BGFX_CAPS_FORMAT_TEXTURE_MSAA` - Texture can be sampled as MSAA.
      *   - `BGFX_CAPS_FORMAT_TEXTURE_MIP_AUTOGEN` - Texture format supports auto-generated
      *     mips.
+     *   - `BGFX_CAPS_FORMAT_TEXTURE_BACKBUFFER` - Texture format can be used as back buffer format.
      */
-    uint16_t             formats[BGFX_TEXTURE_FORMAT_COUNT];
+    uint32_t             formats[BGFX_TEXTURE_FORMAT_COUNT];
 
 } bgfx_caps_t;
 

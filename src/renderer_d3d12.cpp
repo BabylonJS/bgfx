@@ -1654,7 +1654,7 @@ namespace bgfx { namespace d3d12
 
 				for (uint32_t ii = 0; ii < TextureFormat::Count; ++ii)
 				{
-					uint16_t support = BGFX_CAPS_FORMAT_TEXTURE_NONE;
+					uint32_t support = BGFX_CAPS_FORMAT_TEXTURE_NONE;
 
 					const bool isDepthFormat = bimg::isDepth(bimg::TextureFormat::Enum(ii));
 					const DXGI_FORMAT fmt = isDepthFormat
@@ -1726,6 +1726,19 @@ namespace bgfx { namespace d3d12
 									| D3D12_FORMAT_SUPPORT1_MULTISAMPLE_LOAD
 									) )
 									? BGFX_CAPS_FORMAT_TEXTURE_MSAA
+									: BGFX_CAPS_FORMAT_TEXTURE_NONE
+									;
+
+							support |= 0 != (data.Support1 & (0
+									| D3D12_FORMAT_SUPPORT1_DISPLAY
+									) )
+									? BGFX_CAPS_FORMAT_TEXTURE_BACKBUFFER
+									: BGFX_CAPS_FORMAT_TEXTURE_NONE
+									;
+
+							support |= 0 != (data.Support1 & D3D12_FORMAT_SUPPORT1_DISPLAY)
+									|| 0 != (data.Support2 & D3D12_FORMAT_SUPPORT2_DISPLAYABLE)
+									? BGFX_CAPS_FORMAT_TEXTURE_BACKBUFFER
 									: BGFX_CAPS_FORMAT_TEXTURE_NONE
 									;
 						}
@@ -1815,6 +1828,12 @@ namespace bgfx { namespace d3d12
 									| D3D12_FORMAT_SUPPORT1_TEXTURECUBE
 									) )
 									? BGFX_CAPS_FORMAT_TEXTURE_CUBE_SRGB
+									: BGFX_CAPS_FORMAT_TEXTURE_NONE
+									;
+
+							support |= 0 != (data.Support1 & D3D12_FORMAT_SUPPORT1_DISPLAY)
+									|| 0 != (data.Support2 & D3D12_FORMAT_SUPPORT2_DISPLAYABLE)
+									? BGFX_CAPS_FORMAT_TEXTURE_BACKBUFFER
 									: BGFX_CAPS_FORMAT_TEXTURE_NONE
 									;
 						}
@@ -2336,6 +2355,28 @@ namespace bgfx { namespace d3d12
 
 			D3D12_RESOURCE_DESC desc = getResourceDesc(backBuffer);
 
+			TextureFormat::Enum colorFormat = TextureFormat::Enum::Count;
+			for (int i = 0; i < TextureFormat::Enum::Count; i++)
+			{
+				if (s_textureFormat[i].m_fmt == desc.Format)
+				{
+					colorFormat = TextureFormat::Enum(i);
+					break;
+				}
+
+				if (s_textureFormat[i].m_fmtSrgb == desc.Format)
+				{
+					colorFormat = TextureFormat::Enum(i);
+					break;
+				}
+			}
+
+			if (colorFormat == TextureFormat::Enum::Count)
+			{
+				BX_TRACE("Unable to capture screenshot %s.", _filePath);
+				return;
+			}
+
 			const uint32_t width  = (uint32_t)desc.Width;
 			const uint32_t height = (uint32_t)desc.Height;
 
@@ -2373,22 +2414,17 @@ namespace bgfx { namespace d3d12
 
 			void* data;
 			readback->Map(0, NULL, (void**)&data);
-			bimg::imageSwizzleBgra8(
-				  data
-				, layout.Footprint.RowPitch
-				, width
-				, height
-				, data
-				, layout.Footprint.RowPitch
-				);
+
 			g_callback->screenShot(_filePath
 				, width
 				, height
 				, layout.Footprint.RowPitch
+				, colorFormat
 				, data
 				, (uint32_t)total
 				, false
 				);
+
 			D3D12_RANGE writeRange = { 0, 0 };
 			readback->Unmap(0, &writeRange);
 
