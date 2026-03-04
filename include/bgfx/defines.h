@@ -99,6 +99,9 @@
 #define BGFX_STATE_CULL_SHIFT                     36                           //!< Culling mode bit shift
 #define BGFX_STATE_CULL_MASK                      UINT64_C(0x0000003000000000) //!< Culling mode bit mask
 
+/// Front winding direction. Will default to clockwise unless otherwise specified.
+#define BGFX_STATE_FRONT_CCW               	UINT64_C(0x0000008000000000) //!< Front counter-clockwise (default is clockwise).
+
 /**
  * Alpha reference value.
  *
@@ -456,12 +459,12 @@
 #define BGFX_RESET_SUSPEND                        UINT32_C(0x00080000) //!< Suspend rendering.
 #define BGFX_RESET_TRANSPARENT_BACKBUFFER         UINT32_C(0x00100000) //!< Transparent backbuffer. Availability depends on: `BGFX_CAPS_TRANSPARENT_BACKBUFFER`.
 
-#define BGFX_RESET_FULLSCREEN_SHIFT               0
+#define BGFX_RESET_FULLSCREEN_SHIFT         0
 
-#define BGFX_RESET_FULLSCREEN_MASK                UINT32_C(0x00000001)
+#define BGFX_RESET_FULLSCREEN_MASK          UINT32_C(0x00000001)
 
-#define BGFX_RESET_RESERVED_SHIFT                 31                   //!< Internal bit shift
-#define BGFX_RESET_RESERVED_MASK                  UINT32_C(0x80000000) //!< Internal bit mask
+#define BGFX_RESET_RESERVED_SHIFT           31                   //!< Internal bit shift
+#define BGFX_RESET_RESERVED_MASK            UINT32_C(0x80000000) //!< Internal bit mask
 
 #define BGFX_CAPS_ALPHA_TO_COVERAGE               UINT64_C(0x0000000000000001) //!< Alpha to coverage is supported.
 #define BGFX_CAPS_BLEND_INDEPENDENT               UINT64_C(0x0000000000000002) //!< Blend independent is supported.
@@ -497,6 +500,8 @@
 #define BGFX_CAPS_VERTEX_ATTRIB_UINT10            UINT64_C(0x0000000080000000) //!< Vertex attribute 10_10_10_2 is supported.
 #define BGFX_CAPS_VERTEX_ID                       UINT64_C(0x0000000100000000) //!< Rendering with VertexID only is supported.
 #define BGFX_CAPS_VIEWPORT_LAYER_ARRAY            UINT64_C(0x0000000200000000) //!< Viewport layer is available in vertex shader.
+#define BGFX_CAPS_VERTEX_ATTRIB_INT8              UINT64_C(0x0000000400000000) //!< Vertex attribute signed 8-8-8-8 is supported.
+#define BGFX_CAPS_VERTEX_ATTRIB_UINT16            UINT64_C(0x0000000800000000) //!< Vertex attribute unsigned 16-16 is supported.
 /// All texture compare modes are supported.
 #define BGFX_CAPS_TEXTURE_COMPARE_ALL (0 \
 	| BGFX_CAPS_TEXTURE_COMPARE_RESERVED \

@@ -339,6 +339,12 @@ namespace bgfx { namespace d3d12
 
 	static const DXGI_FORMAT s_attribType[][4][2] =
 	{
+		{ // Int8
+			{ DXGI_FORMAT_R8_SINT,            DXGI_FORMAT_R8_SNORM           },
+			{ DXGI_FORMAT_R8G8_SINT,          DXGI_FORMAT_R8G8_SNORM         },
+			{ DXGI_FORMAT_R8G8B8A8_SINT,      DXGI_FORMAT_R8G8B8A8_SNORM     },
+			{ DXGI_FORMAT_R8G8B8A8_SINT,      DXGI_FORMAT_R8G8B8A8_SNORM     },
+		},
 		{ // Uint8
 			{ DXGI_FORMAT_R8_UINT,            DXGI_FORMAT_R8_UNORM           },
 			{ DXGI_FORMAT_R8G8_UINT,          DXGI_FORMAT_R8G8_UNORM         },
@@ -356,6 +362,12 @@ namespace bgfx { namespace d3d12
 			{ DXGI_FORMAT_R16G16_SINT,        DXGI_FORMAT_R16G16_SNORM       },
 			{ DXGI_FORMAT_R16G16B16A16_SINT,  DXGI_FORMAT_R16G16B16A16_SNORM },
 			{ DXGI_FORMAT_R16G16B16A16_SINT,  DXGI_FORMAT_R16G16B16A16_SNORM },
+		},
+		{ // Uint16
+			{ DXGI_FORMAT_R16_UINT,           DXGI_FORMAT_R16_UNORM          },
+			{ DXGI_FORMAT_R16G16_UINT,        DXGI_FORMAT_R16G16_UNORM       },
+			{ DXGI_FORMAT_R16G16B16A16_UINT,  DXGI_FORMAT_R16G16B16A16_UNORM },
+			{ DXGI_FORMAT_R16G16B16A16_UINT,  DXGI_FORMAT_R16G16B16A16_UNORM },
 		},
 		{ // Half
 			{ DXGI_FORMAT_R16_FLOAT,          DXGI_FORMAT_R16_FLOAT          },
@@ -1629,6 +1641,8 @@ namespace bgfx { namespace d3d12
 					| (m_variableRateShadingSupport ? BGFX_CAPS_VARIABLE_RATE_SHADING : 0)
 					| BGFX_CAPS_VERTEX_ATTRIB_HALF
 					| BGFX_CAPS_VERTEX_ATTRIB_UINT10
+					| BGFX_CAPS_VERTEX_ATTRIB_INT8
+					| BGFX_CAPS_VERTEX_ATTRIB_UINT16
 					| BGFX_CAPS_VERTEX_ID
 					| BGFX_CAPS_VIEWPORT_LAYER_ARRAY
 					);
@@ -4667,7 +4681,7 @@ namespace bgfx { namespace d3d12
 		uint8_t numStreams = 0;
 		_outNumVertices = _draw.m_numVertices;
 
-		if (UINT8_MAX != _draw.m_streamMask)
+		if (UINT32_MAX != _draw.m_streamMask)
 		{
 			for (BitMaskToIndexIteratorT it(_draw.m_streamMask)
 				; !it.isDone()
@@ -5979,16 +5993,16 @@ namespace bgfx { namespace d3d12
 		if (TextureD3D12::Texture3D == m_type)
 		{
 			box.front = _z;
-			box.back  = box.front + _depth;
+			box.back = _z + _depth;
 		}
 		else
 		{
 			layer = _z * (TextureD3D12::TextureCube == m_type ? 6 : 1);
 			box.front = 0;
-			box.back  = 1;
+			box.back = _depth;
 		}
 
-		const uint32_t subres = _mip + ((layer + _side) * m_numMips);
+		const uint32_t subres = _mip + (_side * m_numMips) + (m_type == Texture3D ? 0 : _z * m_numMips);
 
 		uint8_t* srcData = _mem->data;
 		uint8_t* temp = NULL;
@@ -7380,7 +7394,7 @@ namespace bgfx { namespace d3d12
 					const VertexLayout* layouts[BGFX_CONFIG_MAX_VERTEX_STREAMS];
 
 					uint8_t numStreams = 0;
-					if (UINT8_MAX != draw.m_streamMask)
+					if (UINT32_MAX != draw.m_streamMask)
 					{
 						for (BitMaskToIndexIteratorT it(draw.m_streamMask)
 							; !it.isDone()

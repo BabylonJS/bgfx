@@ -1386,7 +1386,7 @@ namespace bgfx
 		m_draw.m_uniformBegin = m_uniformBegin;
 		m_draw.m_uniformEnd   = m_uniformEnd;
 
-		if (UINT8_MAX != m_draw.m_streamMask)
+		if (UINT32_MAX != m_draw.m_streamMask)
 		{
 			uint32_t numVertices = UINT32_MAX;
 			for (BitMaskToIndexIteratorT it(m_draw.m_streamMask); !it.isDone(); it.next() )
@@ -1670,6 +1670,8 @@ namespace bgfx
 		CAPS_FLAGS(BGFX_CAPS_VARIABLE_RATE_SHADING),
 		CAPS_FLAGS(BGFX_CAPS_VERTEX_ATTRIB_HALF),
 		CAPS_FLAGS(BGFX_CAPS_VERTEX_ATTRIB_UINT10),
+		CAPS_FLAGS(BGFX_CAPS_VERTEX_ATTRIB_INT8),
+		CAPS_FLAGS(BGFX_CAPS_VERTEX_ATTRIB_UINT16),
 		CAPS_FLAGS(BGFX_CAPS_VERTEX_ID),
 		CAPS_FLAGS(BGFX_CAPS_VIEWPORT_LAYER_ARRAY),
 #undef CAPS_FLAGS
@@ -3856,9 +3858,10 @@ namespace bgfx
 			s_allocatorStub = NULL;
 		}
 
-		s_threadIndex = 0;
-		g_callback    = NULL;
-		g_allocator   = NULL;
+		s_threadIndex       = 0;
+		s_renderFrameCalled = false;
+		g_callback          = NULL;
+		g_allocator         = NULL;
 	}
 
 	void reset(uint32_t _width, uint32_t _height, uint32_t _flags, TextureFormat::Enum _format)
@@ -6085,6 +6088,8 @@ static_assert( (0
 	| BGFX_CAPS_TEXTURE_READ_BACK
 	| BGFX_CAPS_VERTEX_ATTRIB_HALF
 	| BGFX_CAPS_VERTEX_ATTRIB_UINT10
+	| BGFX_CAPS_VERTEX_ATTRIB_INT8
+	| BGFX_CAPS_VERTEX_ATTRIB_UINT16
 	| BGFX_CAPS_VERTEX_ID
 	| BGFX_CAPS_PRIMITIVE_ID
 	| BGFX_CAPS_VIEWPORT_LAYER_ARRAY
@@ -6115,6 +6120,8 @@ static_assert( (0
 	^ BGFX_CAPS_TEXTURE_READ_BACK
 	^ BGFX_CAPS_VERTEX_ATTRIB_HALF
 	^ BGFX_CAPS_VERTEX_ATTRIB_UINT10
+	^ BGFX_CAPS_VERTEX_ATTRIB_INT8
+	^ BGFX_CAPS_VERTEX_ATTRIB_UINT16
 	^ BGFX_CAPS_VERTEX_ID
 	^ BGFX_CAPS_PRIMITIVE_ID
 	^ BGFX_CAPS_VIEWPORT_LAYER_ARRAY
