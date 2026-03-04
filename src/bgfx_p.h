@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2025 Branimir Karadzic. All rights reserved.
+ * Copyright 2011-2026 Branimir Karadzic. All rights reserved.
  * License: https://github.com/bkaradzic/bgfx/blob/master/LICENSE
  */
 
@@ -240,6 +240,7 @@ namespace stl = std;
 #define BGFX_RENDERER_METAL_NAME      "Metal"
 #define BGFX_RENDERER_NVN_NAME        "NVN"
 #define BGFX_RENDERER_VULKAN_NAME     "Vulkan"
+#define BGFX_RENDERER_WEBGPU_NAME     "WebGPU"
 
 #if BGFX_CONFIG_RENDERER_OPENGL
 #	if BGFX_CONFIG_RENDERER_OPENGL >= 31 && BGFX_CONFIG_RENDERER_OPENGL <= 33
@@ -285,7 +286,18 @@ namespace stl = std;
 
 namespace bgfx
 {
-	constexpr uint32_t kChunkMagicTex = BX_MAKEFOURCC('T', 'E', 'X', 0x0);
+	static constexpr uint32_t kChunkMagicTex = BX_MAKEFOURCC('T', 'E', 'X', 0x0);
+
+	// Palette:
+	// https://colorkit.co/color-palette-generator/a8e6cf-dcedc1-ffd3b6-76b4bd-bdeaee-8874a3-ff0000-ff8b94/
+	static constexpr uint32_t kColorFrame    = 0xa8'e6'cf'ff;
+	static constexpr uint32_t kColorSubmit   = 0xdc'ed'c1'ff;
+	static constexpr uint32_t kColorView     = 0xff'd3'b6'ff;
+	static constexpr uint32_t kColorDraw     = 0x76'b4'bd'ff;
+	static constexpr uint32_t kColorCompute  = 0xbd'ea'ee'ff;
+	static constexpr uint32_t kColorResource = 0x88'74'a3'ff;
+	static constexpr uint32_t kColorMarker   = 0xff'00'00'ff;
+	static constexpr uint32_t kColorWait     = 0xff'8b'94'ff;
 
 	extern InternalData g_internalData;
 	extern PlatformData g_platformData;
@@ -430,7 +442,7 @@ namespace bgfx
 	void* findModule(const char* _name);
 	bool windowsVersionIs(Condition::Enum _op, uint32_t _version, uint32_t _build = UINT32_MAX);
 
-	constexpr bool isShaderType(uint32_t _magic, char _type)
+	static constexpr bool isShaderType(uint32_t _magic, char _type)
 	{
 		return uint32_t(_type) == (_magic & BX_MAKEFOURCC(0xff, 0, 0, 0) );
 	}
@@ -485,7 +497,7 @@ namespace bgfx
 		uint16_t m_flags;
 	};
 
-	struct Rect
+	BX_ALIGN_DECL(8, struct) Rect
 	{
 		Rect()
 		{
@@ -509,21 +521,34 @@ namespace bgfx
 
 		bool isZero() const
 		{
+			static_assert(8 == sizeof(Rect), "");
+
 			uint64_t ui64 = *( (uint64_t*)this);
 			return UINT64_C(0) == ui64;
 		}
 
 		bool isZeroArea() const
 		{
-			return 0 == m_width
+			return false
+				|| 0 == m_width
 				|| 0 == m_height
+				;
+		}
+
+		bool isEqual(const Rect& _other) const
+		{
+			return true
+				&& m_x      == _other.m_x
+				&& m_y      == _other.m_y
+				&& m_width  == _other.m_width
+				&& m_height == _other.m_height
 				;
 		}
 
 		void set(uint16_t _x, uint16_t _y, uint16_t _width, uint16_t _height)
 		{
-			m_x = _x;
-			m_y = _y;
+			m_x      = _x;
+			m_y      = _y;
 			m_width  = _width;
 			m_height = _height;
 		}
@@ -534,8 +559,8 @@ namespace bgfx
 			const uint16_t sy = bx::max<uint16_t>(_a.m_y, _b.m_y);
 			const uint16_t ex = bx::min<uint16_t>(_a.m_x + _a.m_width,  _b.m_x + _b.m_width );
 			const uint16_t ey = bx::min<uint16_t>(_a.m_y + _a.m_height, _b.m_y + _b.m_height);
-			m_x = sx;
-			m_y = sy;
+			m_x      = sx;
+			m_y      = sy;
 			m_width  = (uint16_t)bx::uint32_satsub(ex, sx);
 			m_height = (uint16_t)bx::uint32_satsub(ey, sy);
 		}
@@ -593,6 +618,8 @@ namespace bgfx
 	const char* getName(ShaderHandle _handle);
 	const char* getName(Topology::Enum _topology);
 
+	const struct UniformRef& getUniformRef(UniformHandle _handle);
+
 	template<typename Ty>
 	inline void release(Ty)
 	{
@@ -604,17 +631,23 @@ namespace bgfx
 		release( (const Memory*)_mem);
 	}
 
-	inline uint64_t packStencil(uint32_t _fstencil, uint32_t _bstencil)
+	inline constexpr uint64_t packStencil(uint32_t _fstencil, uint32_t _bstencil)
 	{
 		return (uint64_t(_bstencil)<<32)|uint64_t(_fstencil);
 	}
 
-	inline uint32_t unpackStencil(uint8_t _0or1, uint64_t _stencil)
+	inline constexpr uint32_t unpackStencil(uint8_t _0or1, uint64_t _stencil)
 	{
 		return uint32_t( (_stencil >> (32*_0or1) ) );
 	}
 
-	inline bool needBorderColor(uint64_t _flags)
+	static constexpr uint64_t kStencilNoRefMask = packStencil(~BGFX_STENCIL_FUNC_REF_MASK, ~BGFX_STENCIL_FUNC_REF_MASK);
+	static constexpr uint64_t kStencilDisabled  = packStencil(
+		  BGFX_STENCIL_TEST_ALWAYS | BGFX_STENCIL_OP_FAIL_S_KEEP | BGFX_STENCIL_OP_FAIL_Z_KEEP | BGFX_STENCIL_OP_PASS_Z_KEEP
+		, BGFX_STENCIL_TEST_ALWAYS | BGFX_STENCIL_OP_FAIL_S_KEEP | BGFX_STENCIL_OP_FAIL_Z_KEEP | BGFX_STENCIL_OP_PASS_Z_KEEP
+		);
+
+	inline constexpr bool needBorderColor(uint64_t _flags)
 	{
 		return BGFX_SAMPLER_U_BORDER == (_flags & BGFX_SAMPLER_U_BORDER)
 			|| BGFX_SAMPLER_V_BORDER == (_flags & BGFX_SAMPLER_V_BORDER)
@@ -622,7 +655,7 @@ namespace bgfx
 			;
 	}
 
-	inline uint8_t calcNumMips(bool _hasMips, uint16_t _width, uint16_t _height, uint16_t _depth = 1)
+	inline constexpr uint8_t calcNumMips(bool _hasMips, uint16_t _width, uint16_t _height, uint16_t _depth = 1)
 	{
 		if (_hasMips)
 		{
@@ -752,19 +785,21 @@ namespace bgfx
 
 		TextureHandle m_texture;
 		TransientVertexBuffer* m_vb;
-		TransientIndexBuffer* m_ib;
-		VertexLayout m_layout;
+		TransientIndexBuffer*  m_ib;
+		VertexLayout  m_layout;
 		ProgramHandle m_program;
 		uint8_t m_scale;
+
+		uintptr_t m_usedData;
 	};
 
 	struct RendererContextI;
 
-	extern void blit(RendererContextI* _renderCtx, TextVideoMemBlitter& _blitter, const TextVideoMem& _mem);
+	extern void dbgTextSubmit(RendererContextI* _renderCtx, TextVideoMemBlitter& _blitter, const TextVideoMem& _mem);
 
-	inline void blit(RendererContextI* _renderCtx, TextVideoMemBlitter& _blitter, const TextVideoMem* _mem)
+	inline void dbgTextSubmit(RendererContextI* _renderCtx, TextVideoMemBlitter& _blitter, const TextVideoMem* _mem)
 	{
-		blit(_renderCtx, _blitter, *_mem);
+		dbgTextSubmit(_renderCtx, _blitter, *_mem);
 	}
 
 	template <uint32_t maxKeys>
@@ -777,8 +812,8 @@ namespace bgfx
 
 		void add(uint32_t _key, uint32_t _value)
 		{
-			uint32_t num = m_num++;
-			m_keys[num] = _key;
+			const uint32_t num = m_num++;
+			m_keys  [num] = _key;
 			m_values[num] = _value;
 		}
 
@@ -786,7 +821,7 @@ namespace bgfx
 		{
 			if (0 < m_num)
 			{
-				uint32_t* tempKeys = (uint32_t*)BX_STACK_ALLOC(sizeof(m_keys) );
+				uint32_t* tempKeys   = (uint32_t*)BX_STACK_ALLOC(sizeof(m_keys) );
 				uint32_t* tempValues = (uint32_t*)BX_STACK_ALLOC(sizeof(m_values) );
 				bx::radixSort(m_keys, tempKeys, m_values, tempValues, m_num);
 				return true;
@@ -810,6 +845,33 @@ namespace bgfx
 		uint32_t m_values[maxKeys];
 	};
 
+	template<typename MaskT>
+	struct BitMaskToIndexIteratorT
+	{
+		BitMaskToIndexIteratorT(MaskT _mask)
+		{
+			const uint8_t ntz = bx::countTrailingZeros(_mask);
+			mask = _mask >> ntz;
+			idx  = ntz;
+		}
+
+		void next()
+		{
+			// operator>> promotes to int, so we need to cast back:
+			const uint8_t ntzPlus1 = bx::countTrailingZeros<MaskT>(mask>>1) + 1;
+			mask >>= ntzPlus1;
+			idx   += ntzPlus1;
+		}
+
+		bool isDone() const
+		{
+			return 0 == mask;
+		}
+
+		MaskT   mask;
+		uint8_t idx;
+	};
+
 	struct ClearQuad
 	{
 		ClearQuad()
@@ -824,7 +886,7 @@ namespace bgfx
 		void shutdown();
 
 		VertexBufferHandle m_vb;
-		VertexLayout m_layout;
+		VertexLayoutHandle m_layout;
 		ProgramHandle m_program[BGFX_CONFIG_MAX_FRAME_BUFFER_ATTACHMENTS];
 	};
 
@@ -1034,60 +1096,71 @@ namespace bgfx
 	};
 
 	//
-	constexpr uint8_t  kSortKeyViewNumBits         = uint8_t(31 - bx::uint32_cntlz(BGFX_CONFIG_MAX_VIEWS) );
-	constexpr uint8_t  kSortKeyViewBitShift        = 64-kSortKeyViewNumBits;
-	constexpr uint64_t kSortKeyViewMask            = uint64_t(BGFX_CONFIG_MAX_VIEWS-1)<<kSortKeyViewBitShift;
+	static constexpr uint8_t  kSortKeyViewNumBits         = uint8_t(31 - bx::uint32_cntlz(BGFX_CONFIG_MAX_VIEWS) );
+	static constexpr uint8_t  kSortKeyViewBitShift        = 64-kSortKeyViewNumBits;
+	static constexpr uint64_t kSortKeyViewMask            = uint64_t(BGFX_CONFIG_MAX_VIEWS-1)<<kSortKeyViewBitShift;
 
-	constexpr uint8_t  kSortKeyDrawBitShift        = kSortKeyViewBitShift - 1;
-	constexpr uint64_t kSortKeyDrawBit             = uint64_t(1)<<kSortKeyDrawBitShift;
-
-	//
-	constexpr uint8_t  kSortKeyDrawTypeNumBits     = 2;
-	constexpr uint8_t  kSortKeyDrawTypeBitShift    = kSortKeyDrawBitShift - kSortKeyDrawTypeNumBits;
-	constexpr uint64_t kSortKeyDrawTypeMask        = uint64_t(3)<<kSortKeyDrawTypeBitShift;
-
-	constexpr uint64_t kSortKeyDrawTypeProgram     = uint64_t(0)<<kSortKeyDrawTypeBitShift;
-	constexpr uint64_t kSortKeyDrawTypeDepth       = uint64_t(1)<<kSortKeyDrawTypeBitShift;
-	constexpr uint64_t kSortKeyDrawTypeSequence    = uint64_t(2)<<kSortKeyDrawTypeBitShift;
+	static constexpr uint8_t  kSortKeyDrawBitShift        = kSortKeyViewBitShift - 1;
+	static constexpr uint64_t kSortKeyDrawBit             = uint64_t(1)<<kSortKeyDrawBitShift;
 
 	//
-	constexpr uint8_t  kSortKeyTransNumBits        = 2;
+	static constexpr uint8_t  kSortKeyDrawTypeNumBits     = 2;
+	static constexpr uint8_t  kSortKeyDrawTypeBitShift    = kSortKeyDrawBitShift - kSortKeyDrawTypeNumBits;
+	static constexpr uint64_t kSortKeyDrawTypeMask        = uint64_t(3)<<kSortKeyDrawTypeBitShift;
 
-	constexpr uint8_t  kSortKeyDraw0BlendShift     = kSortKeyDrawTypeBitShift - kSortKeyTransNumBits;
-	constexpr uint64_t kSortKeyDraw0BlendMask      = uint64_t(0x3)<<kSortKeyDraw0BlendShift;
-
-	constexpr uint8_t  kSortKeyDraw0ProgramShift   = kSortKeyDraw0BlendShift - BGFX_CONFIG_SORT_KEY_NUM_BITS_PROGRAM;
-	constexpr uint64_t kSortKeyDraw0ProgramMask    = uint64_t(BGFX_CONFIG_MAX_PROGRAMS-1)<<kSortKeyDraw0ProgramShift;
-
-	constexpr uint8_t  kSortKeyDraw0DepthShift     = kSortKeyDraw0ProgramShift - BGFX_CONFIG_SORT_KEY_NUM_BITS_DEPTH;
-	constexpr uint64_t kSortKeyDraw0DepthMask      = ( (uint64_t(1)<<BGFX_CONFIG_SORT_KEY_NUM_BITS_DEPTH)-1)<<kSortKeyDraw0DepthShift;
+	static constexpr uint64_t kSortKeyDrawTypeProgram     = uint64_t(0)<<kSortKeyDrawTypeBitShift;
+	static constexpr uint64_t kSortKeyDrawTypeDepth       = uint64_t(1)<<kSortKeyDrawTypeBitShift;
+	static constexpr uint64_t kSortKeyDrawTypeSequence    = uint64_t(2)<<kSortKeyDrawTypeBitShift;
 
 	//
-	constexpr uint8_t  kSortKeyDraw1DepthShift     = kSortKeyDrawTypeBitShift - BGFX_CONFIG_SORT_KEY_NUM_BITS_DEPTH;
-	constexpr uint64_t kSortKeyDraw1DepthMask      = ( (uint64_t(1)<<BGFX_CONFIG_SORT_KEY_NUM_BITS_DEPTH)-1)<<kSortKeyDraw1DepthShift;
+	static constexpr uint8_t  kSortKeyTransNumBits        = 2;
 
-	constexpr uint8_t  kSortKeyDraw1BlendShift     = kSortKeyDraw1DepthShift - kSortKeyTransNumBits;
-	constexpr uint64_t kSortKeyDraw1BlendMask      = uint64_t(0x3)<<kSortKeyDraw1BlendShift;
+	static constexpr uint8_t  kSortKeyDraw0BlendShift     = kSortKeyDrawTypeBitShift - kSortKeyTransNumBits;
+	static constexpr uint64_t kSortKeyDraw0BlendMask      = uint64_t(0x3)<<kSortKeyDraw0BlendShift;
 
-	constexpr uint8_t  kSortKeyDraw1ProgramShift   = kSortKeyDraw1BlendShift - BGFX_CONFIG_SORT_KEY_NUM_BITS_PROGRAM;
-	constexpr uint64_t kSortKeyDraw1ProgramMask    = uint64_t(BGFX_CONFIG_MAX_PROGRAMS-1)<<kSortKeyDraw1ProgramShift;
+	static constexpr uint8_t  kSortKeyAlphaRefNumBits     = 1;
 
-	//
-	constexpr uint8_t  kSortKeyDraw2SeqShift       = kSortKeyDrawTypeBitShift - BGFX_CONFIG_SORT_KEY_NUM_BITS_SEQ;
-	constexpr uint64_t kSortKeyDraw2SeqMask        = ( (uint64_t(1)<<BGFX_CONFIG_SORT_KEY_NUM_BITS_SEQ)-1)<<kSortKeyDraw2SeqShift;
+	static constexpr uint8_t  kSortKeyDraw0AlphaRefShift  = kSortKeyDraw0BlendShift - kSortKeyAlphaRefNumBits;
+	static constexpr uint64_t kSortKeyDraw0AlphaRefMask   = uint64_t(1)<<kSortKeyDraw0AlphaRefShift;
 
-	constexpr uint8_t  kSortKeyDraw2BlendShift     = kSortKeyDraw2SeqShift - kSortKeyTransNumBits;
-	constexpr uint64_t kSortKeyDraw2BlendMask      = uint64_t(0x3)<<kSortKeyDraw2BlendShift;
+	static constexpr uint8_t  kSortKeyDraw0ProgramShift   = kSortKeyDraw0AlphaRefShift - BGFX_CONFIG_SORT_KEY_NUM_BITS_PROGRAM;
+	static constexpr uint64_t kSortKeyDraw0ProgramMask    = uint64_t(BGFX_CONFIG_MAX_PROGRAMS-1)<<kSortKeyDraw0ProgramShift;
 
-	constexpr uint8_t  kSortKeyDraw2ProgramShift   = kSortKeyDraw2BlendShift - BGFX_CONFIG_SORT_KEY_NUM_BITS_PROGRAM;
-	constexpr uint64_t kSortKeyDraw2ProgramMask    = uint64_t(BGFX_CONFIG_MAX_PROGRAMS-1)<<kSortKeyDraw2ProgramShift;
+	static constexpr uint8_t  kSortKeyDraw0DepthShift     = kSortKeyDraw0ProgramShift - BGFX_CONFIG_SORT_KEY_NUM_BITS_DEPTH;
+	static constexpr uint64_t kSortKeyDraw0DepthMask      = ( (uint64_t(1)<<BGFX_CONFIG_SORT_KEY_NUM_BITS_DEPTH)-1)<<kSortKeyDraw0DepthShift;
 
 	//
-	constexpr uint8_t  kSortKeyComputeSeqShift     = kSortKeyDrawBitShift - BGFX_CONFIG_SORT_KEY_NUM_BITS_SEQ;
-	constexpr uint64_t kSortKeyComputeSeqMask      = ( (uint64_t(1)<<BGFX_CONFIG_SORT_KEY_NUM_BITS_SEQ)-1)<<kSortKeyComputeSeqShift;
+	static constexpr uint8_t  kSortKeyDraw1DepthShift     = kSortKeyDrawTypeBitShift - BGFX_CONFIG_SORT_KEY_NUM_BITS_DEPTH;
+	static constexpr uint64_t kSortKeyDraw1DepthMask      = ( (uint64_t(1)<<BGFX_CONFIG_SORT_KEY_NUM_BITS_DEPTH)-1)<<kSortKeyDraw1DepthShift;
 
-	constexpr uint8_t  kSortKeyComputeProgramShift = kSortKeyComputeSeqShift - BGFX_CONFIG_SORT_KEY_NUM_BITS_PROGRAM;
-	constexpr uint64_t kSortKeyComputeProgramMask  = uint64_t(BGFX_CONFIG_MAX_PROGRAMS-1)<<kSortKeyComputeProgramShift;
+	static constexpr uint8_t  kSortKeyDraw1BlendShift     = kSortKeyDraw1DepthShift - kSortKeyTransNumBits;
+	static constexpr uint64_t kSortKeyDraw1BlendMask      = uint64_t(0x3)<<kSortKeyDraw1BlendShift;
+
+	static constexpr uint8_t  kSortKeyDraw1AlphaRefShift  = kSortKeyDraw1BlendShift - kSortKeyAlphaRefNumBits;
+	static constexpr uint64_t kSortKeyDraw1AlphaRefMask   = uint64_t(1)<<kSortKeyDraw1AlphaRefShift;
+
+	static constexpr uint8_t  kSortKeyDraw1ProgramShift   = kSortKeyDraw1AlphaRefShift - BGFX_CONFIG_SORT_KEY_NUM_BITS_PROGRAM;
+	static constexpr uint64_t kSortKeyDraw1ProgramMask    = uint64_t(BGFX_CONFIG_MAX_PROGRAMS-1)<<kSortKeyDraw1ProgramShift;
+
+	//
+	static constexpr uint8_t  kSortKeyDraw2SeqShift       = kSortKeyDrawTypeBitShift - BGFX_CONFIG_SORT_KEY_NUM_BITS_SEQ;
+	static constexpr uint64_t kSortKeyDraw2SeqMask        = ( (uint64_t(1)<<BGFX_CONFIG_SORT_KEY_NUM_BITS_SEQ)-1)<<kSortKeyDraw2SeqShift;
+
+	static constexpr uint8_t  kSortKeyDraw2BlendShift     = kSortKeyDraw2SeqShift - kSortKeyTransNumBits;
+	static constexpr uint64_t kSortKeyDraw2BlendMask      = uint64_t(0x3)<<kSortKeyDraw2BlendShift;
+
+	static constexpr uint8_t  kSortKeyDraw2AlphaRefShift  = kSortKeyDraw2BlendShift - kSortKeyAlphaRefNumBits;
+	static constexpr uint64_t kSortKeyDraw2AlphaRefMask   = uint64_t(1)<<kSortKeyDraw2AlphaRefShift;
+
+	static constexpr uint8_t  kSortKeyDraw2ProgramShift   = kSortKeyDraw2AlphaRefShift - BGFX_CONFIG_SORT_KEY_NUM_BITS_PROGRAM;
+	static constexpr uint64_t kSortKeyDraw2ProgramMask    = uint64_t(BGFX_CONFIG_MAX_PROGRAMS-1)<<kSortKeyDraw2ProgramShift;
+
+	//
+	static constexpr uint8_t  kSortKeyComputeSeqShift     = kSortKeyDrawBitShift - BGFX_CONFIG_SORT_KEY_NUM_BITS_SEQ;
+	static constexpr uint64_t kSortKeyComputeSeqMask      = ( (uint64_t(1)<<BGFX_CONFIG_SORT_KEY_NUM_BITS_SEQ)-1)<<kSortKeyComputeSeqShift;
+
+	static constexpr uint8_t  kSortKeyComputeProgramShift = kSortKeyComputeSeqShift - BGFX_CONFIG_SORT_KEY_NUM_BITS_PROGRAM;
+	static constexpr uint64_t kSortKeyComputeProgramMask  = uint64_t(BGFX_CONFIG_MAX_PROGRAMS-1)<<kSortKeyComputeProgramShift;
 
 	static_assert(BGFX_CONFIG_MAX_VIEWS <= (1<<kSortKeyViewNumBits) );
 	static_assert( (BGFX_CONFIG_MAX_PROGRAMS & (BGFX_CONFIG_MAX_PROGRAMS-1) ) == 0); // Must be power of 2.
@@ -1096,6 +1169,7 @@ namespace bgfx
 		| kSortKeyDrawBit
 		| kSortKeyDrawTypeMask
 		| kSortKeyDraw0BlendMask
+		| kSortKeyDraw0AlphaRefMask
 		| kSortKeyDraw0ProgramMask
 		| kSortKeyDraw0DepthMask
 		) == (0
@@ -1103,6 +1177,7 @@ namespace bgfx
 		^ kSortKeyDrawBit
 		^ kSortKeyDrawTypeMask
 		^ kSortKeyDraw0BlendMask
+		^ kSortKeyDraw0AlphaRefMask
 		^ kSortKeyDraw0ProgramMask
 		^ kSortKeyDraw0DepthMask
 		) );
@@ -1112,6 +1187,7 @@ namespace bgfx
 		| kSortKeyDrawTypeMask
 		| kSortKeyDraw1DepthMask
 		| kSortKeyDraw1BlendMask
+		| kSortKeyDraw1AlphaRefMask
 		| kSortKeyDraw1ProgramMask
 		) == (0
 		^ kSortKeyViewMask
@@ -1119,6 +1195,7 @@ namespace bgfx
 		^ kSortKeyDrawTypeMask
 		^ kSortKeyDraw1DepthMask
 		^ kSortKeyDraw1BlendMask
+		^ kSortKeyDraw1AlphaRefMask
 		^ kSortKeyDraw1ProgramMask
 		) );
 	static_assert( (0 // Render key mask shouldn't overlap.
@@ -1127,6 +1204,7 @@ namespace bgfx
 		| kSortKeyDrawTypeMask
 		| kSortKeyDraw2SeqMask
 		| kSortKeyDraw2BlendMask
+		| kSortKeyDraw2AlphaRefMask
 		| kSortKeyDraw2ProgramMask
 		) == (0
 		^ kSortKeyViewMask
@@ -1134,6 +1212,7 @@ namespace bgfx
 		^ kSortKeyDrawTypeMask
 		^ kSortKeyDraw2SeqMask
 		^ kSortKeyDraw2BlendMask
+		^ kSortKeyDraw2AlphaRefMask
 		^ kSortKeyDraw2ProgramMask
 		) );
 	static_assert( (0 // Compute key mask shouldn't overlap.
@@ -1156,22 +1235,22 @@ namespace bgfx
 	// |  view-+|                                                       |
 	// |        +-draw                                                  |
 	// |----------------------------------------------------------------| Draw Key 0 - Sort by program
-	// |        |kkttpppppppppdddddddddddddddddddddddddddddddd          |
-	// |        | ^ ^        ^                               ^          |
-	// |        | | |        |                               |          |
+	// |        |kkttrpppppppppdddddddddddddddddddddddddddddddd         |
+	// |        | ^ ^^        ^                               ^         |
+	// |        | | |+ref     |                               |         |
 	// |        | | +-blend  +-program                 depth-+          |
 	// |        | +-key type                                            |
 	// |----------------------------------------------------------------| Draw Key 1 - Sort by depth
-	// |        |kkddddddddddddddddddddddddddddddddttppppppppp          |
-	// |        | ^                               ^ ^        ^          |
-	// |        | |                               | +-blend  |          |
-	// |        | +-key type                depth-+  program-+          |
+	// |        |kkddddddddddddddddddddddddddddddddttrppppppppp         |
+	// |        | ^                               ^ ^+-ref    ^         |
+	// |        | |                               | +-blend   |         |
+	// |        | +-key type                depth-+   program-+         |
 	// |        |                                                       |
 	// |----------------------------------------------------------------| Draw Key 2 - Sequential
-	// |        |kkssssssssssssssssssssttppppppppp                      |
-	// |        | ^                   ^ ^        ^                      |
-	// |        | |                   | |        |                      |
-	// |        | +-key type      seq-+ +-blend  +-program              |
+	// |        |kkssssssssssssssssssssttrppppppppp                     |
+	// |        | ^                   ^ ^^        ^                     |
+	// |        | |                   | |+-ref    |                     |
+	// |        | +-key type      seq-+ +-blend   +-program             |
 	// |        |                                                       |
 	// |----------------------------------------------------------------| Compute Key
 	// |        |ssssssssssssssssssssppppppppp                          |
@@ -1196,11 +1275,12 @@ namespace bgfx
 			{
 			case SortProgram:
 				{
-					const uint64_t depth   = (uint64_t(m_depth      ) << kSortKeyDraw0DepthShift  ) & kSortKeyDraw0DepthMask;
-					const uint64_t program = (uint64_t(m_program.idx) << kSortKeyDraw0ProgramShift) & kSortKeyDraw0ProgramMask;
-					const uint64_t blend   = (uint64_t(m_blend      ) << kSortKeyDraw0BlendShift  ) & kSortKeyDraw0BlendMask;
-					const uint64_t view    = (uint64_t(m_view       ) << kSortKeyViewBitShift     ) & kSortKeyViewMask;
-					const uint64_t key     = view|kSortKeyDrawBit|kSortKeyDrawTypeProgram|blend|program|depth;
+					const uint64_t depth    = (uint64_t(m_depth      ) << kSortKeyDraw0DepthShift   ) & kSortKeyDraw0DepthMask;
+					const uint64_t program  = (uint64_t(m_program.idx) << kSortKeyDraw0ProgramShift ) & kSortKeyDraw0ProgramMask;
+					const uint64_t blend    = (uint64_t(m_blend      ) << kSortKeyDraw0BlendShift   ) & kSortKeyDraw0BlendMask;
+					const uint64_t alphaRef = (uint64_t(m_hasAlphaRef) << kSortKeyDraw0AlphaRefShift) & kSortKeyDraw0AlphaRefMask;
+					const uint64_t view     = (uint64_t(m_view       ) << kSortKeyViewBitShift      ) & kSortKeyViewMask;
+					const uint64_t key      = view|kSortKeyDrawBit|kSortKeyDrawTypeProgram|blend|alphaRef|program|depth;
 
 					return key;
 				}
@@ -1208,22 +1288,24 @@ namespace bgfx
 
 			case SortDepth:
 				{
-					const uint64_t depth   = (uint64_t(m_depth      ) << kSortKeyDraw1DepthShift  ) & kSortKeyDraw1DepthMask;
-					const uint64_t program = (uint64_t(m_program.idx) << kSortKeyDraw1ProgramShift) & kSortKeyDraw1ProgramMask;
-					const uint64_t blend   = (uint64_t(m_blend      ) << kSortKeyDraw1BlendShift) & kSortKeyDraw1BlendMask;
-					const uint64_t view    = (uint64_t(m_view       ) << kSortKeyViewBitShift     ) & kSortKeyViewMask;
-					const uint64_t key     = view|kSortKeyDrawBit|kSortKeyDrawTypeDepth|depth|blend|program;
+					const uint64_t depth    = (uint64_t(m_depth      ) << kSortKeyDraw1DepthShift  )  & kSortKeyDraw1DepthMask;
+					const uint64_t program  = (uint64_t(m_program.idx) << kSortKeyDraw1ProgramShift)  & kSortKeyDraw1ProgramMask;
+					const uint64_t blend    = (uint64_t(m_blend      ) << kSortKeyDraw1BlendShift)    & kSortKeyDraw1BlendMask;
+					const uint64_t alphaRef = (uint64_t(m_hasAlphaRef) << kSortKeyDraw1AlphaRefShift) & kSortKeyDraw1AlphaRefMask;
+					const uint64_t view     = (uint64_t(m_view       ) << kSortKeyViewBitShift     )  & kSortKeyViewMask;
+					const uint64_t key      = view|kSortKeyDrawBit|kSortKeyDrawTypeDepth|depth|blend|alphaRef|program;
 					return key;
 				}
 				break;
 
 			case SortSequence:
 				{
-					const uint64_t seq     = (uint64_t(m_seq        ) << kSortKeyDraw2SeqShift    ) & kSortKeyDraw2SeqMask;
-					const uint64_t program = (uint64_t(m_program.idx) << kSortKeyDraw2ProgramShift) & kSortKeyDraw2ProgramMask;
-					const uint64_t blend   = (uint64_t(m_blend      ) << kSortKeyDraw2BlendShift  ) & kSortKeyDraw2BlendMask;
-					const uint64_t view    = (uint64_t(m_view       ) << kSortKeyViewBitShift     ) & kSortKeyViewMask;
-					const uint64_t key     = view|kSortKeyDrawBit|kSortKeyDrawTypeSequence|seq|blend|program;
+					const uint64_t seq      = (uint64_t(m_seq        ) << kSortKeyDraw2SeqShift     ) & kSortKeyDraw2SeqMask;
+					const uint64_t program  = (uint64_t(m_program.idx) << kSortKeyDraw2ProgramShift ) & kSortKeyDraw2ProgramMask;
+					const uint64_t blend    = (uint64_t(m_blend      ) << kSortKeyDraw2BlendShift   ) & kSortKeyDraw2BlendMask;
+					const uint64_t alphaRef = (uint64_t(m_hasAlphaRef) << kSortKeyDraw2AlphaRefShift) & kSortKeyDraw2AlphaRefMask;
+					const uint64_t view     = (uint64_t(m_view       ) << kSortKeyViewBitShift      ) & kSortKeyViewMask;
+					const uint64_t key      = view|kSortKeyDrawBit|kSortKeyDrawTypeSequence|seq|blend|alphaRef|program;
 
 					BX_ASSERT(seq == (uint64_t(m_seq) << kSortKeyDraw2SeqShift)
 						, "SortKey error, sequence is truncated (m_seq: %d)."
@@ -1298,11 +1380,12 @@ namespace bgfx
 
 		void reset()
 		{
-			m_depth   = 0;
-			m_seq     = 0;
-			m_program = {0};
-			m_view    = 0;
-			m_blend   = 0;
+			m_depth       = 0;
+			m_seq         = 0;
+			m_program     = {0};
+			m_view        = 0;
+			m_blend       = 0;
+			m_hasAlphaRef = false;
 		}
 
 		uint32_t      m_depth;
@@ -1310,36 +1393,47 @@ namespace bgfx
 		ProgramHandle m_program;
 		ViewId        m_view;
 		uint8_t       m_blend;
+		bool          m_hasAlphaRef;
 	};
 #undef SORT_KEY_RENDER_DRAW
 
-	constexpr uint8_t  kBlitKeyViewShift = 32-kSortKeyViewNumBits;
-	constexpr uint32_t kBlitKeyViewMask  = uint32_t(BGFX_CONFIG_MAX_VIEWS-1)<<kBlitKeyViewShift;
-	constexpr uint8_t  kBlitKeyItemShift = 0;
-	constexpr uint32_t kBlitKeyItemMask  = UINT16_MAX;
-
 	struct BlitKey
 	{
-		uint32_t encode()
+		using KeyT = uint32_t;
+
+		static constexpr uint8_t  kViewShift = 32-kSortKeyViewNumBits;
+		static constexpr uint32_t kViewMask  = uint32_t(BGFX_CONFIG_MAX_VIEWS-1)<<kViewShift;
+		static constexpr uint8_t  kItemShift = 0;
+		static constexpr uint32_t kItemMask  = UINT16_MAX;
+
+		static_assert( (0
+			| kViewMask
+			| kItemMask
+			) == (0
+			^ kViewMask
+			^ kItemMask
+			), "BlitKey: Key mask shouldn't overlap!");
+
+		KeyT encode()
 		{
-			const uint32_t view = (uint32_t(m_view) << kBlitKeyViewShift) & kBlitKeyViewMask;
-			const uint32_t item = (uint32_t(m_item) << kBlitKeyItemShift) & kBlitKeyItemMask;
-			const uint32_t key  = view|item;
+			const KeyT view = (KeyT(m_view) << kViewShift) & kViewMask;
+			const KeyT item = (KeyT(m_item) << kItemShift) & kItemMask;
+			const KeyT key  = view|item;
 
 			return key;
 		}
 
-		void decode(uint32_t _key)
+		void decode(KeyT _key)
 		{
-			m_item = uint16_t( (_key & kBlitKeyItemMask) >> kBlitKeyItemShift);
-			m_view =   ViewId( (_key & kBlitKeyViewMask) >> kBlitKeyViewShift);
+			m_item = uint16_t( (_key & kItemMask) >> kItemShift);
+			m_view =   ViewId( (_key & kViewMask) >> kViewShift);
 		}
 
-		static uint32_t remapView(uint32_t _key, ViewId _viewRemap[BGFX_CONFIG_MAX_VIEWS])
+		static KeyT remapView(KeyT _key, ViewId _viewRemap[BGFX_CONFIG_MAX_VIEWS])
 		{
-			const ViewId   oldView = ViewId( (_key & kBlitKeyViewMask) >> kBlitKeyViewShift);
-			const uint32_t view    = uint32_t( (_viewRemap[oldView] << kBlitKeyViewShift) & kBlitKeyViewMask);
-			const uint32_t key     = (_key & ~kBlitKeyViewMask) | view;
+			const ViewId oldView = ViewId( (_key & kViewMask) >> kViewShift);
+			const KeyT   view    = uint32_t( (_viewRemap[oldView] << kViewShift) & kViewMask);
+			const KeyT   key     = (_key & ~kViewMask) | view;
 			return key;
 		}
 
@@ -1455,20 +1549,20 @@ namespace bgfx
 		uint32_t m_num;
 	};
 
-	constexpr uint8_t  kConstantOpcodeTypeShift = 27;
-	constexpr uint32_t kConstantOpcodeTypeMask  = UINT32_C(0xf8000000);
-	constexpr uint8_t  kConstantOpcodeLocShift  = 11;
-	constexpr uint32_t kConstantOpcodeLocMask   = UINT32_C(0x07fff800);
-	constexpr uint8_t  kConstantOpcodeNumShift  = 1;
-	constexpr uint32_t kConstantOpcodeNumMask   = UINT32_C(0x000007fe);
-	constexpr uint8_t  kConstantOpcodeCopyShift = 0;
-	constexpr uint32_t kConstantOpcodeCopyMask  = UINT32_C(0x00000001);
+	static constexpr uint8_t  kConstantOpcodeTypeShift = 27;
+	static constexpr uint32_t kConstantOpcodeTypeMask  = UINT32_C(0xf8000000);
+	static constexpr uint8_t  kConstantOpcodeLocShift  = 11;
+	static constexpr uint32_t kConstantOpcodeLocMask   = UINT32_C(0x07fff800);
+	static constexpr uint8_t  kConstantOpcodeNumShift  = 1;
+	static constexpr uint32_t kConstantOpcodeNumMask   = UINT32_C(0x000007fe);
+	static constexpr uint8_t  kConstantOpcodeCopyShift = 0;
+	static constexpr uint32_t kConstantOpcodeCopyMask  = UINT32_C(0x00000001);
 
-	constexpr uint8_t kUniformFragmentBit  = 0x10;
-	constexpr uint8_t kUniformSamplerBit   = 0x20;
-	constexpr uint8_t kUniformReadOnlyBit  = 0x40;
-	constexpr uint8_t kUniformCompareBit   = 0x80;
-	constexpr uint8_t kUniformMask = 0
+	static constexpr uint8_t kUniformFragmentBit  = 0x10;
+	static constexpr uint8_t kUniformSamplerBit   = 0x20;
+	static constexpr uint8_t kUniformReadOnlyBit  = 0x40;
+	static constexpr uint8_t kUniformCompareBit   = 0x80;
+	static constexpr uint8_t kUniformMask = 0
 		| kUniformFragmentBit
 		| kUniformSamplerBit
 		| kUniformReadOnlyBit
@@ -1495,8 +1589,8 @@ namespace bgfx
 
 		static void update(UniformBuffer** _uniformBuffer)
 		{
-			constexpr uint32_t kThreshold = BGFX_CONFIG_UNIFORM_BUFFER_RESIZE_THRESHOLD_SIZE;
-			constexpr uint32_t kIncrement = BGFX_CONFIG_UNIFORM_BUFFER_RESIZE_INCREMENT_SIZE;
+			static constexpr uint32_t kThreshold = BGFX_CONFIG_UNIFORM_BUFFER_RESIZE_THRESHOLD_SIZE;
+			static constexpr uint32_t kIncrement = BGFX_CONFIG_UNIFORM_BUFFER_RESIZE_INCREMENT_SIZE;
 
 			UniformBuffer* uniformBuffer = *_uniformBuffer;
 			if (kThreshold >= uniformBuffer->m_size - uniformBuffer->m_pos)
@@ -1764,7 +1858,7 @@ namespace bgfx
 
 			m_startIndirect     = 0;
 			m_numIndirect       = UINT32_MAX;
-			m_numIndirectIndex  = 0;  
+			m_numIndirectIndex  = 0;
 			m_indirectBuffer    = BGFX_INVALID_HANDLE;
 			m_numIndirectBuffer = BGFX_INVALID_HANDLE;
 			m_occlusionQuery    = BGFX_INVALID_HANDLE;
@@ -1953,6 +2047,7 @@ namespace bgfx
 	struct UniformRef
 	{
 		bx::FixedString64 m_name;
+		UniformFreq::Enum m_freq;
 		UniformType::Enum m_type;
 		uint16_t          m_num;
 		int16_t           m_refCount;
@@ -2058,6 +2153,7 @@ namespace bgfx
 			setScissor(0, 0, 0, 0);
 			setClear(BGFX_CLEAR_NONE, 0, 0.0f, 0);
 			setMode(ViewMode::Default);
+			setShadingRate(ShadingRate::Rate1x1);
 			setFrameBuffer(BGFX_INVALID_HANDLE);
 			setTransform(NULL, NULL);
 		}
@@ -2093,6 +2189,16 @@ namespace bgfx
 			m_mode = uint8_t(_mode);
 		}
 
+		void setShadingRate(ShadingRate::Enum _shadingRate)
+		{
+			m_shadingRate = uint8_t(_shadingRate);
+		}
+
+		void setUniform(UniformHandle _handle, const void* _value, uint16_t _num)
+		{
+			BX_UNUSED(_handle, _value, _num);
+		}
+
 		void setFrameBuffer(FrameBufferHandle _handle)
 		{
 			m_fbh = _handle;
@@ -2126,6 +2232,151 @@ namespace bgfx
 		Matrix4 m_proj;
 		FrameBufferHandle m_fbh;
 		uint8_t m_mode;
+		uint8_t m_shadingRate;
+	};
+
+	struct UniformCacheKey
+	{
+		using KeyT = uint64_t;
+
+		static constexpr uint8_t kViewShift   = sizeof(KeyT)*8-16;
+		static constexpr KeyT    kViewMask    = KeyT(UINT16_MAX)<<kViewShift;
+		static constexpr uint8_t kHandleShift = kViewShift - 16;
+		static constexpr KeyT    kHandleMask  = KeyT(UINT16_MAX)<<kHandleShift;
+		static constexpr uint8_t kOffsetShift = kHandleShift-20;
+		static constexpr KeyT    kOffsetMask  = KeyT(UINT32_MAX>>12)<<kOffsetShift;
+		static constexpr uint8_t kSizeShift   = kOffsetShift-12;
+		static constexpr KeyT    kSizeMask    = KeyT(UINT16_MAX>>4)<<kSizeShift;
+
+		static_assert( (0
+			| kViewMask
+			| kHandleMask
+			| kOffsetMask
+			| kSizeMask
+			) == (0
+			^ kViewMask
+			^ kHandleMask
+			^ kOffsetMask
+			^ kSizeMask
+			), "UniformCacheKey: Key mask shouldn't overlap!");
+
+		KeyT encode()
+		{
+			static constexpr uint32_t kMaxSize   = ( (kSizeMask  >>kSizeShift  ) + 1)<<4;
+			static constexpr uint32_t kMaxOffset = ( (kOffsetMask>>kOffsetShift) + 1)<<4;
+
+			BX_ASSERT(true
+				&& uint32_t(m_size) < kMaxSize
+				&& m_offset < kMaxOffset
+				, "UniformCacheKey couldn't fit size or offest (size %d max %d, offset %d max %d)!"
+				, m_size
+				, kMaxSize
+				, m_offset
+				, kMaxOffset
+				);
+			BX_UNUSED(kMaxSize, kMaxOffset);
+
+			const KeyT view   = (KeyT(m_view)      << kViewShift)   & kViewMask;
+			const KeyT handle = (KeyT(m_handle)    << kHandleShift) & kHandleMask;
+			const KeyT offset = (KeyT(m_offset>>4) << kOffsetShift) & kOffsetMask;
+			const KeyT size   = (KeyT(m_size>>4)   << kSizeShift)   & kSizeMask;
+			const KeyT key    = view|handle|offset|size;
+
+			return key;
+		}
+
+		void decode(KeyT _key)
+		{
+			m_offset = (uint32_t( (_key & kOffsetMask) >> kOffsetShift) ) << 4;
+			m_handle = {uint16_t( (_key & kHandleMask) >> kHandleShift) };
+			m_size   = (uint16_t( (_key & kSizeMask)   >> kSizeShift  ) ) << 4;
+			m_view   =    ViewId( (_key & kViewMask)   >> kViewShift);
+		}
+
+		static KeyT remapView(KeyT _key, ViewId _viewRemap[BGFX_CONFIG_MAX_VIEWS])
+		{
+			const ViewId oldView = ViewId( (_key & kViewMask) >> kViewShift);
+			const KeyT view      = UINT16_MAX != oldView
+				? (KeyT(_viewRemap[oldView]) << kViewShift) & kViewMask
+				: 0 // frame uniforms go into physical view 0.
+				;
+			const KeyT key       = (_key & ~kViewMask) | view;
+			return key;
+		}
+
+		uint32_t m_offset;
+		uint16_t m_handle;
+		uint16_t m_size;
+		ViewId   m_view;
+	};
+
+	struct UniformCacheEntry
+	{
+		uint32_t offset;
+		uint16_t size;
+		int16_t  refCount;
+	};
+
+	struct UniformCacheFrame
+	{
+		static constexpr uint32_t kMinKeysCapacity = 256;
+		static constexpr uint32_t kMinDataCapacity = 16<<10;
+
+		UniformCacheFrame()
+			: m_keys(NULL)
+			, m_data(NULL)
+			, m_numItems(0)
+			, m_keysCapacity(kMinKeysCapacity)
+			, m_dataCapacity(kMinDataCapacity)
+		{
+			m_keys = (UniformCacheKey::KeyT*)bx::alloc(g_allocator, m_keysCapacity*sizeof(uint64_t) );
+			m_data = (uint8_t*)bx::alloc(g_allocator, m_dataCapacity);
+		}
+
+		~UniformCacheFrame()
+		{
+			bx::free(g_allocator, m_keys);
+			bx::free(g_allocator, m_data);
+		}
+
+		void resize(uint32_t _keysCapacity, uint32_t _dataCapacity)
+		{
+			{
+				const uint32_t newKeysCapacity = bx::alignUp(bx::max(_keysCapacity, kMinKeysCapacity), kMinKeysCapacity);
+
+				if (newKeysCapacity != m_keysCapacity)
+				{
+					m_keys = (UniformCacheKey::KeyT*)bx::realloc(g_allocator, m_keys, newKeysCapacity * sizeof(uint64_t));
+					m_keysCapacity = newKeysCapacity;
+				}
+			}
+
+			{
+				const uint32_t newDataCapacity = bx::alignUp(bx::max(_dataCapacity, kMinDataCapacity), kMinDataCapacity);
+
+				if (newDataCapacity != m_dataCapacity)
+				{
+					m_data = (uint8_t*)bx::realloc(g_allocator, m_data, newDataCapacity);
+					m_dataCapacity = newDataCapacity;
+				}
+			}
+		}
+
+		void sort(ViewId* _viewRemap, uint64_t* _tempKeys)
+		{
+			for (uint32_t ii = 0, num = m_numItems; ii < num; ++ii)
+			{
+				m_keys[ii] = UniformCacheKey::remapView(m_keys[ii], _viewRemap);
+			}
+
+			bx::radixSort(m_keys, _tempKeys, m_numItems);
+		}
+
+		uint64_t* m_keys;
+		uint8_t*  m_data;
+		uint32_t  m_numItems;
+		uint32_t  m_keysCapacity;
+		uint32_t  m_dataCapacity;
 	};
 
 	struct FrameCache
@@ -2175,7 +2426,7 @@ namespace bgfx
 
 			m_perfStats.viewStats = m_viewStats;
 
-			bx::memSet(&m_renderItemBind[0], 0, sizeof(m_renderItemBind));
+			bx::memSet(&m_renderItemBind[0], 0, sizeof(m_renderItemBind) );
 		}
 
 		~Frame()
@@ -2351,11 +2602,13 @@ namespace bgfx
 		uint32_t m_blitKeys[BGFX_CONFIG_MAX_BLIT_ITEMS+1];
 		BlitItem m_blitItem[BGFX_CONFIG_MAX_BLIT_ITEMS+1];
 
+		UniformCacheFrame m_uniformCacheFrame;
+
 		FrameCache m_frameCache;
 		UniformBuffer** m_uniformBuffer;
 
 		uint32_t m_numRenderItems;
-		uint16_t m_numBlitItems;
+		uint32_t m_numBlitItems;
 
 		uint32_t m_iboffset;
 		uint32_t m_vboffset;
@@ -2458,9 +2711,12 @@ namespace bgfx
 			// will leaves bytes uninitialized. This will influence the hashing
 			// as it reads those bytes too. To make this deterministic, we will
 			// clear all bytes (inclusively the padding) before we start.
-			bx::memSet(&m_bind, 0, sizeof(m_bind));
+			bx::memSet(&m_bind, 0, sizeof(m_bind) );
 
-			discard(BGFX_DISCARD_ALL);
+			m_discard = false;
+			m_draw.clear(BGFX_DISCARD_ALL);
+			m_compute.clear(BGFX_DISCARD_ALL);
+			m_bind.clear(BGFX_DISCARD_ALL);
 		}
 
 		void begin(Frame* _frame, uint8_t _idx)
@@ -2517,7 +2773,14 @@ namespace bgfx
 					, _handle.idx
 					, getName(_handle)
 					);
-//				m_uniformSet.insert(_handle.idx);
+				m_uniformSet.insert(_handle.idx);
+
+				const UniformRef& uniform = getUniformRef(_handle);
+				BX_ASSERT(UniformFreq::Draw == uniform.m_freq
+					, "Setting uniform for draw call, but uniform frequency is different (frequency: %d)!"
+					, uniform.m_freq
+					);
+				BX_UNUSED(uniform);
 			}
 
 			UniformBuffer::update(&m_frame->m_uniformBuffer[m_uniformIdx]);
@@ -2527,8 +2790,8 @@ namespace bgfx
 
 		void setState(uint64_t _state, uint32_t _rgba)
 		{
-			const uint8_t blend    = ( (_state&BGFX_STATE_BLEND_MASK    )>>BGFX_STATE_BLEND_SHIFT    )&0xff;
-			const uint8_t alphaRef = ( (_state&BGFX_STATE_ALPHA_REF_MASK)>>BGFX_STATE_ALPHA_REF_SHIFT)&0xff;
+			const uint8_t blend =     ( (_state&BGFX_STATE_BLEND_MASK    )>>BGFX_STATE_BLEND_SHIFT    )&0xff;
+			m_key.m_hasAlphaRef = !!( ( (_state&BGFX_STATE_ALPHA_REF_MASK)>>BGFX_STATE_ALPHA_REF_SHIFT)&0xff);
 
 			// Transparency sort order table:
 			//
@@ -2547,7 +2810,7 @@ namespace bgfx
 			//                    |  |  |  |  |  |  |  |  |  |  |  |  +----- BGFX_STATE_BLEND_INV_FACTOR
 			//                    |  |  |  |  |  |  |  |  |  |  |  |  |
 			//                 x  |  |  |  |  |  |  |  |  |  |  |  |  |  x  x  x  x  x
-			m_key.m_blend = "\x0\x2\x2\x3\x3\x2\x3\x2\x3\x2\x2\x2\x2\x2\x2\x2\x2\x2\x2"[( (blend)&0xf) + (!!blend)] + !!alphaRef;
+			m_key.m_blend = "\x0\x1\x1\x2\x2\x1\x2\x1\x2\x1\x1\x1\x1\x1\x1\x1\x1\x1\x1"[( (blend)&0xf) + (!!blend)];
 
 			m_draw.m_stateFlags = _state;
 			m_draw.m_rgba       = _rgba;
@@ -2792,6 +3055,13 @@ namespace bgfx
 			m_draw.clear(_flags);
 			m_compute.clear(_flags);
 			m_bind.clear(_flags);
+
+			if (_flags & BGFX_DISCARD_STATE)
+			{
+				UniformBuffer* uniformBuffer = m_frame->m_uniformBuffer[m_uniformIdx];
+				m_uniformEnd   = uniformBuffer->getPos();
+				m_uniformBegin = m_uniformEnd;
+			}
 		}
 
 		void submit(ViewId _id, ProgramHandle _program, OcclusionQueryHandle _occlusionQuery, uint32_t _depth, uint8_t _flags);
@@ -2947,12 +3217,20 @@ namespace bgfx
 	};
 
 	// First-fit non-local allocator.
+	//
+	// The free list is kept sorted by address at all times, which:
+	//  - Enables O(1) adjacent-block coalescing on free (no deferred compact needed).
+	//  - Eliminates the need to sort during compact().
+	//  - Provides cache-friendly iteration (contiguous vector storage).
+	//  - Uses binary search for sorted insertion, replacing the O(n) push_front.
+	//
 	class NonLocalAllocator
 	{
 	public:
 		static const uint64_t kInvalidBlock = UINT64_MAX;
 
 		NonLocalAllocator()
+			: m_total(0)
 		{
 		}
 
@@ -2964,11 +3242,12 @@ namespace bgfx
 		{
 			m_free.clear();
 			m_used.clear();
+			m_total = 0;
 		}
 
 		void add(uint64_t _ptr, uint32_t _size)
 		{
-			m_free.push_back(Free(_ptr, _size) );
+			insertFreeBlock(_ptr, _size);
 		}
 
 		uint64_t remove()
@@ -2978,7 +3257,7 @@ namespace bgfx
 			if (0 < m_free.size() )
 			{
 				Free freeBlock = m_free.front();
-				m_free.pop_front();
+				m_free.erase(m_free.begin() );
 				return freeBlock.m_ptr;
 			}
 
@@ -2996,6 +3275,7 @@ namespace bgfx
 					uint64_t ptr = it->m_ptr;
 
 					m_used.insert(stl::make_pair(ptr, _size) );
+					m_total += _size;
 
 					if (it->m_size != _size)
 					{
@@ -3020,30 +3300,28 @@ namespace bgfx
 			UsedList::iterator it = m_used.find(_block);
 			if (it != m_used.end() )
 			{
-				m_free.push_front(Free(it->first, it->second) );
+				const uint64_t ptr  = it->first;
+				const uint32_t size = it->second;
+
+				m_total -= size;
 				m_used.erase(it);
+
+				// Insert into sorted free list and coalesce with adjacent blocks.
+				insertFreeBlock(ptr, size);
 			}
 		}
 
 		bool compact()
 		{
-			m_free.sort();
-
-			for (FreeList::iterator it = m_free.begin(), next = it, itEnd = m_free.end(); next != itEnd;)
-			{
-				if ( (it->m_ptr + it->m_size) == next->m_ptr)
-				{
-					it->m_size += next->m_size;
-					next = m_free.erase(next);
-				}
-				else
-				{
-					it = next;
-					++next;
-				}
-			}
-
+			// The free list is maintained in sorted order with immediate
+			// coalescing, so compact() is a no-op for merging. Just report
+			// whether all allocations have been freed.
 			return 0 == m_used.size();
+		}
+
+		uint32_t getTotal() const
+		{
+			return m_total;
 		}
 
 	private:
@@ -3060,15 +3338,331 @@ namespace bgfx
 				return m_ptr < rhs.m_ptr;
 			}
 
+			bool operator>(const Free& rhs) const
+			{
+				return m_ptr > rhs.m_ptr;
+			}
+
 			uint64_t m_ptr;
 			uint32_t m_size;
 		};
 
-		typedef stl::list<Free> FreeList;
+		// Insert a free block at its sorted position and coalesce with
+		// adjacent neighbors. Uses bx::upperBound to find the insertion
+		// point in O(log n), then checks the immediate neighbors for
+		// merge opportunities.
+		void insertFreeBlock(uint64_t _ptr, uint32_t _size)
+		{
+			// Use bx::upperBound to find the insertion point (first element with m_ptr > _ptr).
+			const Free key(_ptr, 0);
+			const uint32_t idx = 0 < m_free.size()
+				? bx::upperBound(key, m_free.data(), uint32_t(m_free.size() ) )
+				: 0
+				;
+
+			// Check if we can merge with the previous block.
+			const bool mergePrev = idx > 0
+				&& (m_free[idx - 1].m_ptr + m_free[idx - 1].m_size) == _ptr
+				;
+
+			// Check if we can merge with the next block.
+			const bool mergeNext = idx < uint32_t(m_free.size() )
+				&& (_ptr + _size) == m_free[idx].m_ptr
+				;
+
+			if (mergePrev && mergeNext)
+			{
+				// Merge all three: extend previous to cover current + next.
+				m_free[idx - 1].m_size += _size + m_free[idx].m_size;
+				m_free.erase(m_free.begin() + idx);
+			}
+			else if (mergePrev)
+			{
+				// Extend previous block.
+				m_free[idx - 1].m_size += _size;
+			}
+			else if (mergeNext)
+			{
+				// Extend next block backward.
+				m_free[idx].m_ptr   = _ptr;
+				m_free[idx].m_size += _size;
+			}
+			else
+			{
+				// No merge possible — insert new block at sorted position.
+				m_free.insert(m_free.begin() + idx, Free(_ptr, _size) );
+			}
+		}
+
+		typedef stl::vector<Free> FreeList;
 		FreeList m_free;
 
 		typedef stl::unordered_map<uint64_t, uint32_t> UsedList;
 		UsedList m_used;
+
+		uint32_t m_total;
+	};
+
+	struct UniformCache
+	{
+		UniformCache()
+		{
+			const uint32_t size = 1<<20;
+			m_data = (uint8_t*)bx::alloc(g_allocator, size);
+			m_uniformStoreAlloc.add(0, size);
+		}
+
+		~UniformCache()
+		{
+			BX_ASSERT(true
+				&& 0 == m_uniformKeyHashMap.size()
+				&& 0 == m_uniformEntryMap.size()
+				&& 0 == m_uniformStoreAlloc.getTotal()
+				, "UniformCache leak (keys %d, entries %d, %d bytes)!"
+				, m_uniformKeyHashMap.size()
+				, m_uniformEntryMap.size()
+				, m_uniformStoreAlloc.getTotal()
+				);
+
+			bx::free(g_allocator, m_data);
+			m_uniformKeyHashMap.clear();
+			m_uniformEntryMap.clear();
+		}
+
+		void setViewUniform(ViewId _id, UniformHandle _handle, const void* _value, uint16_t _num)
+		{
+			const UniformRef& uniform = getUniformRef(_handle);
+
+			const UniformFreq::Enum freq = UINT16_MAX == _id
+				? UniformFreq::Frame
+				: UniformFreq::View
+				;
+
+			BX_ASSERT(0 < uniform.m_refCount
+				, "Uniform reference count it 0 (handle %3d)!"
+				, _handle.idx
+				);
+			BX_ASSERT(uniform.m_freq == freq
+				, "Setting uniform per view, but uniform is created with different bgfx::UniformFreq::Enum!"
+				);
+			BX_ASSERT(_num == UINT16_MAX || uniform.m_num >= _num
+				, "Truncated uniform update. %d (max: %d)"
+				, _num, uniform.m_num
+				);
+			BX_UNUSED(freq);
+
+			UniformCacheKey key =
+			{
+				.m_offset = 0,
+				.m_handle = _handle.idx,
+				.m_size   = 0,
+				.m_view   = _id,
+			};
+
+			static constexpr UniformCacheKey::KeyT kViewHandleMask = UniformCacheKey::kViewMask|UniformCacheKey::kHandleMask;
+			static_assert( ( (kViewHandleMask>>32)<<32) == kViewHandleMask, "View + handle must be in top 32 bits of 64-bit key.");
+			const uint32_t uniformKey = uint32_t(key.encode() >> 32);
+
+			setUniform(uniformKey, uniform.m_type, _value, _num);
+		}
+
+		void setUniform(uint32_t _uniformKey, UniformType::Enum _type, const void* _value, uint16_t _num)
+		{
+			const uint32_t typeSize = g_uniformTypeSize[_type];
+			const uint32_t dataSize = _num * typeSize;
+
+			bx::HashMurmur3 murmur;
+			murmur.begin();
+			murmur.add(_type);
+			murmur.add(_num);
+			murmur.add(_value, dataSize);
+			const uint32_t hash = murmur.end();
+
+			UniformKeyHashMap::iterator itKey = m_uniformKeyHashMap.find(_uniformKey);
+			if (itKey != m_uniformKeyHashMap.end() )
+			{
+				if (itKey->second == hash)
+				{
+					return;
+				}
+
+				UniformEntryMap::iterator itOldEntry = m_uniformEntryMap.find(itKey->second);
+				if (itOldEntry != m_uniformEntryMap.end())
+				{
+					if (release(itOldEntry->second) )
+					{
+						m_uniformEntryMap.erase(itOldEntry);
+					}
+				}
+
+				itKey->second = hash;
+
+				UniformEntryMap::iterator itEntry = m_uniformEntryMap.find(hash);
+				if (itEntry != m_uniformEntryMap.end())
+				{
+					++itEntry->second.refCount;
+
+					return;
+				}
+			}
+			else
+			{
+				m_uniformKeyHashMap.insert(stl::make_pair(_uniformKey, hash) );
+			}
+
+			UniformEntryMap::iterator itEntry = m_uniformEntryMap.find(hash);
+			if (itEntry != m_uniformEntryMap.end())
+			{
+				++itEntry->second.refCount;
+			}
+			else
+			{
+				const uint64_t offset = m_uniformStoreAlloc.alloc(dataSize);
+				BX_ASSERT(NonLocalAllocator::kInvalidBlock != offset, "UniformCache: Failed to allocate data!");
+
+				m_uniformEntryMap.insert(stl::make_pair(hash, UniformCacheEntry
+					{
+						.offset   = bx::narrowCast<uint32_t>(offset),
+						.size     = bx::narrowCast<uint16_t>(dataSize),
+						.refCount = 1
+					}) );
+
+				bx::memCopy(&m_data[offset], _value, dataSize);
+			}
+		}
+
+		void frame(UniformCacheFrame& _outUniformCacheFrame)
+		{
+			m_uniformStoreAlloc.compact();
+
+			_outUniformCacheFrame.resize(
+				  uint32_t(m_uniformKeyHashMap.size() )
+				, m_uniformStoreAlloc.getTotal()
+				);
+
+			using OffsetRemap = stl::unordered_map<uint32_t, uint32_t>;
+			OffsetRemap offsetRemap;
+
+			uint32_t linearOffset = 0;
+			uint32_t num = 0;
+			for (UniformKeyHashMap::const_iterator itKey = m_uniformKeyHashMap.begin(), itEnd = m_uniformKeyHashMap.end(); itKey != itEnd; ++itKey)
+			{
+				UniformEntryMap::iterator itEntry = m_uniformEntryMap.find(itKey->second);
+				BX_ASSERT(itEntry != m_uniformEntryMap.end()
+					, "Couldn't find uniform cache entry for key 0x%d, hash 0x%x!"
+					, itKey->first
+					, itKey->second
+					);
+
+				const uint32_t offset = itEntry->second.offset;
+				const uint16_t size   = itEntry->second.size;
+
+				UniformCacheKey key;
+				key.decode(uint64_t(itKey->first)<<32);
+				key.m_size = size;
+
+				OffsetRemap::const_iterator itOffset = offsetRemap.find(offset);
+				if (itOffset != offsetRemap.end())
+				{
+					key.m_offset = itOffset->second;
+				}
+				else
+				{
+					key.m_offset = linearOffset;
+
+					offsetRemap.insert(stl::make_pair(offset, linearOffset) );
+					bx::memCopy(&_outUniformCacheFrame.m_data[linearOffset], &m_data[offset], size);
+
+					linearOffset += size;
+				}
+
+				_outUniformCacheFrame.m_keys[num++] = key.encode();
+			}
+
+			_outUniformCacheFrame.m_numItems = num;
+		}
+
+		void invalidate(ViewId _viewId)
+		{
+			for (UniformKeyHashMap::iterator itKey = m_uniformKeyHashMap.begin(), itEnd = m_uniformKeyHashMap.end(); itKey != itEnd;)
+			{
+				UniformCacheKey key;
+				key.decode(uint64_t(itKey->first) << 32);
+
+				if (key.m_view == _viewId)
+				{
+					release(itKey->second);
+
+					UniformKeyHashMap::iterator itErase = itKey;
+					++itKey;
+
+					m_uniformKeyHashMap.erase(itErase);
+				}
+				else
+				{
+					++itKey;
+				}
+			}
+		}
+
+		void invalidate(UniformHandle _handle)
+		{
+			for (UniformKeyHashMap::iterator itKey = m_uniformKeyHashMap.begin(), itEnd = m_uniformKeyHashMap.end(); itKey != itEnd;)
+			{
+				UniformCacheKey key;
+				key.decode(uint64_t(itKey->first) << 32);
+
+				if (key.m_handle == _handle.idx)
+				{
+					release(itKey->second);
+
+					UniformKeyHashMap::iterator itErase = itKey;
+					++itKey;
+
+					m_uniformKeyHashMap.erase(itErase);
+				}
+				else
+				{
+					++itKey;
+				}
+			}
+		}
+
+		bool release(UniformCacheEntry& _entry)
+		{
+			--_entry.refCount;
+
+			if (0 == _entry.refCount)
+			{
+				const uint64_t offset = _entry.offset;
+
+				m_uniformStoreAlloc.free(offset);
+				return true;
+			}
+
+			return false;
+		}
+
+		void release(uint32_t _hash)
+		{
+			UniformEntryMap::iterator itEntry = m_uniformEntryMap.find(_hash);
+			if (itEntry != m_uniformEntryMap.end())
+			{
+				if (release(itEntry->second) )
+				{
+					m_uniformEntryMap.erase(itEntry);
+				}
+			}
+		}
+
+		using UniformKeyHashMap = stl::unordered_map<uint32_t, uint32_t>;
+		using UniformEntryMap   = stl::unordered_map<uint32_t, UniformCacheEntry>;
+
+		UniformKeyHashMap m_uniformKeyHashMap;
+		UniformEntryMap   m_uniformEntryMap;
+
+		NonLocalAllocator m_uniformStoreAlloc;
+		uint8_t* m_data;
 	};
 
 	struct BX_NO_VTABLE RendererContextI
@@ -3094,10 +3688,8 @@ namespace bgfx
 		virtual void destroyShader(ShaderHandle _handle) = 0;
 		virtual void createProgram(ProgramHandle _handle, ShaderHandle _vsh, ShaderHandle _fsh) = 0;
 		virtual void destroyProgram(ProgramHandle _handle) = 0;
-		virtual void* createTexture(TextureHandle _handle, const Memory* _mem, uint64_t _flags, uint8_t _skip) = 0;
-		virtual void updateTextureBegin(TextureHandle _handle, uint8_t _side, uint8_t _mip) = 0;
+		virtual void* createTexture(TextureHandle _handle, const Memory* _mem, uint64_t _flags, uint8_t _skip, uint64_t _external) = 0;
 		virtual void updateTexture(TextureHandle _handle, uint8_t _side, uint8_t _mip, const Rect& _rect, uint16_t _z, uint16_t _depth, uint16_t _pitch, const Memory* _mem) = 0;
-		virtual void updateTextureEnd() = 0;
 		virtual void readTexture(TextureHandle _handle, void* _data, uint8_t _mip) = 0;
 		virtual void resizeTexture(TextureHandle _handle, uint16_t _width, uint16_t _height, uint8_t _numMips, uint16_t _numLayers) = 0;
 		virtual void overrideInternal(TextureHandle _handle, uintptr_t _ptr, uint16_t _layerIndex) = 0;
@@ -3115,8 +3707,9 @@ namespace bgfx
 		virtual void setMarker(const char* _name, uint16_t _len) = 0;
 		virtual void setName(Handle _handle, const char* _name, uint16_t _len) = 0;
 		virtual void submit(Frame* _render, ClearQuad& _clearQuad, TextVideoMemBlitter& _textVideoMemBlitter) = 0;
-		virtual void blitSetup(TextVideoMemBlitter& _blitter) = 0;
-		virtual void blitRender(TextVideoMemBlitter& _blitter, uint32_t _numIndices) = 0;
+		virtual void dbgTextRenderBegin(TextVideoMemBlitter& _blitter) = 0;
+		virtual void dbgTextRender(TextVideoMemBlitter& _blitter, uint32_t _numIndices) = 0;
+		virtual void dbgTextRenderEnd(TextVideoMemBlitter& _blitter) = 0;
 	};
 
 	inline RendererContextI::~RendererContextI()
@@ -3168,7 +3761,7 @@ namespace bgfx
 			BX_TRACE("render thread exit");
 			return bx::kExitSuccess;
 		}
-#endif
+#endif // BX_CONFIG_SUPPORTS_THREADING
 
 		// game thread
 		bool init(const Init& _init);
@@ -3197,6 +3790,11 @@ namespace bgfx
 				? _formatColor
 				: m_init.resolution.formatColor
 				;
+
+			BX_ASSERT(0 != (g_caps.formats[formatColor] & BGFX_CAPS_FORMAT_TEXTURE_BACKBUFFER)
+				, "Format %s can't be used for back buffer!"
+				, getName(formatColor)
+				);
 
 			if (!g_platformDataChangedSinceReset
 			&&  m_init.resolution.formatColor == formatColor
@@ -4072,14 +4670,15 @@ namespace bgfx
 
 		IndirectBufferHandle createIndirectBuffer(uint32_t _num)
 		{
+			BGFX_MUTEX_SCOPE(m_resourceApiLock);
 			BX_UNUSED(_num);
 			IndirectBufferHandle handle = { m_vertexBufferHandle.alloc() };
 
 			BX_WARN(isValid(handle), "Failed to allocate draw indirect buffer handle.");
 			if (isValid(handle) )
 			{
-				uint32_t size  = _num * BGFX_CONFIG_DRAW_INDIRECT_STRIDE;
-				uint16_t flags = BGFX_BUFFER_DRAW_INDIRECT;
+				const uint32_t size  = _num * BGFX_CONFIG_DRAW_INDIRECT_STRIDE;
+				const uint16_t flags = BGFX_BUFFER_DRAW_INDIRECT;
 
 				CommandBuffer& cmdbuf = getCommandBuffer(CommandBuffer::CreateDynamicVertexBuffer);
 				cmdbuf.write(handle);
@@ -4092,6 +4691,7 @@ namespace bgfx
 
 		void destroyIndirectBuffer(IndirectBufferHandle _handle)
 		{
+			BGFX_MUTEX_SCOPE(m_resourceApiLock);
 			VertexBufferHandle handle = { _handle.idx };
 			BGFX_CHECK_HANDLE("destroyDrawIndirectBuffer", m_vertexBufferHandle, handle);
 
@@ -4237,9 +4837,10 @@ namespace bgfx
 				}
 
 				PredefinedUniform::Enum predefined = nameToPredefinedUniformEnum(name);
-				if (PredefinedUniform::Count == predefined && UniformType::End != UniformType::Enum(type) )
+				if (PredefinedUniform::Count == predefined
+				&&  UniformType::End != UniformType::Enum(type) )
 				{
-					uniforms[sr.m_num] = createUniform(name, UniformType::Enum(type), num);
+					uniforms[sr.m_num] = createUniform(name, UniformFreq::Count, UniformType::Enum(type), num);
 					sr.m_num++;
 				}
 			}
@@ -4508,7 +5109,7 @@ namespace bgfx
 			}
 		}
 
-		BGFX_API_FUNC(TextureHandle createTexture(const Memory* _mem, uint64_t _flags, uint8_t _skip, TextureInfo* _info, BackbufferRatio::Enum _ratio, bool _immutable) )
+		BGFX_API_FUNC(TextureHandle createTexture(const Memory* _mem, uint64_t _flags, uint8_t _skip, TextureInfo* _info, BackbufferRatio::Enum _ratio, bool _immutable, uint64_t _external) )
 		{
 			BGFX_MUTEX_SCOPE(m_resourceApiLock);
 
@@ -4586,6 +5187,7 @@ namespace bgfx
 			cmdbuf.write(_mem);
 			cmdbuf.write(_flags);
 			cmdbuf.write(_skip);
+			cmdbuf.write(_external);
 
 			setDebugNameForHandle(handle);
 
@@ -4894,7 +5496,7 @@ namespace bgfx
 			}
 		}
 
-		BGFX_API_FUNC(UniformHandle createUniform(const char* _name, UniformType::Enum _type, uint16_t _num) )
+		BGFX_API_FUNC(UniformHandle createUniform(const char* _name, UniformFreq::Enum _freq, UniformType::Enum _type, uint16_t _num) )
 		{
 			BGFX_MUTEX_SCOPE(m_resourceApiLock);
 
@@ -4921,8 +5523,14 @@ namespace bgfx
 					, uniform.m_type
 					);
 
-				uint32_t oldsize = g_uniformTypeSize[uniform.m_type];
-				uint32_t newsize = g_uniformTypeSize[_type];
+				const uint32_t oldsize = g_uniformTypeSize[uniform.m_type];
+				const uint32_t newsize = g_uniformTypeSize[_type];
+
+				if (UniformFreq::Count != _freq)
+				{
+					// Ignore shader created uniforms, and use UniformFreq when user creates uniform.
+					uniform.m_freq = _freq;
+				}
 
 				if (oldsize < newsize
 				||  uniform.m_num < _num)
@@ -4958,6 +5566,10 @@ namespace bgfx
 			UniformRef& uniform = m_uniformRef[handle.idx];
 			uniform.m_name.set(_name);
 			uniform.m_refCount = 1;
+			uniform.m_freq = UniformFreq::Count == _freq
+				? UniformFreq::Draw
+				: _freq
+				;
 			uniform.m_type = _type;
 			uniform.m_num  = _num;
 
@@ -5160,11 +5772,6 @@ namespace bgfx
 			m_view[_id].setTransform(_view, _proj);
 		}
 
-		BGFX_API_FUNC(void resetView(ViewId _id) )
-		{
-			m_view[_id].reset();
-		}
-
 		BGFX_API_FUNC(void setViewOrder(ViewId _id, uint16_t _num, const ViewId* _order) )
 		{
 			const uint32_t num = bx::min(_id + _num, BGFX_CONFIG_MAX_VIEWS) - _id;
@@ -5182,11 +5789,27 @@ namespace bgfx
 			}
 		}
 
+		BGFX_API_FUNC(void setViewShadingRate(ViewId _id, ShadingRate::Enum _shadingRate) )
+		{
+			m_view[_id].setShadingRate(_shadingRate);
+		}
+
+		BGFX_API_FUNC(void setViewUniform(ViewId _id, UniformHandle _handle, const void* _value, uint16_t _num) )
+		{
+			m_uniformCache.setViewUniform(_id, _handle, _value, _num);
+		}
+
+		BGFX_API_FUNC(void resetView(ViewId _id) )
+		{
+			m_view[_id].reset();
+			m_uniformCache.invalidate(_id);
+		}
+
 		BGFX_API_FUNC(Encoder* begin(bool _forThread) );
 
 		BGFX_API_FUNC(void end(Encoder* _encoder) );
 
-		BGFX_API_FUNC(uint32_t frame(bool _capture = false) );
+		BGFX_API_FUNC(uint32_t frame(uint8_t _flags = BGFX_FRAME_NONE) );
 
 		uint32_t getSeqIncr(ViewId _id)
 		{
@@ -5221,7 +5844,7 @@ namespace bgfx
 				return true;
 			}
 
-			BGFX_PROFILER_SCOPE("bgfx/API thread wait", 0xff2040ff);
+			BGFX_PROFILER_SCOPE("bgfx/API thread wait", kColorWait);
 			int64_t start = bx::getHPCounter();
 			bool ok = m_apiSem.wait(_msecs);
 			if (ok)
@@ -5246,7 +5869,7 @@ namespace bgfx
 		{
 			if (!m_singleThreaded)
 			{
-				BGFX_PROFILER_SCOPE("bgfx/Render thread wait", 0xff2040ff);
+				BGFX_PROFILER_SCOPE("bgfx/Render thread wait", kColorWait);
 				int64_t start = bx::getHPCounter();
 				bool ok = m_renderSem.wait();
 				BX_ASSERT(ok, "Semaphore wait failed."); BX_UNUSED(ok);
@@ -5372,6 +5995,8 @@ namespace bgfx
 		ViewId m_viewRemap[BGFX_CONFIG_MAX_VIEWS];
 		uint32_t m_seq[BGFX_CONFIG_MAX_VIEWS];
 		View m_view[BGFX_CONFIG_MAX_VIEWS];
+
+		UniformCache m_uniformCache;
 
 		float m_clearColor[BGFX_CONFIG_MAX_COLOR_PALETTE][4];
 

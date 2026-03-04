@@ -255,6 +255,10 @@ BX_PRAGMA_DIAGNOSTIC_IGNORED_CLANG("-Wunguarded-availability-new");
 		{ kMtlPixelFormatETC2_RGB8,             kMtlPixelFormatETC2_RGB8_sRGB,       MTLReadWriteTextureTierNone, { $R, $G, $B, $A }, false }, // ETC2
 		{ kMtlPixelFormatEAC_RGBA8,             kMtlPixelFormatEAC_RGBA8_sRGB,       MTLReadWriteTextureTierNone, { $R, $G, $B, $A }, false }, // ETC2A
 		{ kMtlPixelFormatETC2_RGB8A1,           kMtlPixelFormatETC2_RGB8A1_sRGB,     MTLReadWriteTextureTierNone, { $R, $G, $B, $A }, false }, // ETC2A1
+		{ kMtlPixelFormatEAC_R11Unorm,          kMtlPixelFormatInvalid,              MTLReadWriteTextureTierNone, { $R, $G, $B, $A }, false }, // EACR11 UNORM
+		{ kMtlPixelFormatEAC_R11Snorm,          kMtlPixelFormatInvalid,              MTLReadWriteTextureTierNone, { $R, $G, $B, $A }, false }, // EACR11 SNORM
+		{ kMtlPixelFormatEAC_RG11Unorm,         kMtlPixelFormatInvalid,              MTLReadWriteTextureTierNone, { $R, $G, $B, $A }, false }, // EACRG11 UNORM
+		{ kMtlPixelFormatEAC_RG11Snorm,         kMtlPixelFormatInvalid,              MTLReadWriteTextureTierNone, { $R, $G, $B, $A }, false }, // EACRG11 SNORM
 		{ kMtlPixelFormatPVRTC_RGB_2BPP,        kMtlPixelFormatPVRTC_RGB_2BPP_sRGB,  MTLReadWriteTextureTierNone, { $R, $G, $B, $A }, false }, // PTC12
 		{ kMtlPixelFormatPVRTC_RGB_4BPP,        kMtlPixelFormatPVRTC_RGB_4BPP_sRGB,  MTLReadWriteTextureTierNone, { $R, $G, $B, $A }, false }, // PTC14
 		{ kMtlPixelFormatPVRTC_RGBA_2BPP,       kMtlPixelFormatPVRTC_RGBA_2BPP_sRGB, MTLReadWriteTextureTierNone, { $R, $G, $B, $A }, false }, // PTC12A
@@ -359,6 +363,18 @@ BX_PRAGMA_DIAGNOSTIC_POP();
 		 8,
 		16,
 	};
+
+	static float s_shadingRate[] =
+	{
+		1.0f,
+		0.75f,
+		0.75f,
+		0.5f,
+		0.5f,
+		0.5f,
+		0.25f,
+	};
+	static_assert(ShadingRate::Count == BX_COUNTOF(s_shadingRate) );
 
 	static UniformType::Enum convertMtlType(MTLDataType _type)
 	{
@@ -488,6 +504,7 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 			, m_rtMsaa(false)
 			, m_capture(NULL)
 			, m_captureSize(0)
+			, m_variableRateShadingSupported(false)
 		{
 			bx::memSet(&m_windows, 0xff, sizeof(m_windows) );
 		}
@@ -592,6 +609,8 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 			}
 #endif // BX_PLATFORM_OSX
 
+			m_variableRateShadingSupported = false; //m_device.supportsVariableRasterizationRate();
+
 			g_caps.numGPUs = 1;
 			g_caps.gpu[0].vendorId = g_caps.vendorId;
 			g_caps.gpu[0].deviceId = g_caps.deviceId;
@@ -608,6 +627,7 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 				| BGFX_CAPS_TEXTURE_2D_ARRAY
 				| BGFX_CAPS_TEXTURE_3D
 				| BGFX_CAPS_TEXTURE_BLIT
+				| BGFX_CAPS_TEXTURE_EXTERNAL
 				| BGFX_CAPS_TEXTURE_READ_BACK
 				| BGFX_CAPS_VERTEX_ATTRIB_HALF
 				| BGFX_CAPS_VERTEX_ATTRIB_UINT10
@@ -638,6 +658,11 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 			// Maximum number of entries in the buffer argument table, per graphics or compute function are 31.
 			// It is decremented by 1 because 1 entry is used for uniforms.
 			g_caps.limits.maxComputeBindings = bx::uint32_min(30, BGFX_MAX_COMPUTE_BINDINGS);
+
+			g_caps.supported |= m_variableRateShadingSupported
+				? BGFX_CAPS_VARIABLE_RATE_SHADING
+				: 0
+				;
 
 			CHECK_FEATURE_AVAILABLE(
 				  m_hasPixelFormatDepth32Float_Stencil8
@@ -708,7 +733,7 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 
 			for (uint32_t ii = 0; ii < TextureFormat::Count; ++ii)
 			{
-				uint16_t support = 0;
+				uint32_t support = 0;
 
 				support |= kMtlPixelFormatInvalid != s_textureFormat[ii].m_fmt
 					? BGFX_CAPS_FORMAT_TEXTURE_2D
@@ -749,6 +774,8 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 
 				g_caps.formats[ii] = support;
 			}
+
+			g_caps.formats[TextureFormat::BGRA8] |= BGFX_CAPS_FORMAT_TEXTURE_BACKBUFFER;
 
 			g_caps.formats[TextureFormat::A8     ] &= ~(BGFX_CAPS_FORMAT_TEXTURE_FRAMEBUFFER | BGFX_CAPS_FORMAT_TEXTURE_FRAMEBUFFER_MSAA);
 			g_caps.formats[TextureFormat::RG32I  ] &= ~(BGFX_CAPS_FORMAT_TEXTURE_FRAMEBUFFER_MSAA);
@@ -1070,23 +1097,15 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 			m_program[_handle.idx].destroy();
 		}
 
-		void* createTexture(TextureHandle _handle, const Memory* _mem, uint64_t _flags, uint8_t _skip) override
+		void* createTexture(TextureHandle _handle, const Memory* _mem, uint64_t _flags, uint8_t _skip, uint64_t _external) override
 		{
-			m_textures[_handle.idx].create(_mem, _flags, _skip);
+			m_textures[_handle.idx].create(_mem, _flags, _skip, _external);
 			return NULL;
-		}
-
-		void updateTextureBegin(TextureHandle /*_handle*/, uint8_t /*_side*/, uint8_t /*_mip*/) override
-		{
 		}
 
 		void updateTexture(TextureHandle _handle, uint8_t _side, uint8_t _mip, const Rect& _rect, uint16_t _z, uint16_t _depth, uint16_t _pitch, const Memory* _mem) override
 		{
 			m_textures[_handle.idx].update(_side, _mip, _rect, _z, _depth, _pitch, _mem);
-		}
-
-		void updateTextureEnd() override
-		{
 		}
 
 		static MTLPixelFormat getSwapChainPixelFormat(SwapChainMtl* _swapChain)
@@ -1147,7 +1166,7 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 			bx::write(&writer, tc, bx::ErrorAssert{});
 
 			texture.destroy();
-			texture.create(mem, texture.m_flags, 0);
+			texture.create(mem, texture.m_flags, 0, 0);
 
 			release(mem);
 		}
@@ -1253,22 +1272,25 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 			m_cmd.kick(false, true);
 			m_commandBuffer = 0;
 
-			uint32_t width  = m_screenshotTarget.width();
-			uint32_t height = m_screenshotTarget.height();
-			uint32_t length = width*height*4;
-			uint8_t* data   = (uint8_t*)bx::alloc(g_allocator, length);
+			const uint32_t width  = m_screenshotTarget.width();
+			const uint32_t height = m_screenshotTarget.height();
+			const uint8_t  bpp    = bimg::getBitsPerPixel(bimg::TextureFormat::Enum(m_resolution.formatColor) );
+			const uint32_t pitch  = width * bpp / 8;
+			const uint32_t size   = height*pitch;
+			uint8_t* data   = (uint8_t*)bx::alloc(g_allocator, size);
 
 			MTLRegion region = { { 0, 0, 0 }, { width, height, 1 } };
 
-			m_screenshotTarget.getBytes(data, 4*width, 0, region, 0, 0);
+			m_screenshotTarget.getBytes(data, pitch, 0, region, 0, 0);
 
 			g_callback->screenShot(
 				  _filePath
 				, m_screenshotTarget.width()
 				, m_screenshotTarget.height()
-				, width*4
+				, pitch
+				, m_resolution.formatColor
 				, data
-				, length
+				, size
 				, false
 				);
 
@@ -1336,14 +1358,15 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 
 		void submitBlit(BlitState& _bs, uint16_t _view);
 
+		void submitUniformCache(UniformCacheState& _ucs, uint16_t _view);
+
 		void submit(Frame* _render, ClearQuad& _clearQuad, TextVideoMemBlitter& _textVideoMemBlitter) override;
 
-		void blitSetup(TextVideoMemBlitter& _blitter) override
+		void dbgTextRenderBegin(TextVideoMemBlitter& /*_blitter*/) override
 		{
-			BX_UNUSED(_blitter);
 		}
 
-		void blitRender(TextVideoMemBlitter& _blitter, uint32_t _numIndices) override
+		void dbgTextRender(TextVideoMemBlitter& _blitter, uint32_t _numIndices) override
 		{
 			const uint32_t numVertices = _numIndices*4/6;
 			if (0 < numVertices)
@@ -1456,6 +1479,10 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 					, 1
 					);
 			}
+		}
+
+		void dbgTextRenderEnd(TextVideoMemBlitter& /*_blitter*/) override
+		{
 		}
 
 		bool isDeviceRemoved() override
@@ -1595,21 +1622,12 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 
 				MTLRegion region = { { 0, 0, 0 }, { m_resolution.width, m_resolution.height, 1 } };
 
-				m_screenshotTarget.getBytes(m_capture, 4*m_resolution.width, 0, region, 0, 0);
+				const uint8_t  bpp   = bimg::getBitsPerPixel(bimg::TextureFormat::Enum(m_resolution.formatColor) );
+				const uint32_t pitch = m_resolution.width * bpp / 8;
+
+				m_screenshotTarget.getBytes(m_capture, pitch, 0, region, 0, 0);
 
 				m_commandBuffer = m_cmd.alloc();
-
-				if (m_screenshotTarget.pixelFormat() == kMtlPixelFormatRGBA8Uint)
-				{
-					bimg::imageSwizzleBgra8(
-						  m_capture
-						, m_resolution.width*4
-						, m_resolution.width
-						, m_resolution.height
-						, m_capture
-						, m_resolution.width*4
-						);
-				}
 
 				g_callback->captureFrame(m_capture, m_captureSize);
 
@@ -1788,13 +1806,14 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 
 			uint32_t numMrt = 1;
 			FrameBufferHandle fbh = m_fbh;
-			if (isValid(fbh) && m_frameBuffers[fbh.idx].m_swapChain == NULL)
+			if (isValid(fbh)
+			&&  NULL == m_frameBuffers[fbh.idx].m_swapChain)
 			{
 				const FrameBufferMtl& fb = m_frameBuffers[fbh.idx];
 				numMrt = bx::uint32_max(1, fb.m_num);
 			}
 
-			const VertexLayout* layout = &_clearQuad.m_layout;
+			const VertexLayout* layout  = &m_vertexLayouts[_clearQuad.m_layout.idx];
 			const PipelineStateMtl* pso = getPipelineState(
 				  state
 				, 0
@@ -1828,8 +1847,8 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 				m_renderCommandEncoder.setFragmentBuffer(m_uniformBuffer, m_uniformBufferFragmentOffset, 0);
 			}
 
+			const float mrtClearDepth[4] = { _clear.m_depth };
 			float mrtClearColor[BGFX_CONFIG_MAX_FRAME_BUFFER_ATTACHMENTS][4];
-			float mrtClearDepth[4] = { _clear.m_depth };
 
 			if (BGFX_CLEAR_COLOR_USE_PALETTE & _clear.m_flags)
 			{
@@ -1913,6 +1932,7 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 				FrameBufferMtl& frameBuffer = m_frameBuffers[m_fbh.idx];
 				frameBuffer.resolve();
 			}
+
 			if (!isValid(_fbh)
 			||  m_frameBuffers[_fbh.idx].m_swapChain)
 			{
@@ -2004,7 +2024,7 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 			uint32_t fstencil = unpackStencil(0, _stencil);
 			uint32_t ref      = (fstencil&BGFX_STENCIL_FUNC_REF_MASK)>>BGFX_STENCIL_FUNC_REF_SHIFT;
 
-			_stencil &= packStencil(~BGFX_STENCIL_FUNC_REF_MASK, ~BGFX_STENCIL_FUNC_REF_MASK);
+			_stencil &= kStencilNoRefMask;
 
 			bx::HashMurmur2A murmur;
 			murmur.begin();
@@ -2739,6 +2759,8 @@ BX_PRAGMA_DIAGNOSTIC_POP();
 		void* m_capture;
 		uint32_t m_captureSize;
 
+		bool m_variableRateShadingSupported;
+
 		// descriptors
 		RenderPipelineDescriptor m_renderPipelineDescriptor;
 		DepthStencilDescriptor   m_depthStencilDescriptor;
@@ -3001,7 +3023,7 @@ BX_PRAGMA_DIAGNOSTIC_POP();
 		BufferMtl::create(_size, _data, _flags, stride, true);
 	}
 
-	void TextureMtl::create(const Memory* _mem, uint64_t _flags, uint8_t _skip)
+	void TextureMtl::create(const Memory* _mem, uint64_t _flags, uint8_t _skip, uint64_t _external)
 	{
 		m_sampler = s_renderMtl->getSamplerState(uint32_t(_flags) );
 
@@ -3142,7 +3164,15 @@ BX_PRAGMA_DIAGNOSTIC_POP();
 				}
 			}
 
-			m_ptr = s_renderMtl->m_device.newTextureWithDescriptor(desc);
+			if (0 != _external)
+			{
+				m_ptr    = id<MTLTexture>(_external);
+				m_flags |= BGFX_SAMPLER_INTERNAL_SHARED;
+			}
+			else
+			{
+				m_ptr = s_renderMtl->m_device.newTextureWithDescriptor(desc);
+			}
 
 			if (sampleCount > 1)
 			{
@@ -3163,8 +3193,6 @@ BX_PRAGMA_DIAGNOSTIC_POP();
 				desc.pixelFormat = kMtlPixelFormatStencil8;
 				m_ptrStencil = s_renderMtl->m_device.newTextureWithDescriptor(desc);
 			}
-
-			MTL_RELEASE(desc, 0);
 
 			uint8_t* temp = NULL;
 			if (convert)
@@ -3243,11 +3271,36 @@ BX_PRAGMA_DIAGNOSTIC_POP();
 				}
 			}
 
+			MTL_RELEASE(desc, 0);
+
 			if (NULL != temp)
 			{
 				bx::free(g_allocator, temp);
 			}
 		}
+	}
+
+	void TextureMtl::destroy()
+	{
+		if (0 == (m_flags & BGFX_SAMPLER_INTERNAL_SHARED) )
+		{
+			MTL_RELEASE_W(m_ptr, 0);
+		}
+
+		MTL_RELEASE_W(m_ptrMsaa, 0);
+		MTL_RELEASE_W(m_ptrStencil, 0);
+
+		for (uint32_t ii = 0; ii < m_numMips; ++ii)
+		{
+			MTL_RELEASE_W(m_ptrMips[ii], 0);
+		}
+	}
+
+	void TextureMtl::overrideInternal(uintptr_t _ptr)
+	{
+		destroy();
+		m_flags |= BGFX_SAMPLER_INTERNAL_SHARED;
+		m_ptr = id<MTLTexture>(_ptr);
 	}
 
 	void TextureMtl::update(uint8_t _side, uint8_t _mip, const Rect& _rect, uint16_t _z, uint16_t _depth, uint16_t _pitch, const Memory* _mem)
@@ -3985,7 +4038,7 @@ BX_PRAGMA_DIAGNOSTIC_POP();
 
 	bool TimerQueryMtl::get()
 	{
-		if (0 != m_control.available() )
+		if (0 != m_control.getNumUsed() )
 		{
 			uint32_t offset = m_control.m_read;
 			m_begin = m_result[offset].m_begin;
@@ -4035,7 +4088,7 @@ BX_PRAGMA_DIAGNOSTIC_POP();
 	{
 		BX_UNUSED(_wait);
 
-		while (0 != m_control.available() )
+		while (0 != m_control.getNumUsed() )
 		{
 			Query& query = m_query[m_control.m_read];
 
@@ -4053,7 +4106,7 @@ BX_PRAGMA_DIAGNOSTIC_POP();
 	{
 		const uint32_t size = m_control.m_size;
 
-		for (uint32_t ii = 0, num = m_control.available(); ii < num; ++ii)
+		for (uint32_t ii = 0, num = m_control.getNumUsed(); ii < num; ++ii)
 		{
 			Query& query = m_query[(m_control.m_read + ii) % size];
 			if (query.m_handle.idx == _handle.idx)
@@ -4134,6 +4187,16 @@ BX_PRAGMA_DIAGNOSTIC_POP();
 		}
 	}
 
+	void RendererContextMtl::submitUniformCache(UniformCacheState& _ucs, uint16_t _view)
+	{
+		while (_ucs.hasItem(_view) )
+		{
+			const UniformCacheItem& uci = _ucs.advance();
+
+			bx::memCopy(m_uniforms[uci.m_handle], &_ucs.m_frame->m_uniformCacheFrame.m_data[uci.m_offset], uci.m_size);
+		}
+	}
+
 	void RendererContextMtl::submit(Frame* _render, ClearQuad& _clearQuad, TextVideoMemBlitter& _textVideoMemBlitter)
 	{
 		m_cmd.finish(false);
@@ -4141,6 +4204,22 @@ BX_PRAGMA_DIAGNOSTIC_POP();
 		if (NULL == m_commandBuffer)
 		{
 			m_commandBuffer = m_cmd.alloc();
+		}
+
+		if (_render->m_capture)
+		{
+			CaptureManager captureMgr = getSharedCaptureManager();
+			CaptureDescriptor captureDesc = newCaptureDescriptor();
+			captureDesc.captureObject = m_device;
+			captureDesc.destination = MTLCaptureDestinationDeveloperTools;
+
+			NSError* err = NULL;
+ 			[captureMgr startCaptureWithDescriptor: captureDesc error: &err];
+
+			if (NULL != err)
+			{
+				BX_TRACE("Failed to start capture. Error %d: %s", err.code, err.localizedDescription.UTF8String);
+			}
 		}
 
 		BGFX_MTL_PROFILER_BEGIN_LITERAL("rendererSubmit", kColorFrame);
@@ -4246,6 +4325,7 @@ BX_PRAGMA_DIAGNOSTIC_POP();
 		uint16_t view = UINT16_MAX;
 		FrameBufferHandle fbh = { BGFX_CONFIG_MAX_FRAME_BUFFERS };
 
+		UniformCacheState ucs(_render);
 		BlitState bs(_render);
 
 		const uint64_t primType = 0;
@@ -4317,6 +4397,7 @@ BX_PRAGMA_DIAGNOSTIC_POP();
 
 					viewState.m_rect = _render->m_view[view].m_rect;
 
+					submitUniformCache(ucs, view);
 					submitBlit(bs, view);
 
 					if (!isCompute)
@@ -4326,7 +4407,7 @@ BX_PRAGMA_DIAGNOSTIC_POP();
 						viewScissorRect = viewHasScissor ? scissorRect : viewState.m_rect;
 						Clear& clr = _render->m_view[view].m_clear;
 
-						Rect viewRect = viewState.m_rect;
+						const Rect viewRect = viewState.m_rect;
 						bool clearWithRenderPass = false;
 
 						if (NULL == m_renderCommandEncoder
@@ -4476,6 +4557,19 @@ BX_PRAGMA_DIAGNOSTIC_POP();
 									stencilAttachment.loadAction  = MTLLoadActionLoad;
 									stencilAttachment.storeAction = MTLStoreActionStore;
 								}
+							}
+
+							if (m_variableRateShadingSupported)
+							{
+								RasterizationRateLayerDescriptor rrld = newRasterizationRateLayerDescriptor(s_shadingRate[_render->m_view[view].m_shadingRate]);
+								RasterizationRateMapDescriptor   rrmd = newRasterizationRateMapDescriptor();
+								rrmd.screenSize = MTLSizeMake(viewRect.m_width, viewRect.m_height, 0);
+								[rrmd
+									setLayer: rrld
+									atIndex: 0
+								];
+
+								renderPassDescriptor.rasterizationRateMap = m_device.newRasterizationRateMapWithDescriptor(rrmd);
 							}
 
 							rce = m_commandBuffer.renderCommandEncoderWithDescriptor(renderPassDescriptor);
@@ -4866,14 +4960,13 @@ BX_PRAGMA_DIAGNOSTIC_POP();
 
 					uint32_t numVertices = draw.m_numVertices;
 					uint8_t  numStreams  = 0;
-					for (uint32_t idx = 0, streamMask = draw.m_streamMask
-						; 0 != streamMask
-						; streamMask >>= 1, idx += 1, ++numStreams
+
+					for (BitMaskToIndexIteratorT it(draw.m_streamMask)
+						; !it.isDone()
+						; it.next(), numStreams++
 						)
 					{
-						const uint32_t ntz = bx::uint32_cnttz(streamMask);
-						streamMask >>= ntz;
-						idx         += ntz;
+						const uint8_t idx = it.idx;
 
 						currentState.m_stream[idx].m_layoutHandle   = draw.m_stream[idx].m_layoutHandle;
 						currentState.m_stream[idx].m_handle         = draw.m_stream[idx].m_handle;
@@ -5230,7 +5323,7 @@ BX_PRAGMA_DIAGNOSTIC_POP();
 		}
 		while (m_gpuTimer.get() );
 
-		maxGpuLatency = bx::uint32_imax(maxGpuLatency, m_gpuTimer.m_control.available()-1);
+		maxGpuLatency = bx::uint32_imax(maxGpuLatency, m_gpuTimer.m_control.getNumUsed()-1);
 
 		const int64_t timerFreq = bx::getHPFrequency();
 
@@ -5336,7 +5429,7 @@ BX_PRAGMA_DIAGNOSTIC_POP();
 				max = frameTime;
 			}
 
-			blit(this, _textVideoMemBlitter, tvm);
+			dbgTextSubmit(this, _textVideoMemBlitter, tvm);
 			rce = m_renderCommandEncoder;
 
 			rce.popDebugGroup();
@@ -5345,7 +5438,7 @@ BX_PRAGMA_DIAGNOSTIC_POP();
 		{
 			rce.pushDebugGroup("debugtext");
 
-			blit(this, _textVideoMemBlitter, _render->m_textVideoMem);
+			dbgTextSubmit(this, _textVideoMemBlitter, _render->m_textVideoMem);
 			rce = m_renderCommandEncoder;
 
 			rce.popDebugGroup();
@@ -5354,6 +5447,15 @@ BX_PRAGMA_DIAGNOSTIC_POP();
 		endEncoding();
 
 		m_renderCommandEncoderFrameBufferHandle = BGFX_INVALID_HANDLE;
+
+		if (_render->m_capture)
+		{
+			CaptureManager captureMgr = getSharedCaptureManager();
+			if ([captureMgr isCapturing])
+			{
+				[captureMgr stopCapture];
+			}
+		}
 
 		if (m_screenshotTarget)
 		{

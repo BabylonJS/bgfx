@@ -88,6 +88,7 @@ struct SmImpl
 	{
 		Hard,
 		PCF,
+		PCSS,
 		VSM,
 		ESM,
 
@@ -385,55 +386,49 @@ struct Uniforms
 		m_csmFarDistances[2] = 180.0f;
 		m_csmFarDistances[3] = 1000.0f;
 
-		m_tetraNormalGreen[0] = 0.0f;
-		m_tetraNormalGreen[1] = -0.57735026f;
-		m_tetraNormalGreen[2] = 0.81649661f;
-
-		m_tetraNormalYellow[0] = 0.0f;
-		m_tetraNormalYellow[1] = -0.57735026f;
-		m_tetraNormalYellow[2] = -0.81649661f;
-
-		m_tetraNormalBlue[0] = -0.81649661f;
-		m_tetraNormalBlue[1] = 0.57735026f;
-		m_tetraNormalBlue[2] = 0.0f;
-
-		m_tetraNormalRed[0] = 0.81649661f;
-		m_tetraNormalRed[1] = 0.57735026f;
-		m_tetraNormalRed[2] = 0.0f;
-
 		m_XNum = 2.0f;
 		m_YNum = 2.0f;
 		m_XOffset = 10.0f/512.0f;
 		m_YOffset = 10.0f/512.0f;
 
 		u_params0          = bgfx::createUniform("u_params0",          bgfx::UniformType::Vec4);
-		u_params1          = bgfx::createUniform("u_params1",          bgfx::UniformType::Vec4);
-		u_params2          = bgfx::createUniform("u_params2",          bgfx::UniformType::Vec4);
+		u_params1          = bgfx::createUniform("u_params1",          bgfx::UniformFreq::Frame, bgfx::UniformType::Vec4);
+		u_params2          = bgfx::createUniform("u_params2",          bgfx::UniformFreq::Frame, bgfx::UniformType::Vec4);
 		u_color            = bgfx::createUniform("u_color",            bgfx::UniformType::Vec4);
-		u_smSamplingParams = bgfx::createUniform("u_smSamplingParams", bgfx::UniformType::Vec4);
-		u_csmFarDistances  = bgfx::createUniform("u_csmFarDistances",  bgfx::UniformType::Vec4);
+		u_smSamplingParams = bgfx::createUniform("u_smSamplingParams", bgfx::UniformFreq::Frame, bgfx::UniformType::Vec4);
+		u_csmFarDistances  = bgfx::createUniform("u_csmFarDistances",  bgfx::UniformFreq::Frame, bgfx::UniformType::Vec4);
 		u_lightMtx         = bgfx::createUniform("u_lightMtx",         bgfx::UniformType::Mat4);
 
-		u_tetraNormalGreen  = bgfx::createUniform("u_tetraNormalGreen",  bgfx::UniformType::Vec4);
-		u_tetraNormalYellow = bgfx::createUniform("u_tetraNormalYellow", bgfx::UniformType::Vec4);
-		u_tetraNormalBlue   = bgfx::createUniform("u_tetraNormalBlue",   bgfx::UniformType::Vec4);
-		u_tetraNormalRed    = bgfx::createUniform("u_tetraNormalRed",    bgfx::UniformType::Vec4);
+		u_tetraNormalGreen  = bgfx::createUniform("u_tetraNormalGreen",  bgfx::UniformFreq::Frame, bgfx::UniformType::Vec4);
+		u_tetraNormalYellow = bgfx::createUniform("u_tetraNormalYellow", bgfx::UniformFreq::Frame, bgfx::UniformType::Vec4);
+		u_tetraNormalBlue   = bgfx::createUniform("u_tetraNormalBlue",   bgfx::UniformFreq::Frame, bgfx::UniformType::Vec4);
+		u_tetraNormalRed    = bgfx::createUniform("u_tetraNormalRed",    bgfx::UniformFreq::Frame, bgfx::UniformType::Vec4);
+
+		const float tetraNormalGreen[]  = {         0.0f, -0.57735026f,  0.81649661f };
+		const float tetraNormalYellow[] = {         0.0f, -0.57735026f, -0.81649661f };
+		const float tetraNormalBlue[]   = { -0.81649661f,  0.57735026f,         0.0f };
+		const float tetraNormalRed[]    = {  0.81649661f,  0.57735026f,         0.0f };
+
+		bgfx::setFrameUniform(u_tetraNormalGreen,  tetraNormalGreen);
+		bgfx::setFrameUniform(u_tetraNormalYellow, tetraNormalYellow);
+		bgfx::setFrameUniform(u_tetraNormalBlue,   tetraNormalBlue);
+		bgfx::setFrameUniform(u_tetraNormalRed,    tetraNormalRed);
 
 		u_shadowMapMtx0 = bgfx::createUniform("u_shadowMapMtx0", bgfx::UniformType::Mat4);
 		u_shadowMapMtx1 = bgfx::createUniform("u_shadowMapMtx1", bgfx::UniformType::Mat4);
 		u_shadowMapMtx2 = bgfx::createUniform("u_shadowMapMtx2", bgfx::UniformType::Mat4);
 		u_shadowMapMtx3 = bgfx::createUniform("u_shadowMapMtx3", bgfx::UniformType::Mat4);
 
-		u_lightPosition             = bgfx::createUniform("u_lightPosition",              bgfx::UniformType::Vec4);
-		u_lightAmbientPower         = bgfx::createUniform("u_lightAmbientPower",          bgfx::UniformType::Vec4);
-		u_lightDiffusePower         = bgfx::createUniform("u_lightDiffusePower",          bgfx::UniformType::Vec4);
-		u_lightSpecularPower        = bgfx::createUniform("u_lightSpecularPower",         bgfx::UniformType::Vec4);
-		u_lightSpotDirectionInner   = bgfx::createUniform("u_lightSpotDirectionInner",    bgfx::UniformType::Vec4);
-		u_lightAttenuationSpotOuter = bgfx::createUniform("u_lightAttenuationSpotOuter",  bgfx::UniformType::Vec4);
+		u_lightPosition             = bgfx::createUniform("u_lightPosition",              bgfx::UniformFreq::Frame, bgfx::UniformType::Vec4);
+		u_lightAmbientPower         = bgfx::createUniform("u_lightAmbientPower",          bgfx::UniformFreq::Frame, bgfx::UniformType::Vec4);
+		u_lightDiffusePower         = bgfx::createUniform("u_lightDiffusePower",          bgfx::UniformFreq::Frame, bgfx::UniformType::Vec4);
+		u_lightSpecularPower        = bgfx::createUniform("u_lightSpecularPower",         bgfx::UniformFreq::Frame, bgfx::UniformType::Vec4);
+		u_lightSpotDirectionInner   = bgfx::createUniform("u_lightSpotDirectionInner",    bgfx::UniformFreq::Frame, bgfx::UniformType::Vec4);
+		u_lightAttenuationSpotOuter = bgfx::createUniform("u_lightAttenuationSpotOuter",  bgfx::UniformFreq::Frame, bgfx::UniformType::Vec4);
 
-		u_materialKa = bgfx::createUniform("u_materialKa", bgfx::UniformType::Vec4);
-		u_materialKd = bgfx::createUniform("u_materialKd", bgfx::UniformType::Vec4);
-		u_materialKs = bgfx::createUniform("u_materialKs", bgfx::UniformType::Vec4);
+		u_materialKa = bgfx::createUniform("u_materialKa", bgfx::UniformFreq::Frame, bgfx::UniformType::Vec4);
+		u_materialKd = bgfx::createUniform("u_materialKd", bgfx::UniformFreq::Frame, bgfx::UniformType::Vec4);
+		u_materialKs = bgfx::createUniform("u_materialKs", bgfx::UniformFreq::Frame, bgfx::UniformType::Vec4);
 
 	}
 
@@ -450,33 +445,24 @@ struct Uniforms
 		m_shadowMapMtx3 = _shadowMapMtx3;
 	}
 
-	// Call this once at initialization.
-	void submitConstUniforms()
-	{
-		bgfx::setUniform(u_tetraNormalGreen,  m_tetraNormalGreen);
-		bgfx::setUniform(u_tetraNormalYellow, m_tetraNormalYellow);
-		bgfx::setUniform(u_tetraNormalBlue,   m_tetraNormalBlue);
-		bgfx::setUniform(u_tetraNormalRed,    m_tetraNormalRed);
-	}
-
 	// Call this once per frame.
 	void submitPerFrameUniforms()
 	{
-		bgfx::setUniform(u_params1, m_params1);
-		bgfx::setUniform(u_params2, m_params2);
-		bgfx::setUniform(u_smSamplingParams, m_paramsBlur);
-		bgfx::setUniform(u_csmFarDistances, m_csmFarDistances);
+		bgfx::setFrameUniform(u_params1, m_params1);
+		bgfx::setFrameUniform(u_params2, m_params2);
+		bgfx::setFrameUniform(u_smSamplingParams, m_paramsBlur);
+		bgfx::setFrameUniform(u_csmFarDistances, m_csmFarDistances);
 
-		bgfx::setUniform(u_materialKa, &m_materialPtr->m_ka);
-		bgfx::setUniform(u_materialKd, &m_materialPtr->m_kd);
-		bgfx::setUniform(u_materialKs, &m_materialPtr->m_ks);
+		bgfx::setFrameUniform(u_materialKa, &m_materialPtr->m_ka);
+		bgfx::setFrameUniform(u_materialKd, &m_materialPtr->m_kd);
+		bgfx::setFrameUniform(u_materialKs, &m_materialPtr->m_ks);
 
-		bgfx::setUniform(u_lightPosition,             &m_lightPtr->m_position_viewSpace);
-		bgfx::setUniform(u_lightAmbientPower,         &m_lightPtr->m_ambientPower);
-		bgfx::setUniform(u_lightDiffusePower,         &m_lightPtr->m_diffusePower);
-		bgfx::setUniform(u_lightSpecularPower,        &m_lightPtr->m_specularPower);
-		bgfx::setUniform(u_lightSpotDirectionInner,   &m_lightPtr->m_spotDirectionInner_viewSpace);
-		bgfx::setUniform(u_lightAttenuationSpotOuter, &m_lightPtr->m_attenuationSpotOuter);
+		bgfx::setFrameUniform(u_lightPosition,             &m_lightPtr->m_position_viewSpace);
+		bgfx::setFrameUniform(u_lightAmbientPower,         &m_lightPtr->m_ambientPower);
+		bgfx::setFrameUniform(u_lightDiffusePower,         &m_lightPtr->m_diffusePower);
+		bgfx::setFrameUniform(u_lightSpecularPower,        &m_lightPtr->m_specularPower);
+		bgfx::setFrameUniform(u_lightSpotDirectionInner,   &m_lightPtr->m_spotDirectionInner_viewSpace);
+		bgfx::setFrameUniform(u_lightAttenuationSpotOuter, &m_lightPtr->m_attenuationSpotOuter);
 	}
 
 	// Call this before each draw call.
@@ -576,10 +562,6 @@ struct Uniforms
 		float m_paramsBlur[4];
 	};
 
-	float m_tetraNormalGreen[3];
-	float m_tetraNormalYellow[3];
-	float m_tetraNormalBlue[3];
-	float m_tetraNormalRed[3];
 	float m_csmFarDistances[4];
 
 	float* m_lightMtxPtr;
@@ -946,32 +928,41 @@ void worldSpaceFrustumCorners(
 	}
 }
 
+
 /**
- * _splits = { near0, far0, near1, far1... nearN, farN }
- * N = _numSplits
+ * Calculate cascade split depths based on view camera frustum using GPU Gems 3 method.
+ * Based on: https://developer.nvidia.com/gpugems/GPUGems3/gpugems3_ch10.html
+ * 
+ * @param cascadeSplits Output array of normalized split depths [0..1] for each cascade
+ * @param numSplits Number of cascade splits (typically 4)
+ * @param nearClip Near clip plane distance
+ * @param farClip Far clip plane distance  
+ * @param splitLambda Blend factor between logarithmic (1.0) and uniform (0.0) distribution
  */
-void splitFrustum(float* _splits, uint8_t _numSplits, float _near, float _far, float _splitWeight = 0.75f)
-{
-	const float l = _splitWeight;
-	const float ratio = _far/_near;
-	const int8_t numSlices = _numSplits*2;
-	const float numSlicesf = float(numSlices);
+ void calculateCascadeSplits(float* cascadeSplits, uint8_t numSplits, float nearClip, float farClip, float splitLambda)
+ {
+     const float clipRange = farClip - nearClip;
+     const float minZ = nearClip;
+     const float maxZ = nearClip + clipRange;
+     const float range = maxZ - minZ;
+     const float ratio = maxZ / minZ;
 
-	// First slice.
-	_splits[0] = _near;
+     // Calculate split depths based on view camera frustum
+     // Use a modified indexing similar to the original implementation for better distribution feel
+     // The original used odd indices (1,3,5,7) out of (num_splits*2), giving more weight to near cascades
+     const float numSlicesF = float(numSplits) * 2.5f;
+    
+     for(uint32_t i = 0; i < numSplits; i++)
+     { 
+         // Use odd indices like the original: 1, 3, 5, 7 for 4 splits
+         const float si = float(i * 2 + 1) / numSlicesF;
+         const float logSplit = minZ * bx::pow(ratio, si);
+         const float uniformSplit = minZ + range * si;
+         const float d = splitLambda * (logSplit - uniformSplit) + uniformSplit;
+         cascadeSplits[i] = (d - nearClip) / clipRange;
+     }
+ }
 
-	for (uint8_t nn = 2, ff = 1; nn < numSlices; nn+=2, ff+=2)
-	{
-		float si = float(int8_t(ff) ) / numSlicesf;
-
-		const float nearp = l*(_near*bx::pow(ratio, si) ) + (1 - l)*(_near + (_far - _near)*si);
-		_splits[nn] = nearp;          //near
-		_splits[ff] = nearp * 1.005f; //far from previous split
-	}
-
-	// Last slice.
-	_splits[numSlices-1] = _far;
-}
 
 struct Programs
 {
@@ -1002,31 +993,37 @@ struct Programs
 		// Color lighting.
 		m_colorLighting[SmType::Single][DepthImpl::InvZ][SmImpl::Hard] = loadProgram("vs_shadowmaps_color_lighting", "fs_shadowmaps_color_lighting_hard");
 		m_colorLighting[SmType::Single][DepthImpl::InvZ][SmImpl::PCF]  = loadProgram("vs_shadowmaps_color_lighting", "fs_shadowmaps_color_lighting_pcf");
+		m_colorLighting[SmType::Single][DepthImpl::InvZ][SmImpl::PCSS] = loadProgram("vs_shadowmaps_color_lighting", "fs_shadowmaps_color_lighting_pcss");
 		m_colorLighting[SmType::Single][DepthImpl::InvZ][SmImpl::VSM]  = loadProgram("vs_shadowmaps_color_lighting", "fs_shadowmaps_color_lighting_vsm");
 		m_colorLighting[SmType::Single][DepthImpl::InvZ][SmImpl::ESM]  = loadProgram("vs_shadowmaps_color_lighting", "fs_shadowmaps_color_lighting_esm");
 
 		m_colorLighting[SmType::Single][DepthImpl::Linear][SmImpl::Hard] = loadProgram("vs_shadowmaps_color_lighting_linear", "fs_shadowmaps_color_lighting_hard_linear");
 		m_colorLighting[SmType::Single][DepthImpl::Linear][SmImpl::PCF]  = loadProgram("vs_shadowmaps_color_lighting_linear", "fs_shadowmaps_color_lighting_pcf_linear");
+		m_colorLighting[SmType::Single][DepthImpl::Linear][SmImpl::PCSS] = loadProgram("vs_shadowmaps_color_lighting_linear", "fs_shadowmaps_color_lighting_pcss_linear");
 		m_colorLighting[SmType::Single][DepthImpl::Linear][SmImpl::VSM]  = loadProgram("vs_shadowmaps_color_lighting_linear", "fs_shadowmaps_color_lighting_vsm_linear");
 		m_colorLighting[SmType::Single][DepthImpl::Linear][SmImpl::ESM]  = loadProgram("vs_shadowmaps_color_lighting_linear", "fs_shadowmaps_color_lighting_esm_linear");
 
 		m_colorLighting[SmType::Omni][DepthImpl::InvZ][SmImpl::Hard] = loadProgram("vs_shadowmaps_color_lighting_omni", "fs_shadowmaps_color_lighting_hard_omni");
 		m_colorLighting[SmType::Omni][DepthImpl::InvZ][SmImpl::PCF]  = loadProgram("vs_shadowmaps_color_lighting_omni", "fs_shadowmaps_color_lighting_pcf_omni");
+		m_colorLighting[SmType::Omni][DepthImpl::InvZ][SmImpl::PCSS] = loadProgram("vs_shadowmaps_color_lighting_omni", "fs_shadowmaps_color_lighting_pcss_omni");
 		m_colorLighting[SmType::Omni][DepthImpl::InvZ][SmImpl::VSM]  = loadProgram("vs_shadowmaps_color_lighting_omni", "fs_shadowmaps_color_lighting_vsm_omni");
 		m_colorLighting[SmType::Omni][DepthImpl::InvZ][SmImpl::ESM]  = loadProgram("vs_shadowmaps_color_lighting_omni", "fs_shadowmaps_color_lighting_esm_omni");
 
 		m_colorLighting[SmType::Omni][DepthImpl::Linear][SmImpl::Hard] = loadProgram("vs_shadowmaps_color_lighting_linear_omni", "fs_shadowmaps_color_lighting_hard_linear_omni");
 		m_colorLighting[SmType::Omni][DepthImpl::Linear][SmImpl::PCF]  = loadProgram("vs_shadowmaps_color_lighting_linear_omni", "fs_shadowmaps_color_lighting_pcf_linear_omni");
+		m_colorLighting[SmType::Omni][DepthImpl::Linear][SmImpl::PCSS] = loadProgram("vs_shadowmaps_color_lighting_linear_omni", "fs_shadowmaps_color_lighting_pcss_linear_omni");
 		m_colorLighting[SmType::Omni][DepthImpl::Linear][SmImpl::VSM]  = loadProgram("vs_shadowmaps_color_lighting_linear_omni", "fs_shadowmaps_color_lighting_vsm_linear_omni");
 		m_colorLighting[SmType::Omni][DepthImpl::Linear][SmImpl::ESM]  = loadProgram("vs_shadowmaps_color_lighting_linear_omni", "fs_shadowmaps_color_lighting_esm_linear_omni");
 
 		m_colorLighting[SmType::Cascade][DepthImpl::InvZ][SmImpl::Hard] = loadProgram("vs_shadowmaps_color_lighting_csm", "fs_shadowmaps_color_lighting_hard_csm");
 		m_colorLighting[SmType::Cascade][DepthImpl::InvZ][SmImpl::PCF]  = loadProgram("vs_shadowmaps_color_lighting_csm", "fs_shadowmaps_color_lighting_pcf_csm");
+		m_colorLighting[SmType::Cascade][DepthImpl::InvZ][SmImpl::PCSS] = loadProgram("vs_shadowmaps_color_lighting_csm", "fs_shadowmaps_color_lighting_pcss_csm");
 		m_colorLighting[SmType::Cascade][DepthImpl::InvZ][SmImpl::VSM]  = loadProgram("vs_shadowmaps_color_lighting_csm", "fs_shadowmaps_color_lighting_vsm_csm");
 		m_colorLighting[SmType::Cascade][DepthImpl::InvZ][SmImpl::ESM]  = loadProgram("vs_shadowmaps_color_lighting_csm", "fs_shadowmaps_color_lighting_esm_csm");
 
 		m_colorLighting[SmType::Cascade][DepthImpl::Linear][SmImpl::Hard] = loadProgram("vs_shadowmaps_color_lighting_linear_csm", "fs_shadowmaps_color_lighting_hard_linear_csm");
 		m_colorLighting[SmType::Cascade][DepthImpl::Linear][SmImpl::PCF]  = loadProgram("vs_shadowmaps_color_lighting_linear_csm", "fs_shadowmaps_color_lighting_pcf_linear_csm");
+		m_colorLighting[SmType::Cascade][DepthImpl::Linear][SmImpl::PCSS] = loadProgram("vs_shadowmaps_color_lighting_linear_csm", "fs_shadowmaps_color_lighting_pcss_linear_csm");
 		m_colorLighting[SmType::Cascade][DepthImpl::Linear][SmImpl::VSM]  = loadProgram("vs_shadowmaps_color_lighting_linear_csm", "fs_shadowmaps_color_lighting_vsm_linear_csm");
 		m_colorLighting[SmType::Cascade][DepthImpl::Linear][SmImpl::ESM]  = loadProgram("vs_shadowmaps_color_lighting_linear_csm", "fs_shadowmaps_color_lighting_esm_linear_csm");
 	}
@@ -1252,7 +1249,6 @@ public:
 						   , &m_shadowMapMtx[ShadowMapRenderTargets::Third][0]
 						   , &m_shadowMapMtx[ShadowMapRenderTargets::Fourth][0]
 						   );
-		s_uniforms.submitConstUniforms();
 
 		// Settings.
 		ShadowMapSettings smSettings[LightType::Count][DepthImpl::Count][SmImpl::Count] =
@@ -1294,6 +1290,23 @@ public:
 						, true                             // m_doBlur
 						, &s_programs.m_packDepth[DepthImpl::InvZ][PackDepth::RGBA] //m_progPack
 						, &s_programs.m_colorLighting[SmType::Single][DepthImpl::InvZ][SmImpl::PCF] //m_progDraw
+					},
+					{ //SmImpl::PCSS
+						10.0f, 7.0f, 12.0f, 1.0f         // m_sizePwrTwo
+						, 10.0f, 1.0f, 20.0f, 1.0f         // m_depthValuePow
+						, 1.0f, 1.0f, 99.0f, 1.0f          // m_near
+						, 250.0f, 100.0f, 2000.0f, 50.0f   // m_far
+						, 0.001f, 0.0f, 0.01f, 0.00001f    // m_bias
+						, 0.001f, 0.0f, 0.05f, 0.00001f    // m_normalOffset
+						, 0.7f, 0.0f, 1.0f, 0.01f          // m_customParam0
+						, 500.0f, 1.0f, 1000.0f, 1.0f      // m_customParam1
+						, 2.0f, 0.0f, 8.0f, 1.0f           // m_xNum
+						, 2.0f, 0.0f, 8.0f, 1.0f           // m_yNum
+						, 15.0f, 0.0f, 30.0f, 0.01f          // m_xOffset
+						, 15.0f, 0.0f, 30.0f, 0.01f          // m_yOffset
+						, true                             // m_doBlur
+						, &s_programs.m_packDepth[DepthImpl::InvZ][PackDepth::RGBA] //m_progPack
+						, &s_programs.m_colorLighting[SmType::Single][DepthImpl::InvZ][SmImpl::PCSS] //m_progDraw
 					},
 					{ //SmImpl::VSM
 						10.0f, 7.0f, 12.0f, 1.0f         // m_sizePwrTwo
@@ -1366,6 +1379,23 @@ public:
 						, true                             // m_doBlur
 						, &s_programs.m_packDepth[DepthImpl::Linear][PackDepth::RGBA] //m_progPack
 						, &s_programs.m_colorLighting[SmType::Single][DepthImpl::Linear][SmImpl::PCF] //m_progDraw
+					},
+					{ //SmImpl::PCSS
+						10.0f, 7.0f, 12.0f, 1.0f         // m_sizePwrTwo
+						, 1.0f, 1.0f, 20.0f, 1.0f          // m_depthValuePow
+						, 1.0f, 1.0f, 99.0f, 1.0f          // m_near
+						, 250.0f, 100.0f, 2000.0f, 50.0f   // m_far
+						, 0.0025f, 0.0f, 0.01f, 0.00001f   // m_bias
+						, 0.001f, 0.0f, 0.05f,  0.00001f   // m_normalOffset
+						, 0.7f, 0.0f, 1.0f, 0.01f          // m_customParam0
+						, 2000.0f, 1.0f, 2000.0f, 1.0f     // m_customParam1
+						, 2.0f, 0.0f, 8.0f, 1.0f           // m_xNum
+						, 2.0f, 0.0f, 8.0f, 1.0f           // m_yNum
+						, 0.04f, 0.0f, 1.0f, 0.01f          // m_xOffset
+						, 0.04f, 0.0f, 1.0f, 0.01f          // m_yOffset
+						, true                             // m_doBlur
+						, &s_programs.m_packDepth[DepthImpl::Linear][PackDepth::RGBA] //m_progPack
+						, &s_programs.m_colorLighting[SmType::Single][DepthImpl::Linear][SmImpl::PCSS] //m_progDraw
 					},
 					{ //SmImpl::VSM
 						10.0f, 7.0f, 12.0f, 1.0f         // m_sizePwrTwo
@@ -1443,6 +1473,23 @@ public:
 						, &s_programs.m_packDepth[DepthImpl::InvZ][PackDepth::RGBA] //m_progPack
 						, &s_programs.m_colorLighting[SmType::Omni][DepthImpl::InvZ][SmImpl::PCF] //m_progDraw
 					},
+					{ //SmImpl::PCSS
+						12.0f, 9.0f, 12.0f, 1.0f         // m_sizePwrTwo
+						, 10.0f, 1.0f, 20.0f, 1.0f         // m_depthValuePow
+						, 1.0f, 1.0f, 99.0f, 1.0f          // m_near
+						, 250.0f, 100.0f, 2000.0f, 50.0f   // m_far
+						, 0.001f, 0.0f, 0.01f, 0.00001f    // m_bias
+						, 0.001f, 0.0f, 0.05f, 0.00001f    // m_normalOffset
+						, 0.7f, 0.0f, 1.0f, 0.01f          // m_customParam0
+						, 50.0f, 1.0f, 300.0f, 1.0f        // m_customParam1
+						, 2.0f, 0.0f, 8.0f, 1.0f           // m_xNum
+						, 2.0f, 0.0f, 8.0f, 1.0f           // m_yNum
+						, 4.5f, 0.0f, 15.0f, 0.01f          // m_xOffset
+						, 4.5f, 0.0f, 15.0f, 0.01f          // m_yOffset
+						, true                             // m_doBlur
+						, &s_programs.m_packDepth[DepthImpl::InvZ][PackDepth::RGBA] //m_progPack
+						, &s_programs.m_colorLighting[SmType::Omni][DepthImpl::InvZ][SmImpl::PCSS] //m_progDraw
+					},
 					{ //SmImpl::VSM
 						12.0f, 9.0f, 12.0f, 1.0f         // m_sizePwrTwo
 						, 10.0f, 1.0f, 20.0f, 1.0f         // m_depthValuePow
@@ -1514,6 +1561,23 @@ public:
 						, true                             // m_doBlur
 						, &s_programs.m_packDepth[DepthImpl::Linear][PackDepth::RGBA] //m_progPack
 						, &s_programs.m_colorLighting[SmType::Omni][DepthImpl::Linear][SmImpl::PCF] //m_progDraw
+					},
+					{ //SmImpl::PCSS
+						12.0f, 9.0f, 12.0f, 1.0f         // m_sizePwrTwo
+						, 1.0f, 1.0f, 20.0f, 1.0f          // m_depthValuePow
+						, 1.0f, 1.0f, 99.0f, 1.0f          // m_near
+						, 250.0f, 100.0f, 2000.0f, 50.0f   // m_far
+						, 0.001f, 0.0f, 0.01f, 0.00001f   // m_bias
+						, 0.001f, 0.0f, 0.05f, 0.00001f    // m_normalOffset
+						, 0.7f, 0.0f, 1.0f, 0.01f          // m_customParam0
+						, 120.0f, 1.0f, 300.0f, 1.0f       // m_customParam1
+						, 2.0f, 0.0f, 8.0f, 1.0f           // m_xNum
+						, 2.0f, 0.0f, 8.0f, 1.0f           // m_yNum
+						, 0.02f, 0.0f, 0.1f, 0.01f          // m_xOffset
+						, 0.02f, 0.0f, 0.1f, 0.01f          // m_yOffset
+						, true                             // m_doBlur
+						, &s_programs.m_packDepth[DepthImpl::Linear][PackDepth::RGBA] //m_progPack
+						, &s_programs.m_colorLighting[SmType::Omni][DepthImpl::Linear][SmImpl::PCSS] //m_progDraw
 					},
 					{ //SmImpl::VSM
 						12.0f, 9.0f, 12.0f, 1.0f         // m_sizePwrTwo
@@ -1591,6 +1655,23 @@ public:
 						, &s_programs.m_packDepth[DepthImpl::InvZ][PackDepth::RGBA] //m_progPack
 						, &s_programs.m_colorLighting[SmType::Cascade][DepthImpl::InvZ][SmImpl::PCF] //m_progDraw
 					},
+					{ //SmImpl::PCSS
+						11.0f, 7.0f, 12.0f, 1.0f         // m_sizePwrTwo
+						, 1.0f, 1.0f, 20.0f, 1.0f          // m_depthValuePow
+						, 1.0f, 1.0f, 99.0f, 1.0f          // m_near
+						, 550.0f, 100.0f, 2000.0f, 50.0f   // m_far
+						, 0.0012f, 0.0f, 0.01f, 0.00001f   // m_bias
+						, 0.001f, 0.0f, 0.04f, 0.00001f    // m_normalOffset
+						, 0.7f, 0.0f, 1.0f, 0.01f          // m_customParam0
+						, 200.0f, 1.0f, 400.0f, 1.0f       // m_customParam1
+						, 2.0f, 0.0f, 8.0f, 1.0f           // m_xNum
+						, 2.0f, 0.0f, 8.0f, 1.0f           // m_yNum
+						, 0.5f, 0.0f, 3.0f, 0.01f          // m_xOffset
+						, 0.5f, 0.0f, 3.0f, 0.01f          // m_yOffset
+						, true                             // m_doBlur
+						, &s_programs.m_packDepth[DepthImpl::InvZ][PackDepth::RGBA] //m_progPack
+						, &s_programs.m_colorLighting[SmType::Cascade][DepthImpl::InvZ][SmImpl::PCSS] //m_progDraw
+					},
 					{ //SmImpl::VSM
 						11.0f, 7.0f, 12.0f, 1.0f         // m_sizePwrTwo
 						, 1.0f, 1.0f, 20.0f, 1.0f          // m_depthValuePow
@@ -1662,6 +1743,23 @@ public:
 						, true                             // m_doBlur
 						, &s_programs.m_packDepth[DepthImpl::Linear][PackDepth::RGBA] //m_progPack
 						, &s_programs.m_colorLighting[SmType::Cascade][DepthImpl::Linear][SmImpl::PCF] //m_progDraw
+					},
+					{ //SmImpl::PCSS
+						11.0f, 7.0f, 12.0f, 1.0f         // m_sizePwrTwo
+						, 1.0f, 1.0f, 20.0f, 1.0f          // m_depthValuePow
+						, 1.0f, 1.0f, 99.0f, 1.0f          // m_near
+						, 550.0f, 100.0f, 2000.0f, 50.0f   // m_far
+						, 0.0012f, 0.0f, 0.01f, 0.00001f   // m_bias
+						, 0.001f, 0.0f, 0.04f, 0.00001f    // m_normalOffset
+						, 0.7f, 0.0f, 1.0f, 0.01f          // m_customParam0
+						, 200.0f, 1.0f, 400.0f, 1.0f       // m_customParam1
+						, 2.0f, 0.0f, 8.0f, 1.0f           // m_xNum
+						, 2.0f, 0.0f, 8.0f, 1.0f           // m_yNum
+						, 0.5f, 0.0f, 3.0f, 0.01f          // m_xOffset
+						, 0.5f, 0.0f, 3.0f, 0.01f          // m_yOffset
+						, true                             // m_doBlur
+						, &s_programs.m_packDepth[DepthImpl::Linear][PackDepth::RGBA] //m_progPack
+						, &s_programs.m_colorLighting[SmType::Cascade][DepthImpl::Linear][SmImpl::PCSS] //m_progDraw
 					},
 					{ //SmImpl::VSM
 						11.0f, 7.0f, 12.0f, 1.0f         // m_sizePwrTwo
@@ -1745,6 +1843,8 @@ public:
 
 		m_timeAccumulatorLight = 0.0f;
 		m_timeAccumulatorScene = 0.0f;
+
+		m_frameTime.reset();
 	}
 
 	virtual int shutdown() override
@@ -1789,6 +1889,9 @@ public:
 	{
 		if (!entry::processEvents(m_width, m_height, m_debug, m_reset, &m_mouseState) )
 		{
+			m_frameTime.frame();
+			const float deltaTime = bx::toSeconds<float>(m_frameTime.getDeltaTime() );
+
 			m_viewState.m_width  = uint16_t(m_width);
 			m_viewState.m_height = uint16_t(m_height);
 
@@ -1806,10 +1909,6 @@ public:
 
 			float currentShadowMapSizef = float(int16_t(m_currentShadowMapSize) );
 			s_uniforms.m_shadowMapTexelSize = 1.0f / currentShadowMapSizef;
-
-			s_uniforms.submitConstUniforms();
-
-			//		s_uniforms.submitConstUniforms();
 
 			// Imgui.
 			imguiBeginFrame(m_mouseState.m_mx
@@ -1871,6 +1970,7 @@ public:
 			ImGui::Text("Shadow Map implementation");
 			IMGUI_RADIO_BUTTON("Hard", m_settings.m_smImpl, SmImpl::Hard);
 			IMGUI_RADIO_BUTTON("PCF", m_settings.m_smImpl, SmImpl::PCF);
+			IMGUI_RADIO_BUTTON("PCSS", m_settings.m_smImpl, SmImpl::PCSS);
 			IMGUI_RADIO_BUTTON("VSM", m_settings.m_smImpl, SmImpl::VSM);
 			IMGUI_RADIO_BUTTON("ESM", m_settings.m_smImpl, SmImpl::ESM);
 			currentSmSettings = &m_smSettings[m_settings.m_lightType][m_settings.m_depthImpl][m_settings.m_smImpl];
@@ -1896,6 +1996,12 @@ public:
 					ImGui::Text("PCF");
 					IMGUI_FLOAT_SLIDER("X Offset", currentSmSettings->m_xOffset);
 					IMGUI_FLOAT_SLIDER("Y Offset", currentSmSettings->m_yOffset);
+					break;
+
+				case SmImpl::PCSS:
+					ImGui::Text("PCSS");
+					IMGUI_FLOAT_SLIDER("Penumbra X", currentSmSettings->m_xOffset);
+					IMGUI_FLOAT_SLIDER("Penumbra Y", currentSmSettings->m_yOffset);
 					break;
 
 				case SmImpl::VSM:
@@ -2023,14 +2129,6 @@ public:
 
 			s_uniforms.submitPerFrameUniforms();
 
-			// Time.
-			int64_t now = bx::getHPCounter();
-			static int64_t last = now;
-			const int64_t frameTime = now - last;
-			last = now;
-			const double freq = double(bx::getHPFrequency() );
-			const float deltaTime = float(frameTime/freq);
-
 			// Update camera.
 			cameraUpdate(deltaTime, m_mouseState, ImGui::MouseOverArea() );
 
@@ -2061,71 +2159,71 @@ public:
 			float mtxFloor[16];
 			const float floorScale = 550.0f;
 			bx::mtxSRT(mtxFloor
-					   , floorScale //scaleX
-					   , floorScale //scaleY
-					   , floorScale //scaleZ
-					   , 0.0f //rotX
-					   , 0.0f //rotY
-					   , 0.0f //rotZ
-					   , 0.0f //translateX
-					   , 0.0f //translateY
-					   , 0.0f //translateZ
-					   );
+				, floorScale //scaleX
+				, floorScale //scaleY
+				, floorScale //scaleZ
+				, 0.0f //rotX
+				, 0.0f //rotY
+				, 0.0f //rotZ
+				, 0.0f //translateX
+				, 0.0f //translateY
+				, 0.0f //translateZ
+				);
 
 			float mtxBunny[16];
 			bx::mtxSRT(mtxBunny
-					   , 5.0f
-					   , 5.0f
-					   , 5.0f
-					   , 0.0f
-					   , 1.56f - m_timeAccumulatorScene
-					   , 0.0f
-					   , 15.0f
-					   , 5.0f
-					   , 0.0f
-					   );
+				, 5.0f
+				, 5.0f
+				, 5.0f
+				, 0.0f
+				, 1.56f - m_timeAccumulatorScene
+				, 0.0f
+				, 15.0f
+				, 5.0f
+				, 0.0f
+				);
 
 			float mtxHollowcube[16];
 			bx::mtxSRT(mtxHollowcube
-					   , 2.5f
-					   , 2.5f
-					   , 2.5f
-					   , 0.0f
-					   , 1.56f - m_timeAccumulatorScene
-					   , 0.0f
-					   , 0.0f
-					   , 10.0f
-					   , 0.0f
-					   );
+				, 2.5f
+				, 2.5f
+				, 2.5f
+				, 0.0f
+				, 1.56f - m_timeAccumulatorScene
+				, 0.0f
+				, 0.0f
+				, 10.0f
+				, 0.0f
+				);
 
 			float mtxCube[16];
 			bx::mtxSRT(mtxCube
-					   , 2.5f
-					   , 2.5f
-					   , 2.5f
-					   , 0.0f
-					   , 1.56f - m_timeAccumulatorScene
-					   , 0.0f
-					   , -15.0f
-					   , 5.0f
-					   , 0.0f
-					   );
+				, 2.5f
+				, 2.5f
+				, 2.5f
+				, 0.0f
+				, 1.56f - m_timeAccumulatorScene
+				, 0.0f
+				, -15.0f
+				, 5.0f
+				, 0.0f
+				);
 
 			const uint8_t numTrees = 10;
 			float mtxTrees[numTrees][16];
 			for (uint8_t ii = 0; ii < numTrees; ++ii)
 			{
 				bx::mtxSRT(mtxTrees[ii]
-						   , 2.0f
-						   , 2.0f
-						   , 2.0f
-						   , 0.0f
-						   , float(ii)
-						   , 0.0f
-						   , bx::sin(float(ii)*2.0f*bx::kPi/float(numTrees) ) * 60.0f
-						   , 0.0f
-						   , bx::cos(float(ii)*2.0f*bx::kPi/float(numTrees) ) * 60.0f
-						   );
+					, 2.0f
+					, 2.0f
+					, 2.0f
+					, 0.0f
+					, float(ii)
+					, 0.0f
+					, bx::sin(float(ii) * 2.0f * bx::kPi / float(numTrees)) * 60.0f
+					, 0.0f
+					, bx::cos(float(ii) * 2.0f * bx::kPi / float(numTrees)) * 60.0f
+					);
 			}
 
 			// Compute transform matrices.
@@ -2138,17 +2236,16 @@ public:
 			float screenView[16];
 			bx::mtxIdentity(screenView);
 
-			bx::mtxOrtho(
-						 screenProj
-						 , 0.0f
-						 , 1.0f
-						 , 1.0f
-						 , 0.0f
-						 , 0.0f
-						 , 100.0f
-						 , 0.0f
-						 , caps->homogeneousDepth
-						 );
+			bx::mtxOrtho(screenProj
+				, 0.0f
+				, 1.0f
+				, 1.0f
+				, 0.0f
+				, 0.0f
+				, 100.0f
+				, 0.0f
+				, caps->homogeneousDepth
+				);
 
 			// Update render target size.
 			uint16_t shadowMapSize = 1 << uint32_t(currentSmSettings->m_sizePwrTwo);
@@ -2194,13 +2291,13 @@ public:
 				const float fovy = m_settings.m_coverageSpotL;
 				const float aspect = 1.0f;
 				bx::mtxProj(
-							lightProj[ProjType::Horizontal]
-							, fovy
-							, aspect
-							, currentSmSettings->m_near
-							, currentSmSettings->m_far
-							, false
-							);
+					lightProj[ProjType::Horizontal]
+					, fovy
+					, aspect
+					, currentSmSettings->m_near
+					, currentSmSettings->m_far
+					, false
+					);
 
 				//For linear depth, prevent depth division by variable w-component in shaders and divide here by far plane
 				if (DepthImpl::Linear == m_settings.m_depthImpl)
@@ -2231,12 +2328,12 @@ public:
 
 					bx::mtxProj(
 						  lightProj[ProjType::Vertical]
-								, fovx
-								, aspect
-								, currentSmSettings->m_near
-								, currentSmSettings->m_far
-								, false
-								);
+						, fovx
+						, aspect
+						, currentSmSettings->m_near
+						, currentSmSettings->m_far
+						, false
+						);
 
 					//For linear depth, prevent depth division by variable w-component in shaders and divide here by far plane
 					if (DepthImpl::Linear == m_settings.m_depthImpl)
@@ -2256,13 +2353,13 @@ public:
 				const float aspect = bx::tan(bx::toRad(fovx*0.5f) )/bx::tan(bx::toRad(fovy*0.5f) );
 
 				bx::mtxProj(
-							lightProj[ProjType::Horizontal]
-							, fovy
-							, aspect
-							, currentSmSettings->m_near
-							, currentSmSettings->m_far
-							, caps->homogeneousDepth
-							);
+					  lightProj[ProjType::Horizontal]
+					, fovy
+					, aspect
+					, currentSmSettings->m_near
+					, currentSmSettings->m_far
+					, caps->homogeneousDepth
+					);
 
 				//For linear depth, prevent depth division by variable w component in shaders and divide here by far plane
 				if (DepthImpl::Linear == m_settings.m_depthImpl)
@@ -2293,105 +2390,162 @@ public:
 					lightView[ii][15] = 1.0f;
 				}
 			}
-			else // LightType::DirectionalLight == settings.m_lightType
+			else // LightType::DirectionalLight == m_settings.m_lightType
 			{
-				// Setup light view mtx.
-				const bx::Vec3 at = { 0.0f, 0.0f, 0.0f };
-				const bx::Vec3 eye =
-				{
-					-m_directionalLight.m_position.m_x,
-					-m_directionalLight.m_position.m_y,
-					-m_directionalLight.m_position.m_z,
-				};
-				bx::mtxLookAt(lightView[0], eye, at);
-
-				// Compute camera inverse view mtx.
-				float mtxViewInv[16];
-				bx::mtxInverse(mtxViewInv, m_viewState.m_view);
-
-				// Compute split distances.
+				// ============================================================================
+				// Cascaded Shadow Map calculation based on GPU Gems 3, Chapter 10
+				// ============================================================================
+		
 				const uint8_t maxNumSplits = 4;
 				BX_ASSERT(maxNumSplits >= m_settings.m_numSplits, "Error! Max num splits.");
-
-				float splitSlices[maxNumSplits*2];
-				splitFrustum(splitSlices
-					, uint8_t(m_settings.m_numSplits)
-					, currentSmSettings->m_near
-					, currentSmSettings->m_far
-					, m_settings.m_splitDistribution
-					);
-
-				// Update uniforms.
-				for (uint8_t ii = 0, ff = 1; ii < m_settings.m_numSplits; ++ii, ff+=2)
+		
+				// Get camera parameters
+				const float nearClip = currentSmSettings->m_near;
+				const float farClip = currentSmSettings->m_far;
+				const float clipRange = farClip - nearClip;
+		
+				// Calculate cascade split depths using GPU Gems 3 logarithmic/uniform blend
+				float cascadeSplits[maxNumSplits];
+				calculateCascadeSplits(cascadeSplits, 
+										 uint8_t(m_settings.m_numSplits), 
+										 nearClip, 
+										 farClip, 
+										 m_settings.m_splitDistribution);
+		
+				// Light direction (normalized) - this is the direction the light travels
+				const bx::Vec3 lightDir = bx::normalize(bx::Vec3{
+					m_directionalLight.m_position.m_x,
+					m_directionalLight.m_position.m_y,
+					m_directionalLight.m_position.m_z
+				});
+		
+				const bx::Vec3 lightEye = {0.0f, 0.0f, 0.0f};
+				const bx::Vec3 lightAt = lightDir;  // Look along light direction
+				
+				// Use +Y as default up vector, falling back to +Z if light is nearly vertical
+				bx::Vec3 upVec = {0.0f, 1.0f, 0.0f};
+				if(bx::abs(bx::dot(lightDir, upVec)) > 0.99f)
 				{
-					// This lags for 1 frame, but it's not a problem.
-					s_uniforms.m_csmFarDistances[ii] = splitSlices[ff];
+					upVec = {0.0f, 0.0f, 1.0f};
 				}
-
+				
+				// All cascades share the same light view matrix (camera position independent)
+				bx::mtxLookAt(lightView[0], lightEye, lightAt, upVec);
+		
+				// Create base orthographic projection (will be adjusted by crop matrices)
 				float mtxProj[16];
-				bx::mtxOrtho(
-					  mtxProj
-					, 1.0f
-					, -1.0f
-					, 1.0f
-					, -1.0f
-					, -currentSmSettings->m_far
-					, currentSmSettings->m_far
-					, 0.0f
-					, caps->homogeneousDepth
-					);
-
+				bx::mtxOrtho(mtxProj,
+							 -1.0f, 1.0f,    // left, right
+							 -1.0f, 1.0f,    // bottom, top
+							 -currentSmSettings->m_far,
+							 currentSmSettings->m_far,
+							 0.0f,
+							 caps->homogeneousDepth);
+		
+				// Get camera inverse view matrix for frustum corner calculation
+				float mtxViewInv[16];
+				bx::mtxInverse(mtxViewInv, m_viewState.m_view);
+				// Process each cascade
 				const uint8_t numCorners = 8;
 				float frustumCorners[maxNumSplits][numCorners][3];
-				for (uint8_t ii = 0, nn = 0, ff = 1; ii < m_settings.m_numSplits; ++ii, nn+=2, ff+=2)
+				float lastSplitDist = 0.0f;
+		
+				// Cascade blend overlap: extend each cascade's near plane backward to cover
+				// the previous cascade's transition band. Must match the shader's cascadeBlendBand.
+				// const float cascadeBlendOverlap = 0.1f;
+		
+				for(uint8_t ii = 0; ii < m_settings.m_numSplits; ++ii)
 				{
+					const float splitDist = cascadeSplits[ii];
+					
+					// Compute actual near/far distances for this cascade
+					const float cascadeNear = nearClip + lastSplitDist * clipRange;
+					const float cascadeFar = nearClip + splitDist * clipRange;
+		
+					// Update cascade far distance uniform (use original split distance for shader blend)
+					s_uniforms.m_csmFarDistances[ii] = cascadeFar;
+
 					// Compute frustum corners for one split in world space.
-					worldSpaceFrustumCorners( (float*)frustumCorners[ii], splitSlices[nn], splitSlices[ff], projWidth, projHeight, mtxViewInv);
-
-					bx::Vec3 min = {  9000.0f,  9000.0f,  9000.0f };
-					bx::Vec3 max = { -9000.0f, -9000.0f, -9000.0f };
-
-					for (uint8_t jj = 0; jj < numCorners; ++jj)
+					worldSpaceFrustumCorners((float*)frustumCorners[ii], cascadeNear, cascadeFar, projWidth, projHeight, mtxViewInv);
+		
+					bx::Vec3 min = {9000.0f, 9000.0f, 9000.0f};
+					bx::Vec3 max = {-9000.0f, -9000.0f, -9000.0f};
+					float frustum_radius = 0.0f;
+					
+					// Calculate frustum center in world space
+					bx::Vec3 frustumCenter = {0.0f, 0.0f, 0.0f};
+					for(uint8_t jj = 0; jj < numCorners; ++jj)
 					{
-						// Transform to light space.
+						// Transform from view space to world space
+						const bx::Vec3 worldCorner = bx::load<bx::Vec3>(&frustumCorners[ii][jj]);
+						frustumCenter = bx::add(frustumCenter, worldCorner);
+					}
+					frustumCenter = bx::mul(frustumCenter, 1.0f / float(numCorners));
+					
+					// Transform center to light space for radius calculation
+					const bx::Vec3 lightSpaceCenter = bx::mul(frustumCenter, lightView[0]);
+					
+					// Transform corners to light space and compute bounds
+					for(uint8_t jj = 0; jj < numCorners; ++jj)
+					{
 						const bx::Vec3 xyz = bx::mul(bx::load<bx::Vec3>(frustumCorners[ii][jj]), lightView[0]);
-
-						// Update bounding box.
+						
+						// Calculate distance from center for radius
+						const float dx = xyz.x - lightSpaceCenter.x;
+						const float dy = xyz.y - lightSpaceCenter.y;
+						const float dz = xyz.z - lightSpaceCenter.z;
+						const float distance = bx::sqrt(dx*dx + dy*dy + dz*dz);
+						frustum_radius = bx::max(frustum_radius, distance);
+						
+						// Update bounding box in light space
 						min = bx::min(min, xyz);
 						max = bx::max(max, xyz);
 					}
-
+					
+					// Round radius to reduce flickering
+					frustum_radius = bx::ceil(frustum_radius * 8.0f) / 8.0f;
+		
+					// Project bounds to the base ortho projection space
 					const bx::Vec3 minproj = bx::mulH(min, mtxProj);
 					const bx::Vec3 maxproj = bx::mulH(max, mtxProj);
-
-					float scalex = 2.0f / (maxproj.x - minproj.x);
-					float scaley = 2.0f / (maxproj.y - minproj.y);
-
-					if (m_settings.m_stabilize)
+		
+					// Calculate scale using radius-based approach for stability
+					float scalex = 1.0f / frustum_radius;
+					float scaley = 1.0f / frustum_radius;
+		
+					if(m_settings.m_stabilize)
 					{
+						// Quantize scale for stability
 						const float quantizer = 64.0f;
 						scalex = quantizer / bx::ceil(quantizer / scalex);
 						scaley = quantizer / bx::ceil(quantizer / scaley);
 					}
-
-					float offsetx = 0.5f * (maxproj.x + minproj.x) * scalex;
-					float offsety = 0.5f * (maxproj.y + minproj.y) * scaley;
-
+		
+					// Calculate offset to center the cascade in the projection
+					float offsetx = -scalex * (minproj.x + maxproj.x) * 0.5f;
+					float offsety = -scaley * (minproj.y + maxproj.y) * 0.5f;
+		
+					// Apply texel snapping for stability					
 					if (m_settings.m_stabilize)
 					{
 						const float halfSize = currentShadowMapSizef * 0.5f;
 						offsetx = bx::ceil(offsetx * halfSize) / halfSize;
 						offsety = bx::ceil(offsety * halfSize) / halfSize;
 					}
-
+		
+					// Build crop matrix to adjust the base projection for this cascade
 					float mtxCrop[16];
 					bx::mtxIdentity(mtxCrop);
-					mtxCrop[ 0] = scalex;
-					mtxCrop[ 5] = scaley;
-					mtxCrop[12] = offsetx;
-					mtxCrop[13] = offsety;
-
+					mtxCrop[0] = scalex;   // x-scale
+					mtxCrop[5] = scaley;   // y-scale
+					mtxCrop[12] = offsetx; // x-offset
+					mtxCrop[13] = offsety; // y-offset
+					mtxCrop[14] = -lightSpaceCenter.z; // z-offset: center depth range on cascade frustum
+		
+					// Final projection = crop * base projection
 					bx::mtxMul(lightProj[ii], mtxCrop, mtxProj);
+		
+					lastSplitDist = splitDist;
 				}
 			}
 
@@ -3085,6 +3239,8 @@ public:
 
 	float m_timeAccumulatorLight;
 	float m_timeAccumulatorScene;
+
+	FrameTime m_frameTime;
 };
 
 } // namespace

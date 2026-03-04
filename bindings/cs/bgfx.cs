@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2025 Branimir Karadzic. All rights reserved.
+ * Copyright 2011-2026 Branimir Karadzic. All rights reserved.
  * License: https://github.com/bkaradzic/bgfx/blob/master/LICENSE
  */
 
@@ -612,47 +612,47 @@ public static partial class bgfx
 	public enum BufferFlags : ushort
 	{
 		/// <summary>
-		/// 1 8-bit value
+		/// 1 x 8-bit value
 		/// </summary>
 		ComputeFormat8x1       = 0x0001,
 	
 		/// <summary>
-		/// 2 8-bit values
+		/// 2 x 8-bit values
 		/// </summary>
 		ComputeFormat8x2       = 0x0002,
 	
 		/// <summary>
-		/// 4 8-bit values
+		/// 4 x 8-bit values
 		/// </summary>
 		ComputeFormat8x4       = 0x0003,
 	
 		/// <summary>
-		/// 1 16-bit value
+		/// 1 x 16-bit value
 		/// </summary>
 		ComputeFormat16x1      = 0x0004,
 	
 		/// <summary>
-		/// 2 16-bit values
+		/// 2 x 16-bit values
 		/// </summary>
 		ComputeFormat16x2      = 0x0005,
 	
 		/// <summary>
-		/// 4 16-bit values
+		/// 4 x 16-bit values
 		/// </summary>
 		ComputeFormat16x4      = 0x0006,
 	
 		/// <summary>
-		/// 1 32-bit value
+		/// 1 x 32-bit value
 		/// </summary>
 		ComputeFormat32x1      = 0x0007,
 	
 		/// <summary>
-		/// 2 32-bit values
+		/// 2 x 32-bit values
 		/// </summary>
 		ComputeFormat32x2      = 0x0008,
 	
 		/// <summary>
-		/// 4 32-bit values
+		/// 4 x 32-bit values
 		/// </summary>
 		ComputeFormat32x4      = 0x0009,
 		ComputeFormatShift     = 0,
@@ -737,6 +737,11 @@ public static partial class bgfx
 		/// Texture will be used for read back from GPU.
 		/// </summary>
 		ReadBack               = 0x0000800000000000,
+	
+		/// <summary>
+		/// Texture is shared with other device or other process.
+		/// </summary>
+		ExternalShared         = 0x0001000000000000,
 	
 		/// <summary>
 		/// Render target MSAAx2 mode.
@@ -1122,44 +1127,59 @@ public static partial class bgfx
 		TextureDirectAccess    = 0x0000000000400000,
 	
 		/// <summary>
+		/// External texture is supported.
+		/// </summary>
+		TextureExternal        = 0x0000000000800000,
+	
+		/// <summary>
+		/// External shared texture is supported.
+		/// </summary>
+		TextureExternalShared  = 0x0000000001000000,
+	
+		/// <summary>
 		/// Read-back texture is supported.
 		/// </summary>
-		TextureReadBack        = 0x0000000000800000,
+		TextureReadBack        = 0x0000000002000000,
 	
 		/// <summary>
 		/// 2D texture array is supported.
 		/// </summary>
-		Texture2dArray         = 0x0000000001000000,
+		Texture2dArray         = 0x0000000004000000,
 	
 		/// <summary>
 		/// 3D textures are supported.
 		/// </summary>
-		Texture3d              = 0x0000000002000000,
+		Texture3d              = 0x0000000008000000,
 	
 		/// <summary>
 		/// Transparent back buffer supported.
 		/// </summary>
-		TransparentBackbuffer  = 0x0000000004000000,
+		TransparentBackbuffer  = 0x0000000010000000,
+	
+		/// <summary>
+		/// Variable Rate Shading
+		/// </summary>
+		VariableRateShading    = 0x0000000020000000,
 	
 		/// <summary>
 		/// Vertex attribute half-float is supported.
 		/// </summary>
-		VertexAttribHalf       = 0x0000000008000000,
+		VertexAttribHalf       = 0x0000000040000000,
 	
 		/// <summary>
 		/// Vertex attribute 10_10_10_2 is supported.
 		/// </summary>
-		VertexAttribUint10     = 0x0000000010000000,
+		VertexAttribUint10     = 0x0000000080000000,
 	
 		/// <summary>
 		/// Rendering with VertexID only is supported.
 		/// </summary>
-		VertexId               = 0x0000000020000000,
+		VertexId               = 0x0000000100000000,
 	
 		/// <summary>
 		/// Viewport layer is available in vertex shader.
 		/// </summary>
-		ViewportLayerArray     = 0x0000000040000000,
+		ViewportLayerArray     = 0x0000000200000000,
 	
 		/// <summary>
 		/// All texture compare modes are supported.
@@ -1254,6 +1274,11 @@ public static partial class bgfx
 		/// Texture format supports auto-generated mips.
 		/// </summary>
 		TextureMipAutogen      = 0x00008000,
+	
+		/// <summary>
+		/// Texture format can be used as back buffer format.
+		/// </summary>
+		TextureBackbuffer      = 0x00010000,
 	}
 	
 	[Flags]
@@ -1348,6 +1373,25 @@ public static partial class bgfx
 		NegativeZ              = 0x00000005,
 	}
 	
+	[Flags]
+	public enum FrameFlags : uint
+	{
+		/// <summary>
+		/// No frame flags.
+		/// </summary>
+		None                   = 0x00000000,
+	
+		/// <summary>
+		/// Capture frame with graphics debugger.
+		/// </summary>
+		DebugCapture           = 0x00000001,
+	
+		/// <summary>
+		/// Discard all draw calls.
+		/// </summary>
+		Discard                = 0x00000002,
+	}
+	
 	public enum Fatal
 	{
 		DebugCheck,
@@ -1410,6 +1454,11 @@ public static partial class bgfx
 		/// Vulkan
 		/// </summary>
 		Vulkan,
+	
+		/// <summary>
+		/// WebGPU
+		/// </summary>
+		WebGPU,
 	
 		Count
 	}
@@ -1615,6 +1664,26 @@ public static partial class bgfx
 		/// ETC2 RGB8A1
 		/// </summary>
 		ETC2A1,
+	
+		/// <summary>
+		/// EAC R11 UNORM
+		/// </summary>
+		EACR11,
+	
+		/// <summary>
+		/// EAC R11 SNORM
+		/// </summary>
+		EACR11S,
+	
+		/// <summary>
+		/// EAC RG11 UNORM
+		/// </summary>
+		EACRG11,
+	
+		/// <summary>
+		/// EAC RG11 SNORM
+		/// </summary>
+		EACRG11S,
 	
 		/// <summary>
 		/// PVRTC1 RGB 2BPP
@@ -1834,6 +1903,26 @@ public static partial class bgfx
 		Count
 	}
 	
+	public enum UniformFreq
+	{
+		/// <summary>
+		/// Changing per draw call.
+		/// </summary>
+		Draw,
+	
+		/// <summary>
+		/// Changing per view.
+		/// </summary>
+		View,
+	
+		/// <summary>
+		/// Changing per frame.
+		/// </summary>
+		Frame,
+	
+		Count
+	}
+	
 	public enum BackbufferRatio
 	{
 		/// <summary>
@@ -1992,6 +2081,46 @@ public static partial class bgfx
 		Count
 	}
 	
+	public enum ShadingRate
+	{
+		/// <summary>
+		/// 1x1
+		/// </summary>
+		Rate1x1,
+	
+		/// <summary>
+		/// 1x2
+		/// </summary>
+		Rate1x2,
+	
+		/// <summary>
+		/// 2x1
+		/// </summary>
+		Rate2x1,
+	
+		/// <summary>
+		/// 2x2
+		/// </summary>
+		Rate2x2,
+	
+		/// <summary>
+		/// 2x4
+		/// </summary>
+		Rate2x4,
+	
+		/// <summary>
+		/// 4x2
+		/// </summary>
+		Rate4x2,
+	
+		/// <summary>
+		/// 4x4
+		/// </summary>
+		Rate4x4,
+	
+		Count
+	}
+	
 	public enum NativeWindowHandleType
 	{
 		/// <summary>
@@ -2065,7 +2194,7 @@ public static partial class bgfx
 			public uint maxEncoders;
 			public uint minResourceCbSize;
 			public uint maxTransientVbSize;
-			public uint maxTansientIbSize;
+			public uint maxTransientIbSize;
 			public uint minUniformBufferSize;
 		}
 	
@@ -2078,7 +2207,7 @@ public static partial class bgfx
 		public byte numGPUs;
 		public fixed uint gpu[4];
 		public Limits limits;
-		public fixed ushort formats[96];
+		public fixed uint formats[100];
 	}
 	
 	public unsafe struct InternalData
@@ -2092,6 +2221,7 @@ public static partial class bgfx
 		public void* ndt;
 		public void* nwh;
 		public void* context;
+		public void* queue;
 		public void* backBuffer;
 		public void* backBufferDS;
 		public NativeWindowHandleType type;
@@ -2126,6 +2256,7 @@ public static partial class bgfx
 		public ulong capabilities;
 		public byte debug;
 		public byte profile;
+		public byte fallback;
 		public PlatformData platformData;
 		public Resolution resolution;
 		public Limits limits;
@@ -2363,7 +2494,9 @@ public static partial class bgfx
 	
 	/// <summary>
 	/// Add attribute to VertexLayout.
+	/// 
 	/// @remarks Must be called between begin/end.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_attrib">Attribute semantics. See: `bgfx::Attrib`</param>
@@ -2445,7 +2578,7 @@ public static partial class bgfx
 	public static extern unsafe void vertex_convert(VertexLayout* _dstLayout, void* _dstData, VertexLayout* _srcLayout, void* _srcData, uint _num);
 	
 	/// <summary>
-	/// Weld vertices.
+	/// Weld vertices. Returns number of unique vertices after welding.
 	/// </summary>
 	///
 	/// <param name="_output">Welded vertices remapping table. The size of buffer must be the same as number of vertices.</param>
@@ -2537,8 +2670,10 @@ public static partial class bgfx
 	
 	/// <summary>
 	/// Reset graphic settings and back-buffer size.
+	/// 
 	/// @attention This call doesn’t change the window size, it just resizes
 	///   the back-buffer. Your windowing code controls the window size.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_width">Back-buffer width.</param>
@@ -2555,15 +2690,17 @@ public static partial class bgfx
 	/// singlethreaded renderer this call does frame rendering.
 	/// </summary>
 	///
-	/// <param name="_capture">Capture frame with graphics debugger.</param>
+	/// <param name="_flags">Frame flags. See: `BGFX_FRAME_*` for more info.   - `BGFX_FRAME_NONE` - No frame flag.   - `BGFX_FRAME_DEBUG_CAPTURE` - Capture frame with graphics debugger.   - `BGFX_FRAME_DISCARD` - Discard all draw calls.</param>
 	///
 	[DllImport(DllName, EntryPoint="bgfx_frame", CallingConvention = CallingConvention.Cdecl)]
-	public static extern unsafe uint frame(bool _capture);
+	public static extern unsafe uint frame(byte _flags);
 	
 	/// <summary>
 	/// Returns current renderer backend API type.
+	/// 
 	/// @remarks
 	///   Library must be initialized.
+	/// 
 	/// </summary>
 	///
 	[DllImport(DllName, EntryPoint="bgfx_get_renderer_type", CallingConvention = CallingConvention.Cdecl)]
@@ -2571,8 +2708,10 @@ public static partial class bgfx
 	
 	/// <summary>
 	/// Returns renderer capabilities.
+	/// 
 	/// @remarks
 	///   Library must be initialized.
+	/// 
 	/// </summary>
 	///
 	[DllImport(DllName, EntryPoint="bgfx_get_caps", CallingConvention = CallingConvention.Cdecl)]
@@ -2580,7 +2719,9 @@ public static partial class bgfx
 	
 	/// <summary>
 	/// Returns performance counters.
+	/// 
 	/// @attention Pointer returned is valid until `bgfx::frame` is called.
+	/// 
 	/// </summary>
 	///
 	[DllImport(DllName, EntryPoint="bgfx_get_stats", CallingConvention = CallingConvention.Cdecl)]
@@ -2612,7 +2753,9 @@ public static partial class bgfx
 	/// consumed, otherwise you must make sure _data is available for at least 2
 	/// `bgfx::frame` calls. `ReleaseFn` function must be able to be called
 	/// from any thread.
+	/// 
 	/// @attention Data passed must be available for at least 2 `bgfx::frame` calls.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_data">Pointer to data.</param>
@@ -2628,7 +2771,9 @@ public static partial class bgfx
 	/// consumed, otherwise you must make sure _data is available for at least 2
 	/// `bgfx::frame` calls. `ReleaseFn` function must be able to be called
 	/// from any thread.
+	/// 
 	/// @attention Data passed must be available for at least 2 `bgfx::frame` calls.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_data">Pointer to data.</param>
@@ -2728,7 +2873,7 @@ public static partial class bgfx
 	public static extern unsafe void destroy_index_buffer(IndexBufferHandle _handle);
 	
 	/// <summary>
-	/// Create vertex layout.
+	/// Create vertex layout. Vertex layouts are used to describe the format of vertex data.
 	/// </summary>
 	///
 	/// <param name="_layout">Vertex layout.</param>
@@ -2890,6 +3035,7 @@ public static partial class bgfx
 	
 	/// <summary>
 	/// Allocate transient index buffer.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_tib">TransientIndexBuffer structure will be filled, and will be valid for the duration of frame, and can be reused for multiple draw calls.</param>
@@ -2914,6 +3060,7 @@ public static partial class bgfx
 	/// Check for required space and allocate transient vertex and index
 	/// buffers. If both space requirements are satisfied function returns
 	/// true.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_tvb">TransientVertexBuffer structure will be filled, and will be valid for the duration of frame, and can be reused for multiple draw calls.</param>
@@ -2958,8 +3105,10 @@ public static partial class bgfx
 	
 	/// <summary>
 	/// Create shader from memory buffer.
+	/// 
 	/// @remarks
 	///   Shader binary is obtained by compiling shader offline with shaderc command line tool.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_mem">Shader binary.</param>
@@ -2969,8 +3118,10 @@ public static partial class bgfx
 	
 	/// <summary>
 	/// Returns the number of uniforms and uniform handles used inside a shader.
+	/// 
 	/// @remarks
 	///   Only non-predefined uniforms are returned.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_handle">Shader handle.</param>
@@ -2993,8 +3144,10 @@ public static partial class bgfx
 	
 	/// <summary>
 	/// Destroy shader.
+	/// 
 	/// @remark Once a shader program is created with _handle,
 	///   it is safe to destroy that shader.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_handle">Shader handle.</param>
@@ -3096,9 +3249,10 @@ public static partial class bgfx
 	/// <param name="_format">Texture format. See: `TextureFormat::Enum`.</param>
 	/// <param name="_flags">Texture creation (see `BGFX_TEXTURE_*`.), and sampler (see `BGFX_SAMPLER_*`) flags. Default texture sampling mode is linear, and wrap mode is repeat. - `BGFX_SAMPLER_[U/V/W]_[MIRROR/CLAMP]` - Mirror or clamp to edge wrap   mode. - `BGFX_SAMPLER_[MIN/MAG/MIP]_[POINT/ANISOTROPIC]` - Point or anisotropic   sampling.</param>
 	/// <param name="_mem">Texture data. If `_mem` is non-NULL, created texture will be immutable. If `_mem` is NULL content of the texture is uninitialized. When `_numLayers` is more than 1, expected memory layout is texture and all mips together for each array element.</param>
+	/// <param name="_external">Native API pointer to texture.</param>
 	///
 	[DllImport(DllName, EntryPoint="bgfx_create_texture_2d", CallingConvention = CallingConvention.Cdecl)]
-	public static extern unsafe TextureHandle create_texture_2d(ushort _width, ushort _height, bool _hasMips, ushort _numLayers, TextureFormat _format, ulong _flags, Memory* _mem);
+	public static extern unsafe TextureHandle create_texture_2d(ushort _width, ushort _height, bool _hasMips, ushort _numLayers, TextureFormat _format, ulong _flags, Memory* _mem, ulong _external);
 	
 	/// <summary>
 	/// Create texture with size based on back-buffer ratio. Texture will maintain ratio
@@ -3125,9 +3279,10 @@ public static partial class bgfx
 	/// <param name="_format">Texture format. See: `TextureFormat::Enum`.</param>
 	/// <param name="_flags">Texture creation (see `BGFX_TEXTURE_*`.), and sampler (see `BGFX_SAMPLER_*`) flags. Default texture sampling mode is linear, and wrap mode is repeat. - `BGFX_SAMPLER_[U/V/W]_[MIRROR/CLAMP]` - Mirror or clamp to edge wrap   mode. - `BGFX_SAMPLER_[MIN/MAG/MIP]_[POINT/ANISOTROPIC]` - Point or anisotropic   sampling.</param>
 	/// <param name="_mem">Texture data. If `_mem` is non-NULL, created texture will be immutable. If `_mem` is NULL content of the texture is uninitialized. When `_numLayers` is more than 1, expected memory layout is texture and all mips together for each array element.</param>
+	/// <param name="_external">Native API pointer to texture.</param>
 	///
 	[DllImport(DllName, EntryPoint="bgfx_create_texture_3d", CallingConvention = CallingConvention.Cdecl)]
-	public static extern unsafe TextureHandle create_texture_3d(ushort _width, ushort _height, ushort _depth, bool _hasMips, TextureFormat _format, ulong _flags, Memory* _mem);
+	public static extern unsafe TextureHandle create_texture_3d(ushort _width, ushort _height, ushort _depth, bool _hasMips, TextureFormat _format, ulong _flags, Memory* _mem, ulong _external);
 	
 	/// <summary>
 	/// Create Cube texture.
@@ -3138,14 +3293,17 @@ public static partial class bgfx
 	/// <param name="_numLayers">Number of layers in texture array. Must be 1 if caps `BGFX_CAPS_TEXTURE_2D_ARRAY` flag is not set.</param>
 	/// <param name="_format">Texture format. See: `TextureFormat::Enum`.</param>
 	/// <param name="_flags">Texture creation (see `BGFX_TEXTURE_*`.), and sampler (see `BGFX_SAMPLER_*`) flags. Default texture sampling mode is linear, and wrap mode is repeat. - `BGFX_SAMPLER_[U/V/W]_[MIRROR/CLAMP]` - Mirror or clamp to edge wrap   mode. - `BGFX_SAMPLER_[MIN/MAG/MIP]_[POINT/ANISOTROPIC]` - Point or anisotropic   sampling.</param>
-	/// <param name="_mem">Texture data. If `_mem` is non-NULL, created texture will be immutable. If `_mem` is NULL content of the texture is uninitialized. When `_numLayers` is more than 1, expected memory layout is texture and all mips together for each array element.</param>
+	/// <param name="_mem">Texture data. If `_mem` is non-NULL, created texture will be immutable. If `_mem` is NULL content of the texture is uninitialized. When `_numLayers` is more than</param>
+	/// <param name="_external">Native API pointer to texture.</param>
 	///
 	[DllImport(DllName, EntryPoint="bgfx_create_texture_cube", CallingConvention = CallingConvention.Cdecl)]
-	public static extern unsafe TextureHandle create_texture_cube(ushort _size, bool _hasMips, ushort _numLayers, TextureFormat _format, ulong _flags, Memory* _mem);
+	public static extern unsafe TextureHandle create_texture_cube(ushort _size, bool _hasMips, ushort _numLayers, TextureFormat _format, ulong _flags, Memory* _mem, ulong _external);
 	
 	/// <summary>
 	/// Update 2D texture.
+	/// 
 	/// @attention It's valid to update only mutable texture. See `bgfx::createTexture2D` for more info.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_handle">Texture handle.</param>
@@ -3163,7 +3321,9 @@ public static partial class bgfx
 	
 	/// <summary>
 	/// Update 3D texture.
+	/// 
 	/// @attention It's valid to update only mutable texture. See `bgfx::createTexture3D` for more info.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_handle">Texture handle.</param>
@@ -3181,7 +3341,9 @@ public static partial class bgfx
 	
 	/// <summary>
 	/// Update Cube texture.
+	/// 
 	/// @attention It's valid to update only mutable texture. See `bgfx::createTextureCube` for more info.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_handle">Texture handle.</param>
@@ -3200,8 +3362,10 @@ public static partial class bgfx
 	
 	/// <summary>
 	/// Read back texture content.
+	/// 
 	/// @attention Texture must be created with `BGFX_TEXTURE_READ_BACK` flag.
 	/// @attention Availability depends on: `BGFX_CAPS_TEXTURE_READ_BACK`.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_handle">Texture handle.</param>
@@ -3224,8 +3388,10 @@ public static partial class bgfx
 	
 	/// <summary>
 	/// Returns texture direct access pointer.
+	/// 
 	/// @attention Availability depends on: `BGFX_CAPS_TEXTURE_DIRECT_ACCESS`. This feature
 	///   is available on GPUs that have unified memory architecture (UMA) support.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_handle">Texture handle.</param>
@@ -3291,9 +3457,12 @@ public static partial class bgfx
 	
 	/// <summary>
 	/// Create frame buffer for multiple window rendering.
+	/// 
 	/// @remarks
 	///   Frame buffer cannot be used for sampling.
+	/// 
 	/// @attention Availability depends on: `BGFX_CAPS_SWAP_CHAIN`.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_nwh">OS' target native window handle.</param>
@@ -3336,12 +3505,14 @@ public static partial class bgfx
 	
 	/// <summary>
 	/// Create shader uniform parameter.
+	/// 
 	/// @remarks
 	///   1. Uniform names are unique. It's valid to call `bgfx::createUniform`
 	///      multiple times with the same uniform name. The library will always
 	///      return the same handle, but the handle reference count will be
 	///      incremented. This means that the same number of `bgfx::destroyUniform`
 	///      must be called to properly destroy the uniform.
+	/// 
 	///   2. Predefined uniforms (declared in `bgfx_shader.sh`):
 	///      - `u_viewRect vec4(x, y, width, height)` - view rectangle for current
 	///        view, in pixels.
@@ -3359,6 +3530,7 @@ public static partial class bgfx
 	///      - `u_invModelView mat4` - inverted concatenated model view matrix.
 	///      - `u_modelViewProj mat4` - concatenated model view projection matrix.
 	///      - `u_alphaRef float` - alpha reference value for alpha test.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_name">Uniform name in shader.</param>
@@ -3367,6 +3539,44 @@ public static partial class bgfx
 	///
 	[DllImport(DllName, EntryPoint="bgfx_create_uniform", CallingConvention = CallingConvention.Cdecl)]
 	public static extern unsafe UniformHandle create_uniform([MarshalAs(UnmanagedType.LPStr)] string _name, UniformType _type, ushort _num);
+	
+	/// <summary>
+	/// Create shader uniform parameter.
+	/// 
+	/// @remarks
+	///   1. Uniform names are unique. It's valid to call `bgfx::createUniform`
+	///      multiple times with the same uniform name. The library will always
+	///      return the same handle, but the handle reference count will be
+	///      incremented. This means that the same number of `bgfx::destroyUniform`
+	///      must be called to properly destroy the uniform.
+	/// 
+	///   2. Predefined uniforms (declared in `bgfx_shader.sh`):
+	///      - `u_viewRect vec4(x, y, width, height)` - view rectangle for current
+	///        view, in pixels.
+	///      - `u_viewTexel vec4(1.0/width, 1.0/height, undef, undef)` - inverse
+	///        width and height
+	///      - `u_view mat4` - view matrix
+	///      - `u_invView mat4` - inverted view matrix
+	///      - `u_proj mat4` - projection matrix
+	///      - `u_invProj mat4` - inverted projection matrix
+	///      - `u_viewProj mat4` - concatenated view projection matrix
+	///      - `u_invViewProj mat4` - concatenated inverted view projection matrix
+	///      - `u_model mat4[BGFX_CONFIG_MAX_BONES]` - array of model matrices.
+	///      - `u_modelView mat4` - concatenated model view matrix, only first
+	///        model matrix from array is used.
+	///      - `u_invModelView mat4` - inverted concatenated model view matrix.
+	///      - `u_modelViewProj mat4` - concatenated model view projection matrix.
+	///      - `u_alphaRef float` - alpha reference value for alpha test.
+	/// 
+	/// </summary>
+	///
+	/// <param name="_name">Uniform name in shader.</param>
+	/// <param name="_freq">Uniform change frequency (See: `bgfx::UniformFreq`).</param>
+	/// <param name="_type">Type of uniform (See: `bgfx::UniformType`).</param>
+	/// <param name="_num">Number of elements in array.</param>
+	///
+	[DllImport(DllName, EntryPoint="bgfx_create_uniform_with_freq", CallingConvention = CallingConvention.Cdecl)]
+	public static extern unsafe UniformHandle create_uniform_with_freq([MarshalAs(UnmanagedType.LPStr)] string _name, UniformFreq _freq, UniformType _type, ushort _num);
 	
 	/// <summary>
 	/// Retrieve uniform info.
@@ -3388,7 +3598,8 @@ public static partial class bgfx
 	public static extern unsafe void destroy_uniform(UniformHandle _handle);
 	
 	/// <summary>
-	/// Create occlusion query.
+	/// Create occlusion query. Occlusion queries allow the GPU to determine
+	/// if any pixels passed the depth test.
 	/// </summary>
 	///
 	[DllImport(DllName, EntryPoint="bgfx_create_occlusion_query", CallingConvention = CallingConvention.Cdecl)]
@@ -3448,13 +3659,17 @@ public static partial class bgfx
 	
 	/// <summary>
 	/// Set view name.
+	/// 
 	/// @remarks
 	///   This is debug only feature.
+	/// 
 	///   In graphics debugger view name will appear as:
+	/// 
 	///       "nnnc <view name>"
 	///        ^  ^ ^
 	///        |  +--- compute (C)
 	///        +------ view id
+	/// 
 	/// </summary>
 	///
 	/// <param name="_id">View id.</param>
@@ -3540,8 +3755,10 @@ public static partial class bgfx
 	
 	/// <summary>
 	/// Set view sorting mode.
+	/// 
 	/// @remarks
 	///   View mode must be set prior calling `bgfx::submit` for the view.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_id">View id.</param>
@@ -3552,8 +3769,10 @@ public static partial class bgfx
 	
 	/// <summary>
 	/// Set view frame buffer.
+	/// 
 	/// @remarks
 	///   Not persistent after `bgfx::reset` call.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_id">View id.</param>
@@ -3586,8 +3805,23 @@ public static partial class bgfx
 	public static extern unsafe void set_view_order(ushort _id, ushort _num, ushort* _order);
 	
 	/// <summary>
+	/// Set view shading rate.
+	/// 
+	/// @attention Availability depends on: `BGFX_CAPS_VARIABLE_RATE_SHADING`.
+	/// 
+	/// </summary>
+	///
+	/// <param name="_id">View id.</param>
+	/// <param name="_shadingRate">Shading rate.</param>
+	///
+	[DllImport(DllName, EntryPoint="bgfx_set_view_shading_rate", CallingConvention = CallingConvention.Cdecl)]
+	public static extern unsafe void set_view_shading_rate(ushort _id, ShadingRate _shadingRate);
+	
+	/// <summary>
 	/// Reset all view settings to default.
 	/// </summary>
+	///
+	/// <param name="_id">_id View id.</param>
 	///
 	[DllImport(DllName, EntryPoint="bgfx_reset_view", CallingConvention = CallingConvention.Cdecl)]
 	public static extern unsafe void reset_view(ushort _id);
@@ -3623,6 +3857,7 @@ public static partial class bgfx
 	
 	/// <summary>
 	/// Set render states for draw primitive.
+	/// 
 	/// @remarks
 	///   1. To set up more complex states use:
 	///      `BGFX_STATE_ALPHA_REF(_ref)`,
@@ -3633,6 +3868,7 @@ public static partial class bgfx
 	///      `BGFX_STATE_BLEND_EQUATION_SEPARATE(_equationRGB, _equationA)`
 	///   2. `BGFX_STATE_BLEND_EQUATION_ADD` is set when no other blend
 	///      equation is specified.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_state">State flags. Default state for primitive type is   triangles. See: `BGFX_STATE_DEFAULT`.   - `BGFX_STATE_DEPTH_TEST_*` - Depth test function.   - `BGFX_STATE_BLEND_*` - See remark 1 about BGFX_STATE_BLEND_FUNC.   - `BGFX_STATE_BLEND_EQUATION_*` - See remark 2.   - `BGFX_STATE_CULL_*` - Backface culling mode.   - `BGFX_STATE_WRITE_*` - Enable R, G, B, A or Z write.   - `BGFX_STATE_MSAA` - Enable hardware multisample antialiasing.   - `BGFX_STATE_PT_[TRISTRIP/LINES/POINTS]` - Primitive type.</param>
@@ -3663,8 +3899,10 @@ public static partial class bgfx
 	
 	/// <summary>
 	/// Set scissor for draw primitive.
+	/// 
 	/// @remark
 	///   To scissor for all primitives in view see `bgfx::setViewScissor`.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_x">Position x from the left corner of the window.</param>
@@ -3677,8 +3915,10 @@ public static partial class bgfx
 	
 	/// <summary>
 	/// Set scissor from cache for draw primitive.
+	/// 
 	/// @remark
 	///   To scissor for all primitives in view see `bgfx::setViewScissor`.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_cache">Index in scissor cache.</param>
@@ -3709,7 +3949,9 @@ public static partial class bgfx
 	
 	/// <summary>
 	/// Reserve matrices in internal matrix cache.
+	/// 
 	/// @attention Pointer returned can be modified until `bgfx::frame` is called.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_transform">Pointer to `Transform` structure.</param>
@@ -3728,6 +3970,35 @@ public static partial class bgfx
 	///
 	[DllImport(DllName, EntryPoint="bgfx_encoder_set_uniform", CallingConvention = CallingConvention.Cdecl)]
 	public static extern unsafe void encoder_set_uniform(Encoder* _this, UniformHandle _handle, void* _value, ushort _num);
+	
+	/// <summary>
+	/// Set shader uniform parameter for view.
+	/// 
+	/// @attention Uniform must be created with `bgfx::UniformFreq::View` argument.
+	/// 
+	/// </summary>
+	///
+	/// <param name="_id">View id.</param>
+	/// <param name="_handle">Uniform.</param>
+	/// <param name="_value">Pointer to uniform data.</param>
+	/// <param name="_num">Number of elements. Passing `UINT16_MAX` will use the _num passed on uniform creation.</param>
+	///
+	[DllImport(DllName, EntryPoint="bgfx_set_view_uniform", CallingConvention = CallingConvention.Cdecl)]
+	public static extern unsafe void set_view_uniform(ushort _id, UniformHandle _handle, void* _value, ushort _num);
+	
+	/// <summary>
+	/// Set shader uniform parameter for frame.
+	/// 
+	/// @attention Uniform must be created with `bgfx::UniformFreq::View` argument.
+	/// 
+	/// </summary>
+	///
+	/// <param name="_handle">Uniform.</param>
+	/// <param name="_value">Pointer to uniform data.</param>
+	/// <param name="_num">Number of elements. Passing `UINT16_MAX` will use the _num passed on uniform creation.</param>
+	///
+	[DllImport(DllName, EntryPoint="bgfx_set_frame_uniform", CallingConvention = CallingConvention.Cdecl)]
+	public static extern unsafe void set_frame_uniform(UniformHandle _handle, void* _value, ushort _num);
 	
 	/// <summary>
 	/// Set index buffer for draw primitive.
@@ -3799,6 +4070,16 @@ public static partial class bgfx
 	[DllImport(DllName, EntryPoint="bgfx_encoder_set_dynamic_vertex_buffer", CallingConvention = CallingConvention.Cdecl)]
 	public static extern unsafe void encoder_set_dynamic_vertex_buffer(Encoder* _this, byte _stream, DynamicVertexBufferHandle _handle, uint _startVertex, uint _numVertices);
 	
+	/// <summary>
+	/// Set vertex buffer for draw primitive.
+	/// </summary>
+	///
+	/// <param name="_stream">Vertex stream.</param>
+	/// <param name="_handle">Dynamic vertex buffer.</param>
+	/// <param name="_startVertex">First vertex to render.</param>
+	/// <param name="_numVertices">Number of vertices to render.</param>
+	/// <param name="_layoutHandle">Vertex layout for aliasing vertex buffer. If invalid handle is used, vertex layout used for creation of vertex buffer will be used.</param>
+	///
 	[DllImport(DllName, EntryPoint="bgfx_encoder_set_dynamic_vertex_buffer_with_layout", CallingConvention = CallingConvention.Cdecl)]
 	public static extern unsafe void encoder_set_dynamic_vertex_buffer_with_layout(Encoder* _this, byte _stream, DynamicVertexBufferHandle _handle, uint _startVertex, uint _numVertices, VertexLayoutHandle _layoutHandle);
 	
@@ -3830,7 +4111,9 @@ public static partial class bgfx
 	/// <summary>
 	/// Set number of vertices for auto generated vertices use in conjunction
 	/// with gl_VertexID.
+	/// 
 	/// @attention Availability depends on: `BGFX_CAPS_VERTEX_ID`.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_numVertices">Number of vertices.</param>
@@ -3874,8 +4157,12 @@ public static partial class bgfx
 	/// <summary>
 	/// Set number of instances for auto generated instances use in conjunction
 	/// with gl_InstanceID.
+	/// 
 	/// @attention Availability depends on: `BGFX_CAPS_VERTEX_ID`.
+	/// 
 	/// </summary>
+	///
+	/// <param name="_numInstances">Number of instances.</param>
 	///
 	[DllImport(DllName, EntryPoint="bgfx_encoder_set_instance_count", CallingConvention = CallingConvention.Cdecl)]
 	public static extern unsafe void encoder_set_instance_count(Encoder* _this, uint _numInstances);
@@ -3897,8 +4184,10 @@ public static partial class bgfx
 	/// will be applied but no geometry will be submitted. Useful in cases
 	/// when no other draw/compute primitive is submitted to view, but it's
 	/// desired to execute clear view.
+	/// 
 	/// @remark
 	///   These empty draw calls will sort before ordinary draw calls.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_id">View id.</param>
@@ -3934,7 +4223,9 @@ public static partial class bgfx
 	/// <summary>
 	/// Submit primitive for rendering with index and instance data info from
 	/// indirect buffer.
+	/// 
 	/// @attention Availability depends on: `BGFX_CAPS_DRAW_INDIRECT`.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_id">View id.</param>
@@ -3951,7 +4242,9 @@ public static partial class bgfx
 	/// <summary>
 	/// Submit primitive for rendering with index and instance data info and
 	/// draw count from indirect buffers.
+	/// 
 	/// @attention Availability depends on: `BGFX_CAPS_DRAW_INDIRECT_COUNT`.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_id">View id.</param>
@@ -4074,8 +4367,10 @@ public static partial class bgfx
 	
 	/// <summary>
 	/// Blit 2D texture region between two 2D textures.
+	/// 
 	/// @attention Destination texture must be created with `BGFX_TEXTURE_BLIT_DST` flag.
 	/// @attention Availability depends on: `BGFX_CAPS_TEXTURE_BLIT`.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_id">View id.</param>
@@ -4098,9 +4393,11 @@ public static partial class bgfx
 	
 	/// <summary>
 	/// Request screen shot of window back buffer.
+	/// 
 	/// @remarks
 	///   `bgfx::CallbackI::screenShot` must be implemented.
 	/// @attention Frame buffer handle must be created with OS' target native window handle.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_handle">Frame buffer handle. If handle is `BGFX_INVALID_HANDLE` request will be made for main window back buffer.</param>
@@ -4111,13 +4408,16 @@ public static partial class bgfx
 	
 	/// <summary>
 	/// Render frame.
+	/// 
 	/// @attention `bgfx::renderFrame` is blocking call. It waits for
 	///   `bgfx::frame` to be called from API thread to process frame.
 	///   If timeout value is passed call will timeout and return even
 	///   if `bgfx::frame` is not called.
+	/// 
 	/// @warning This call should be only used on platforms that don't
 	///   allow creating separate rendering thread. If it is called before
 	///   to bgfx::init, render thread won't be created by bgfx::init call.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_msecs">Timeout in milliseconds.</param>
@@ -4127,7 +4427,9 @@ public static partial class bgfx
 	
 	/// <summary>
 	/// Set platform data.
+	/// 
 	/// @warning Must be called before `bgfx::init`.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_data">Platform data.</param>
@@ -4137,9 +4439,12 @@ public static partial class bgfx
 	
 	/// <summary>
 	/// Get internal data for interop.
+	/// 
 	/// @attention It's expected you understand some bgfx internals before you
 	///   use this call.
+	/// 
 	/// @warning Must be called only on render thread.
+	/// 
 	/// </summary>
 	///
 	[DllImport(DllName, EntryPoint="bgfx_get_internal_data", CallingConvention = CallingConvention.Cdecl)]
@@ -4148,9 +4453,12 @@ public static partial class bgfx
 	/// <summary>
 	/// Override internal texture with externally created texture. Previously
 	/// created internal texture will released.
+	/// 
 	/// @attention It's expected you understand some bgfx internals before you
 	///   use this call.
+	/// 
 	/// @warning Must be called only on render thread.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_handle">Texture handle.</param>
@@ -4163,11 +4471,15 @@ public static partial class bgfx
 	/// <summary>
 	/// Override internal texture by creating new texture. Previously created
 	/// internal texture will released.
+	/// 
 	/// @attention It's expected you understand some bgfx internals before you
 	///   use this call.
+	/// 
 	/// @returns Native API pointer to texture. If result is 0, texture is not created yet from the
 	///   main thread.
+	/// 
 	/// @warning Must be called only on render thread.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_handle">Texture handle.</param>
@@ -4193,6 +4505,7 @@ public static partial class bgfx
 	
 	/// <summary>
 	/// Set render states for draw primitive.
+	/// 
 	/// @remarks
 	///   1. To set up more complex states use:
 	///      `BGFX_STATE_ALPHA_REF(_ref)`,
@@ -4203,6 +4516,7 @@ public static partial class bgfx
 	///      `BGFX_STATE_BLEND_EQUATION_SEPARATE(_equationRGB, _equationA)`
 	///   2. `BGFX_STATE_BLEND_EQUATION_ADD` is set when no other blend
 	///      equation is specified.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_state">State flags. Default state for primitive type is   triangles. See: `BGFX_STATE_DEFAULT`.   - `BGFX_STATE_DEPTH_TEST_*` - Depth test function.   - `BGFX_STATE_BLEND_*` - See remark 1 about BGFX_STATE_BLEND_FUNC.   - `BGFX_STATE_BLEND_EQUATION_*` - See remark 2.   - `BGFX_STATE_CULL_*` - Backface culling mode.   - `BGFX_STATE_WRITE_*` - Enable R, G, B, A or Z write.   - `BGFX_STATE_MSAA` - Enable hardware multisample antialiasing.   - `BGFX_STATE_PT_[TRISTRIP/LINES/POINTS]` - Primitive type.</param>
@@ -4233,8 +4547,10 @@ public static partial class bgfx
 	
 	/// <summary>
 	/// Set scissor for draw primitive.
+	/// 
 	/// @remark
 	///   To scissor for all primitives in view see `bgfx::setViewScissor`.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_x">Position x from the left corner of the window.</param>
@@ -4247,8 +4563,10 @@ public static partial class bgfx
 	
 	/// <summary>
 	/// Set scissor from cache for draw primitive.
+	/// 
 	/// @remark
 	///   To scissor for all primitives in view see `bgfx::setViewScissor`.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_cache">Index in scissor cache.</param>
@@ -4279,7 +4597,9 @@ public static partial class bgfx
 	
 	/// <summary>
 	/// Reserve matrices in internal matrix cache.
+	/// 
 	/// @attention Pointer returned can be modified until `bgfx::frame` is called.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_transform">Pointer to `Transform` structure.</param>
@@ -4410,7 +4730,9 @@ public static partial class bgfx
 	/// <summary>
 	/// Set number of vertices for auto generated vertices use in conjunction
 	/// with gl_VertexID.
+	/// 
 	/// @attention Availability depends on: `BGFX_CAPS_VERTEX_ID`.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_numVertices">Number of vertices.</param>
@@ -4454,8 +4776,12 @@ public static partial class bgfx
 	/// <summary>
 	/// Set number of instances for auto generated instances use in conjunction
 	/// with gl_InstanceID.
+	/// 
 	/// @attention Availability depends on: `BGFX_CAPS_VERTEX_ID`.
+	/// 
 	/// </summary>
+	///
+	/// <param name="_numInstances">Number of instances.</param>
 	///
 	[DllImport(DllName, EntryPoint="bgfx_set_instance_count", CallingConvention = CallingConvention.Cdecl)]
 	public static extern unsafe void set_instance_count(uint _numInstances);
@@ -4475,8 +4801,10 @@ public static partial class bgfx
 	/// <summary>
 	/// Submit an empty primitive for rendering. Uniforms and draw state
 	/// will be applied but no geometry will be submitted.
+	/// 
 	/// @remark
 	///   These empty draw calls will sort before ordinary draw calls.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_id">View id.</param>
@@ -4512,7 +4840,9 @@ public static partial class bgfx
 	/// <summary>
 	/// Submit primitive for rendering with index and instance data info from
 	/// indirect buffer.
+	/// 
 	/// @attention Availability depends on: `BGFX_CAPS_DRAW_INDIRECT`.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_id">View id.</param>
@@ -4529,7 +4859,9 @@ public static partial class bgfx
 	/// <summary>
 	/// Submit primitive for rendering with index and instance data info and
 	/// draw count from indirect buffers.
+	/// 
 	/// @attention Availability depends on: `BGFX_CAPS_DRAW_INDIRECT_COUNT`.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_id">View id.</param>
@@ -4652,8 +4984,10 @@ public static partial class bgfx
 	
 	/// <summary>
 	/// Blit 2D texture region between two 2D textures.
+	/// 
 	/// @attention Destination texture must be created with `BGFX_TEXTURE_BLIT_DST` flag.
 	/// @attention Availability depends on: `BGFX_CAPS_TEXTURE_BLIT`.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_id">View id.</param>

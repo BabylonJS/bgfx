@@ -1,5 +1,5 @@
 --
--- Copyright 2010-2025 Branimir Karadzic. All rights reserved.
+-- Copyright 2010-2026 Branimir Karadzic. All rights reserved.
 -- License: https://github.com/bkaradzic/bgfx/blob/master/LICENSE
 --
 
@@ -65,7 +65,7 @@ newaction {
 		end
 
 		generate("temp.bgfx.h" ,      "../include/bgfx/c99/bgfx.h", "    ")
---		generate("temp.bgfx.hpp" ,    "../include/bgfx/bgfx.h",     "\t")
+		generate("temp.bgfx.hpp" ,    "../include/bgfx/bgfx.h",     "\t")
 		generate("temp.bgfx.idl.inl", "../src/bgfx.idl.inl",        "\t")
 		generate("temp.defines.h",    "../include/bgfx/defines.h",  "\t")
 
@@ -86,6 +86,9 @@ newaction {
 
 			local c3gen = require "bindings-c3"
 			c3gen.write(c3gen.gen(), "../bindings/c3/bgfx.c3")
+
+			local docsgen = require "docs-rst"
+			docsgen.write(docsgen.gen(), "../docs/bgfx.rst")
 		end
 
 		os.exit()
@@ -110,7 +113,7 @@ newaction {
 		f:close()
 		io.output(path.join(MODULE_DIR, "src/version.h"))
 		io.write("/*\n")
-		io.write(" * Copyright 2011-2025 Branimir Karadzic. All rights reserved.\n")
+		io.write(" * Copyright 2011-2026 Branimir Karadzic. All rights reserved.\n")
 		io.write(" * License: https://github.com/bkaradzic/bgfx/blob/master/LICENSE\n")
 		io.write(" */\n")
 		io.write("\n")

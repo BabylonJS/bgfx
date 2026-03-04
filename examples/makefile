@@ -1,5 +1,5 @@
 #
-# Copyright 2011-2025 Branimir Karadzic. All rights reserved.
+# Copyright 2011-2026 Branimir Karadzic. All rights reserved.
 # License: https://github.com/bkaradzic/bgfx/blob/master/LICENSE
 #
 
@@ -113,3 +113,5 @@ rebuild-embedded:
 	@make -s --no-print-directory rebuild -C common/imgui
 	@make -s --no-print-directory rebuild -C common/nanovg
 	@make -s --no-print-directory rebuild -C common/ps
+	@make -s --no-print-directory rebuild -C ../tools/geometryv
+	@make -s --no-print-directory rebuild -C ../tools/texturev
