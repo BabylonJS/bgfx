@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2025 Branimir Karadzic. All rights reserved.
+ * Copyright 2011-2026 Branimir Karadzic. All rights reserved.
  * License: https://github.com/bkaradzic/bgfx/blob/master/LICENSE
  */
 
@@ -11,7 +11,8 @@
 	|| BX_PLATFORM_LINUX                                                                    \
 	|| BX_PLATFORM_NX                                                                       \
 	|| BX_PLATFORM_RPI                                                                      \
-	) )
+	) )                                                                                     \
+	|| (BGFX_CONFIG_RENDERER_OPENGLES && BX_PLATFORM_WINDOWS)
 
 #define BGFX_USE_HTML5 (BGFX_CONFIG_RENDERER_OPENGLES && (0 \
 	|| BX_PLATFORM_EMSCRIPTEN                               \
@@ -420,6 +421,22 @@ typedef uint64_t GLuint64;
 #	define GL_ETC1_RGB8_OES 0x8D64
 #endif // GL_ETC1_RGB8_OES
 
+#ifndef GL_COMPRESSED_R11_EAC
+#	define GL_COMPRESSED_R11_EAC 0x9270
+#endif // GL_COMPRESSED_R11_EAC
+
+#ifndef GL_COMPRESSED_SIGNED_R11_EAC
+#	define GL_COMPRESSED_SIGNED_R11_EAC 0x9271
+#endif // GL_COMPRESSED_SIGNED_R11_EAC
+
+#ifndef GL_COMPRESSED_RG11_EAC
+#	define GL_COMPRESSED_RG11_EAC 0x9272
+#endif // GL_COMPRESSED_RG11_EAC
+
+#ifndef GL_COMPRESSED_SIGNED_RG11_EAC
+#	define GL_COMPRESSED_SIGNED_RG11_EAC 0x9273
+#endif // GL_COMPRESSED_SIGNED_RG11_EAC
+
 #ifndef GL_COMPRESSED_RGB8_ETC2
 #	define GL_COMPRESSED_RGB8_ETC2 0x9274
 #endif // GL_COMPRESSED_RGB8_ETC2
@@ -427,6 +444,10 @@ typedef uint64_t GLuint64;
 #ifndef GL_COMPRESSED_RGBA8_ETC2_EAC
 #	define GL_COMPRESSED_RGBA8_ETC2_EAC 0x9278
 #endif // GL_COMPRESSED_RGBA8_ETC2_EAC
+
+#ifndef GL_COMPRESSED_SRGB8_ALPHA8_ETC2_EAC
+#	define GL_COMPRESSED_SRGB8_ALPHA8_ETC2_EAC 0x9279
+#endif // GL_COMPRESSED_SRGB8_ALPHA8_ETC2_EAC
 
 #ifndef GL_COMPRESSED_RGB8_PUNCHTHROUGH_ALPHA1_ETC2
 #	define GL_COMPRESSED_RGB8_PUNCHTHROUGH_ALPHA1_ETC2 0x9276
@@ -1624,7 +1645,7 @@ namespace bgfx { namespace gl
 
 		bool update()
 		{
-			if (0 != m_control.available() )
+			if (0 != m_control.getNumUsed() )
 			{
 				Query& query = m_query[m_control.m_read];
 

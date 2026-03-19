@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2025 Branimir Karadzic. All rights reserved.
+ * Copyright 2010-2026 Branimir Karadzic. All rights reserved.
  * License: https://github.com/bkaradzic/bgfx/blob/master/LICENSE
  */
 
@@ -136,7 +136,7 @@ struct InputKeyboard
 
 	const uint8_t* popChar()
 	{
-		if (0 < m_ring.available() )
+		if (0 < m_ring.getNumUsed() )
 		{
 			uint8_t* utf8 = &m_char[m_ring.m_read];
 			m_ring.consume(4);

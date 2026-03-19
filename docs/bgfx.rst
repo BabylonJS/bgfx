@@ -6,9 +6,11 @@ API Reference
 
     If you're just getting started with bgfx, you might get more out of these simple walkthroughs for how to use bgfx's API:
 
-    - `Hello, bgfx! <https://dev.to/pperon/hello-bgfx-4dka>`_
-    - `bgfx-minimal-example <https://github.com/jpcy/bgfx-minimal-example#bgfx-minimal-example>`_
-    - `Using the bgfx library with C++ on Ubuntu <https://www.sandeepnambiar.com/getting-started-with-bgfx/>`_
+    - `Hello, bgfx! (tutorial) <https://dev.to/pperon/hello-bgfx-4dka>`_
+    - `bgfx-minimal-example (repo on GitHub) <https://github.com/jpcy/bgfx-minimal-example#bgfx-minimal-example>`_
+    - `Using the bgfx library with C++ on Ubuntu (tutorial) <https://www.sandeepnambiar.com/getting-started-with-bgfx/>`_
+    - `Getting started with BGFX (playlist on Youtube) <https://www.youtube.com/playlist?list=PLwFtWV3PS6y_oTOfHjbE0Zk8N9_QuQlHy>`_
+    - `Getting started with BGFX (repo on GitHub) <https://github.com/gamecoder-nz/Getting-Started-With-BGFX>`_
 
 General
 -------
@@ -65,6 +67,10 @@ Reset
 
 Frame
 *****
+
+.. doxygendefine:: BGFX_FRAME_NONE
+.. doxygendefine:: BGFX_FRAME_DEBUG_CAPTURE
+.. doxygendefine:: BGFX_FRAME_DISCARD
 
 .. doxygenfunction:: bgfx::frame
 
@@ -133,19 +139,22 @@ Available Caps
 .. doxygendefine:: BGFX_CAPS_INDEX32
 .. doxygendefine:: BGFX_CAPS_INSTANCING
 .. doxygendefine:: BGFX_CAPS_OCCLUSION_QUERY
+.. doxygendefine:: BGFX_CAPS_PRIMITIVE_ID
 .. doxygendefine:: BGFX_CAPS_RENDERER_MULTITHREADED
 .. doxygendefine:: BGFX_CAPS_SWAP_CHAIN
-.. doxygendefine:: BGFX_CAPS_TEXTURE_2D_ARRAY
-.. doxygendefine:: BGFX_CAPS_TEXTURE_3D
 .. doxygendefine:: BGFX_CAPS_TEXTURE_BLIT
-.. doxygendefine:: BGFX_CAPS_TEXTURE_COMPARE_ALL
 .. doxygendefine:: BGFX_CAPS_TEXTURE_COMPARE_LEQUAL
 .. doxygendefine:: BGFX_CAPS_TEXTURE_CUBE_ARRAY
 .. doxygendefine:: BGFX_CAPS_TEXTURE_DIRECT_ACCESS
 .. doxygendefine:: BGFX_CAPS_TEXTURE_READ_BACK
+.. doxygendefine:: BGFX_CAPS_TEXTURE_2D_ARRAY
+.. doxygendefine:: BGFX_CAPS_TEXTURE_3D
+.. doxygendefine:: BGFX_CAPS_TRANSPARENT_BACKBUFFER
+.. doxygendefine:: BGFX_CAPS_VARIABLE_RATE_SHADING
 .. doxygendefine:: BGFX_CAPS_VERTEX_ATTRIB_HALF
 .. doxygendefine:: BGFX_CAPS_VERTEX_ATTRIB_UINT10
 .. doxygendefine:: BGFX_CAPS_VERTEX_ID
+.. doxygendefine:: BGFX_CAPS_VIEWPORT_LAYER_ARRAY
 
 Statistics
 **********
@@ -242,6 +251,11 @@ A View's state is preserved between frames.
 .. doxygenfunction:: bgfx::setViewFrameBuffer
 .. doxygenfunction:: bgfx::setViewTransform
 .. doxygenfunction:: bgfx::setViewOrder
+
+.. doxygenstruct:: bgfx::ShadingRate
+    :members:
+
+.. doxygenfunction:: bgfx::setViewShadingRate
 .. doxygenfunction:: bgfx::resetView
 
 Encoder
@@ -419,6 +433,13 @@ Textures
 
 .. doxygenfunction:: bgfx::setTexture(uint8_t, UniformHandle, TextureHandle, uint32_t)
 
+Uniforms
+********
+
+.. doxygenfunction:: bgfx::setUniform
+.. doxygenfunction:: bgfx::setViewUniform
+.. doxygenfunction:: bgfx::setFrameUniform
+
 Submit
 ******
 
@@ -495,15 +516,21 @@ Shaders and Programs
 Uniforms
 ~~~~~~~~
 
-.. doxygenfunction:: bgfx::createUniform
-.. doxygenfunction:: bgfx::getUniformInfo
-.. doxygenfunction:: bgfx::destroy(UniformHandle _handle)
-
 .. doxygenstruct:: bgfx::UniformType
     :members:
 
+.. doxygenfunction:: bgfx::createUniform(const char* _name, UniformType::Enum, uint16_t)
+
+.. doxygenstruct:: bgfx::UniformFreq
+    :members:
+
+.. doxygenfunction:: bgfx::createUniform(const char* _name, UniformFreq::Enum, UniformType::Enum, uint16_t)
+
 .. doxygenstruct:: bgfx::UniformInfo
     :members:
+
+.. doxygenfunction:: bgfx::getUniformInfo
+.. doxygenfunction:: bgfx::destroy(UniformHandle _handle)
 
 Vertex Buffers
 ~~~~~~~~~~~~~~

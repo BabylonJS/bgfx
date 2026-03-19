@@ -540,6 +540,11 @@ namespace bgfx { namespace mtl
 			return false;
 		}
 
+		bool supportsVariableRasterizationRate()
+		{
+			return [m_obj supportsRasterizationRateMapWithLayerCount:1];
+		}
+
 		id<MTLLibrary> newLibraryWithData(const void* _data)
 		{
 			NSError* error;
@@ -668,6 +673,13 @@ namespace bgfx { namespace mtl
 				, [error.localizedDescription cStringUsingEncoding:NSASCIIStringEncoding]
 				);
 			return state;
+		}
+
+		id<MTLRasterizationRateMap> newRasterizationRateMapWithDescriptor(MTLRasterizationRateMapDescriptor* _descriptor)
+		{
+			return [m_obj
+				newRasterizationRateMapWithDescriptor: _descriptor
+			];
 		}
 
 		bool supportsTextureSampleCount(int32_t sampleCount)
@@ -1093,6 +1105,41 @@ namespace bgfx { namespace mtl
 
 	typedef MTLRenderPipelineReflection* RenderPipelineReflection;
 
+	typedef MTLCaptureManager* CaptureManager;
+
+	MTLCaptureManager* getSharedCaptureManager()
+	{
+		return [MTLCaptureManager sharedCaptureManager];
+	}
+
+	typedef MTLCaptureDescriptor* CaptureDescriptor;
+
+	inline MTLCaptureDescriptor* newCaptureDescriptor()
+	{
+		return [MTLCaptureDescriptor new];
+	}
+
+	typedef MTLRasterizationRateMapDescriptor* RasterizationRateMapDescriptor;
+
+	typedef MTLRasterizationRateLayerDescriptor* RasterizationRateLayerDescriptor;
+
+	inline MTLRasterizationRateLayerDescriptor* newRasterizationRateLayerDescriptor(float _rate)
+	{
+		const float rate[1] = { _rate };
+		return [[MTLRasterizationRateLayerDescriptor alloc]
+			initWithSampleCount: MTLSizeMake(1, 1, 0)
+			horizontal: rate
+			vertical: rate
+		];
+	}
+
+	typedef MTLRasterizationRateMapDescriptor* RasterizationRateMapDescriptor;
+
+	inline MTLRasterizationRateMapDescriptor* newRasterizationRateMapDescriptor()
+	{
+		return [MTLRasterizationRateMapDescriptor new];
+	}
+
 	//helper functions
 	inline void release(NSObject* _obj)
 	{
@@ -1345,30 +1392,9 @@ namespace bgfx { namespace mtl
 			}
 		}
 
-		void create(const Memory* _mem, uint64_t _flags, uint8_t _skip);
-
-		void destroy()
-		{
-			if (0 == (m_flags & BGFX_SAMPLER_INTERNAL_SHARED) )
-			{
-				MTL_RELEASE_W(m_ptr, 0);
-				MTL_RELEASE_W(m_ptrMsaa, 0);
-			}
-
-			MTL_RELEASE_W(m_ptrStencil, 0);
-
-			for (uint32_t ii = 0; ii < m_numMips; ++ii)
-			{
-				MTL_RELEASE_W(m_ptrMips[ii], 0);
-			}
-		}
-
-		void overrideInternal(uintptr_t _ptr)
-		{
-			destroy();
-			m_flags |= BGFX_SAMPLER_INTERNAL_SHARED;
-			m_ptr = id<MTLTexture>(_ptr);
-		}
+		void create(const Memory* _mem, uint64_t _flags, uint8_t _skip, uint64_t _external);
+		void destroy();
+		void overrideInternal(uintptr_t _ptr);
 
 		void update(
 			  uint8_t _side

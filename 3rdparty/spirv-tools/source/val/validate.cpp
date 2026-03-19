@@ -390,15 +390,17 @@ spv_result_t ValidateBinaryUsingContextAndValidationState(
     if (auto error = AtomicsPass(*vstate, &instruction)) return error;
     if (auto error = PrimitivesPass(*vstate, &instruction)) return error;
     if (auto error = BarriersPass(*vstate, &instruction)) return error;
-    // Group
+    if (auto error = DotProductPass(*vstate, &instruction)) return error;
+    if (auto error = GroupPass(*vstate, &instruction)) return error;
     // Device-Side Enqueue
-    // Pipe
+    if (auto error = PipePass(*vstate, &instruction)) return error;
     if (auto error = NonUniformPass(*vstate, &instruction)) return error;
 
     if (auto error = LiteralsPass(*vstate, &instruction)) return error;
     if (auto error = RayQueryPass(*vstate, &instruction)) return error;
     if (auto error = RayTracingPass(*vstate, &instruction)) return error;
     if (auto error = RayReorderNVPass(*vstate, &instruction)) return error;
+    if (auto error = RayReorderEXTPass(*vstate, &instruction)) return error;
     if (auto error = MeshShadingPass(*vstate, &instruction)) return error;
     if (auto error = TensorLayoutPass(*vstate, &instruction)) return error;
     if (auto error = TensorPass(*vstate, &instruction)) return error;
@@ -430,6 +432,7 @@ spv_result_t ValidateBinaryUsingContextAndValidationState(
     if (auto error = ValidateQCOMImageProcessingTextureUsages(*vstate, &inst))
       return error;
   }
+  if (auto error = ValidateLogicalPointers(*vstate)) return error;
 
   return SPV_SUCCESS;
 }

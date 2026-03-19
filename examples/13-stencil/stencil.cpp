@@ -288,21 +288,22 @@ struct Uniforms
 			m_lightRgbInnerR[ii][3] = 1.0f;
 		}
 
+		u_ambient            = bgfx::createUniform("u_ambient",             bgfx::UniformFreq::Frame, bgfx::UniformType::Vec4);
+		u_diffuse            = bgfx::createUniform("u_diffuse",             bgfx::UniformFreq::Frame, bgfx::UniformType::Vec4);
+		u_specular_shininess = bgfx::createUniform("u_specular_shininess",  bgfx::UniformFreq::Frame, bgfx::UniformType::Vec4);
+
 		u_params             = bgfx::createUniform("u_params",              bgfx::UniformType::Vec4);
-		u_ambient            = bgfx::createUniform("u_ambient",             bgfx::UniformType::Vec4);
-		u_diffuse            = bgfx::createUniform("u_diffuse",             bgfx::UniformType::Vec4);
-		u_specular_shininess = bgfx::createUniform("u_specular_shininess",  bgfx::UniformType::Vec4);
 		u_color              = bgfx::createUniform("u_color",               bgfx::UniformType::Vec4);
 		u_lightPosRadius     = bgfx::createUniform("u_lightPosRadius",      bgfx::UniformType::Vec4, MAX_NUM_LIGHTS);
 		u_lightRgbInnerR     = bgfx::createUniform("u_lightRgbInnerR",      bgfx::UniformType::Vec4, MAX_NUM_LIGHTS);
 	}
 
 	//call this once at initialization
-	void submitConstUniforms()
+	void submitFrameUniforms()
 	{
-		bgfx::setUniform(u_ambient,            &m_ambient);
-		bgfx::setUniform(u_diffuse,            &m_diffuse);
-		bgfx::setUniform(u_specular_shininess, &m_specular_shininess);
+		bgfx::setFrameUniform(u_ambient,            &m_ambient);
+		bgfx::setFrameUniform(u_diffuse,            &m_diffuse);
+		bgfx::setFrameUniform(u_specular_shininess, &m_specular_shininess);
 	}
 
 	//call this before each draw call
@@ -878,13 +879,13 @@ public:
 		cameraSetVerticalAngle(-0.35f);
 		cameraGetViewMtx(m_viewState.m_view);
 
-		m_timeOffset = bx::getHPCounter();
-
 		m_scene = StencilReflectionScene;
 		m_numLights       = 4;
 		m_reflectionValue = 0.8f;
 		m_updateLights    = true;
 		m_updateScene     = true;
+
+		m_frameTime.reset();
 	}
 
 	virtual int shutdown() override
@@ -923,6 +924,11 @@ public:
 	{
 		if (!entry::processEvents(m_viewState.m_width, m_viewState.m_height, m_debug, m_reset, &m_mouseState) )
 		{
+			m_frameTime.frame();
+			const float time      = bx::toSeconds<float>(m_frameTime.getDurationTime() );
+			const float deltaTime = bx::toSeconds<float>(m_frameTime.getDeltaTime() );
+			s_uniforms.m_time = time;
+
 			imguiBeginFrame(m_mouseState.m_mx
 				,  m_mouseState.m_my
 				, (m_mouseState.m_buttons[entry::MouseButton::Left  ] ? IMGUI_MBUT_LEFT   : 0)
@@ -979,7 +985,7 @@ public:
 
 			imguiEndFrame();
 
-			s_uniforms.submitConstUniforms();
+			s_uniforms.submitFrameUniforms();
 
 			// Update settings.
 			uint8_t numLights = (uint8_t)m_numLights;
@@ -988,16 +994,6 @@ public:
 			s_uniforms.m_params.m_lightCount   = float(m_numLights);
 			s_uniforms.m_params.m_lightIndex   = 0.0f;
 			s_uniforms.m_color[3]              = m_reflectionValue;
-
-			// Time.
-			int64_t now = bx::getHPCounter();
-			static int64_t last = now;
-			const int64_t frameTime = now - last;
-			last = now;
-			const double freq = double(bx::getHPFrequency() );
-			const float time = (float)( (now - m_timeOffset)/double(bx::getHPFrequency() ) );
-			const float deltaTime = float(frameTime/freq);
-			s_uniforms.m_time = time;
 
 			// Update camera.
 			cameraUpdate(deltaTime, m_mouseState, ImGui::MouseOverArea() );
@@ -1392,7 +1388,7 @@ public:
 
 	float m_lightRgbInnerR[MAX_NUM_LIGHTS][4];
 
-	int64_t m_timeOffset;
+	FrameTime m_frameTime;
 
 	enum Scene
 	{

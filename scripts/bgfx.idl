@@ -1,7 +1,7 @@
 -- vim: syntax=lua
 -- bgfx interface
 
-version(132)
+version(140)
 
 typedef "bool"
 typedef "char"
@@ -28,7 +28,7 @@ funcptr.ReleaseFn
 	.userData   "void*" --- User defined data if needed.
 
 --- Color RGB/alpha/depth write. When it's not specified write will be disabled.
-flag.StateWrite { bits = 64 , base = 1 }
+flag.StateWrite { bits = 64, base = 1 }
 	.R                        --- Enable R write.
 	.G                        --- Enable G write.
 	.B                        --- Enable B write.
@@ -223,15 +223,15 @@ flag.Debug { bits = 32 }
 	()
 
 flag.BufferComputeFormat { bits = 16, shift = 0, range = 4, base = 1 }
-	._8x1  --- 1 8-bit value
-	._8x2  --- 2 8-bit values
-	._8x4  --- 4 8-bit values
-	._16x1 --- 1 16-bit value
-	._16x2 --- 2 16-bit values
-	._16x4 --- 4 16-bit values
-	._32x1 --- 1 32-bit value
-	._32x2 --- 2 32-bit values
-	._32x4 --- 4 32-bit values
+	._8x1  --- 1 x 8-bit value
+	._8x2  --- 2 x 8-bit values
+	._8x4  --- 4 x 8-bit values
+	._16x1 --- 1 x 16-bit value
+	._16x2 --- 2 x 16-bit values
+	._16x4 --- 4 x 16-bit values
+	._32x1 --- 1 x 32-bit value
+	._32x2 --- 2 x 32-bit values
+	._32x4 --- 4 x 32-bit values
 	()
 
 flag.BufferComputeType { bits = 16, shift = 4, range = 2, base = 1 }
@@ -251,13 +251,14 @@ flag.Buffer { bits = 16, base = 8 }
 	()
 
 flag.Texture { bits = 64 }
-	.None         (0)
-	.MsaaSample   (36) --- Texture will be used for MSAA sampling.
-	.Rt           (37) --- Render target no MSAA.
-	.ComputeWrite (45) --- Texture will be used for compute write.
-	.Srgb         (46) --- Sample texture as sRGB.
-	.BlitDst      (47) --- Texture will be used as blit destination.
-	.ReadBack     (48) --- Texture will be used for read back from GPU.
+	.None           (0)
+	.MsaaSample     (36) --- Texture will be used for MSAA sampling.
+	.Rt             (37) --- Render target no MSAA.
+	.ComputeWrite   (45) --- Texture will be used for compute write.
+	.Srgb           (46) --- Sample texture as sRGB.
+	.BlitDst        (47) --- Texture will be used as blit destination.
+	.ReadBack       (48) --- Texture will be used for read back from GPU.
+	.ExternalShared (49) --- Texture is shared with other device or other process.
 	()
 
 flag.TextureRtMsaa { bits = 64, shift = 36, range = 3 , base = 2 }
@@ -388,10 +389,13 @@ flag.Caps { bits = 64, base = 1, name = "Caps" }
 	.TextureCompareReserved
 	.TextureCubeArray       --- Cubemap texture array is supported.
 	.TextureDirectAccess    --- CPU direct access to GPU texture memory.
+	.TextureExternal        --- External texture is supported.
+	.TextureExternalShared  --- External shared texture is supported.
 	.TextureReadBack        --- Read-back texture is supported.
 	.Texture_2dArray        --- 2D texture array is supported.
 	.Texture_3d             --- 3D textures are supported.
 	.TransparentBackbuffer  --- Transparent back buffer supported.
+	.VariableRateShading    --- Variable Rate Shading
 	.VertexAttribHalf       --- Vertex attribute half-float is supported.
 	.VertexAttribUint10     --- Vertex attribute 10_10_10_2 is supported.
 	.VertexId               --- Rendering with VertexID only is supported.
@@ -419,6 +423,7 @@ flag.CapsFormat { bits = 32 }
 	.TextureFramebufferMsaa  --- Texture format can be used as MSAA frame buffer.
 	.TextureMsaa             --- Texture can be sampled as MSAA.
 	.TextureMipAutogen       --- Texture format supports auto-generated mips.
+	.TextureBackbuffer       --- Texture format can be used as back buffer format.
 	()
 
 flag.Resolve { bits = 8 }
@@ -446,6 +451,12 @@ flag.CubeMap { bits = 8, const }
 	.NegativeZ (0x05) --- Cubemap -z.
 	()
 
+flag.Frame { bits = 8 }
+	.None         --- No frame flags.
+	.DebugCapture --- Capture frame with graphics debugger.
+	.Discard      --- Discard all draw calls.
+	()
+
 --- Fatal error enum.
 enum.Fatal { underscore, comment = "" }
 	.DebugCheck
@@ -467,6 +478,7 @@ enum.RendererType { comment = "Renderer types:" }
 	.OpenGLES   --- OpenGL ES 2.0+
 	.OpenGL     --- OpenGL 2.1+
 	.Vulkan     --- Vulkan
+	.WebGPU     --- WebGPU
 	()
 
 --- Access mode enum.
@@ -534,6 +546,10 @@ enum.TextureFormat { comment = "Texture formats:" }
 	.ETC2      --- ETC2 RGB8
 	.ETC2A     --- ETC2 RGBA8
 	.ETC2A1    --- ETC2 RGB8A1
+	.EACR11    --- EAC R11 UNORM
+	.EACR11S   --- EAC R11 SNORM
+	.EACRG11   --- EAC RG11 UNORM
+	.EACRG11S  --- EAC RG11 SNORM
 	.PTC12     --- PVRTC1 RGB 2BPP
 	.PTC14     --- PVRTC1 RGB 4BPP
 	.PTC12A    --- PVRTC1 RGBA 2BPP
@@ -630,6 +646,13 @@ enum.UniformType          { comment = "Uniform types:" }
 	.Mat4    --- 4x4 matrix.
 	()
 
+--- Uniform frequency enum.
+enum.UniformFreq          { comment = "Uniform frequency:" }
+	.Draw    --- Changing per draw call.
+	.View    --- Changing per view.
+	.Frame   --- Changing per frame.
+	()
+
 --- Backbuffer ratio enum.
 enum.BackbufferRatio      { comment = "Backbuffer ratios:" }
 	.Equal     --- Equal to backbuffer.
@@ -689,10 +712,21 @@ enum.ViewMode { underscore, comment = "View modes:" }
 	.DepthDescending --- Sort draw call depth in descending order.
 	()
 
+--- Shading Rate.
+enum.ShadingRate { underscore, comment = "Shading rate:" }
+	.Rate1x1 --- 1x1
+	.Rate1x2 --- 1x2
+	.Rate2x1 --- 2x1
+	.Rate2x2 --- 2x2
+	.Rate2x4 --- 2x4
+	.Rate4x2 --- 4x2
+	.Rate4x4 --- 4x4
+	()
+
 --- Native window handle type.
 enum.NativeWindowHandleType { underscore, comment = "Native Window handle type:" }
-	.Default         --- Platform default handle type (X11 on Linux).
-	.Wayland      	 --- Wayland.
+	.Default --- Platform default handle type (X11 on Linux).
+	.Wayland --- Wayland.
 	()
 
 --- Render frame enum.
@@ -748,7 +782,7 @@ struct.Caps
 	.numGPUs      "uint8_t"            --- Number of enumerated GPUs.
 	.gpu          "GPU[4]"             --- Enumerated GPUs.
 	.limits       "Limits"             --- Renderer runtime limits.
-	.formats      "uint16_t[TextureFormat::Count]"
+	.formats      "uint32_t[TextureFormat::Count]"
 		--- Supported texture format capabilities flags:
 		---   - `BGFX_CAPS_FORMAT_TEXTURE_NONE` - Texture format is not supported.
 		---   - `BGFX_CAPS_FORMAT_TEXTURE_2D` - Texture format is supported.
@@ -772,6 +806,7 @@ struct.Caps
 		---   - `BGFX_CAPS_FORMAT_TEXTURE_MSAA` - Texture can be sampled as MSAA.
 		---   - `BGFX_CAPS_FORMAT_TEXTURE_MIP_AUTOGEN` - Texture format supports auto-generated
 		---     mips.
+		---   - `BGFX_CAPS_FORMAT_TEXTURE_BACKBUFFER` - Texture format can be used as back buffer format.
 
 --- Internal data.
 struct.InternalData
@@ -780,16 +815,22 @@ struct.InternalData
 
 --- Platform data.
 struct.PlatformData { ctor }
-	.ndt          "void*" 							--- Native display type (*nix specific).
-	.nwh          "void*" 							--- Native window handle. If `NULL`, bgfx will create a headless
-													--- context/device, provided the rendering API supports it.
-	.context      "void*" 							--- GL context, D3D device, or Vulkan device. If `NULL`, bgfx
-													--- will create context/device.
-	.backBuffer   "void*" 							--- GL back-buffer, or D3D render target view. If `NULL` bgfx will
-													--- create back-buffer color surface.
-	.backBufferDS "void*" 							--- Backbuffer depth/stencil. If `NULL`, bgfx will create a back-buffer
-													--- depth/stencil surface.
-	.type		  "NativeWindowHandleType::Enum" 	--- Handle type. Needed for platforms having more than one option.
+	.ndt "void*" --- Native display type (*nix specific).
+	.nwh "void*"
+		--- Native window handle. If `NULL`, bgfx will create a headless
+		--- context/device, provided the rendering API supports it.
+	.context "void*"
+		--- GL context, D3D device, or Vulkan device. If `NULL`, bgfx
+		--- will create context/device.
+	.queue "void*"
+		--- D3D12 Queue. If `NULL` bgfx will create queue.
+	.backBuffer "void*"
+		--- GL back-buffer, or D3D render target view. If `NULL` bgfx will
+		--- create back-buffer color surface.
+	.backBufferDS "void*"
+		--- Backbuffer depth/stencil. If `NULL`, bgfx will create a back-buffer
+		--- depth/stencil surface.
+	.type "NativeWindowHandleType::Enum" --- Handle type. Needed for platforms having more than one option.
 
 --- Backbuffer resolution and reset parameters.
 struct.Resolution { ctor }
@@ -812,34 +853,35 @@ struct.Limits { ctor, namespace = "Init" }
 
 --- Initialization parameters used by `bgfx::init`.
 struct.Init { ctor }
-	.type            "RendererType::Enum" --- Select rendering backend. When set to RendererType::Count
-	                                      --- a default rendering backend will be selected appropriate to the platform.
-	                                      --- See: `bgfx::RendererType`
+	.type         "RendererType::Enum" --- Select rendering backend. When set to RendererType::Count
+	                                   --- a default rendering backend will be selected appropriate to the platform.
+	                                   --- See: `bgfx::RendererType`
 
-	.vendorId       "uint16_t"            --- Vendor PCI ID. If set to `BGFX_PCI_ID_NONE`, discrete and integrated
-	                                      --- GPUs will be prioritised.
-	                                      ---   - `BGFX_PCI_ID_NONE` - Autoselect adapter.
-	                                      ---   - `BGFX_PCI_ID_SOFTWARE_RASTERIZER` - Software rasterizer.
-	                                      ---   - `BGFX_PCI_ID_AMD` - AMD adapter.
-	                                      ---   - `BGFX_PCI_ID_APPLE` - Apple adapter.
-	                                      ---   - `BGFX_PCI_ID_INTEL` - Intel adapter.
-	                                      ---   - `BGFX_PCI_ID_NVIDIA` - NVIDIA adapter.
-	                                      ---   - `BGFX_PCI_ID_MICROSOFT` - Microsoft adapter.
+	.vendorId     "uint16_t"           --- Vendor PCI ID. If set to `BGFX_PCI_ID_NONE`, discrete and integrated
+	                                   --- GPUs will be prioritised.
+	                                   ---   - `BGFX_PCI_ID_NONE` - Autoselect adapter.
+	                                   ---   - `BGFX_PCI_ID_SOFTWARE_RASTERIZER` - Software rasterizer.
+	                                   ---   - `BGFX_PCI_ID_AMD` - AMD adapter.
+	                                   ---   - `BGFX_PCI_ID_APPLE` - Apple adapter.
+	                                   ---   - `BGFX_PCI_ID_INTEL` - Intel adapter.
+	                                   ---   - `BGFX_PCI_ID_NVIDIA` - NVIDIA adapter.
+	                                   ---   - `BGFX_PCI_ID_MICROSOFT` - Microsoft adapter.
 
-	.deviceId       "uint16_t"            --- Device ID. If set to 0 it will select first device, or device with
-	                                      --- matching ID.
-	.capabilities   "uint64_t"            --- Capabilities initialization mask (default: UINT64_MAX).
-	.debug          "bool"                --- Enable device for debugging.
-	.profile        "bool"                --- Enable device for profiling.
-	.platformData   "PlatformData"        --- Platform data.
-	.resolution     "Resolution"          --- Backbuffer resolution and reset parameters. See: `bgfx::Resolution`.
-	.limits         "Limits"              --- Configurable runtime limits parameters.
-	.callback       "CallbackI*"          --- Provide application specific callback interface.
-	                                      --- See: `bgfx::CallbackI`
+	.deviceId     "uint16_t"           --- Device ID. If set to 0 it will select first device, or device with
+	                                   --- matching ID.
+	.capabilities "uint64_t"           --- Capabilities initialization mask (default: UINT64_MAX).
+	.debug        "bool"               --- Enable device for debugging.
+	.profile      "bool"               --- Enable device for profiling.
+	.fallback     "bool"               --- Enable fallback to next available renderer.
+	.platformData "PlatformData"       --- Platform data.
+	.resolution   "Resolution"         --- Backbuffer resolution and reset parameters. See: `bgfx::Resolution`.
+	.limits       "Limits"             --- Configurable runtime limits parameters.
+	.callback     "CallbackI*"         --- Provide application specific callback interface.
+	                                   --- See: `bgfx::CallbackI`
 
-	.allocator      "bx::AllocatorI*"     --- Custom allocator. When a custom allocator is not
-	                                      --- specified, bgfx uses the CRT allocator. Bgfx assumes
-	                                      --- custom allocator is thread safe.
+	.allocator    "bx::AllocatorI*"    --- Custom allocator. When a custom allocator is not
+	                                   --- specified, bgfx uses the CRT allocator. Bgfx assumes
+	                                   --- custom allocator is thread safe.
 
 --- Memory must be obtained by calling `bgfx::alloc`, `bgfx::copy`, or `bgfx::makeRef`.
 ---
@@ -976,7 +1018,7 @@ struct.Stats
 	.transientVbUsed         "int32_t"       --- Amount of transient vertex buffer used.
 	.transientIbUsed         "int32_t"       --- Amount of transient index buffer used.
 
-	.numPrims                "uint32_t[Topology::Count]" --- Number of primitives rendered.
+	.numPrims "uint32_t[Topology::Count]"    --- Number of primitives rendered.
 
 	.gpuMemoryMax            "int64_t"       --- Maximum available GPU memory for application.
 	.gpuMemoryUsed           "int64_t"       --- Amount of GPU memory used by the application.
@@ -1206,11 +1248,13 @@ func.reset
 --- just swaps internal buffers, kicks render thread, and returns. In
 --- singlethreaded renderer this call does frame rendering.
 func.frame
-	"uint32_t"      --- Current frame number. This might be used in conjunction with
-	                --- double/multi buffering data outside the library and passing it to
-	                --- library via `bgfx::makeRef` calls.
-	.capture "bool" --- Capture frame with graphics debugger.
-	 { default = false }
+	"uint32_t"                       --- Current frame number. This might be used in conjunction with
+	                                 --- double/multi buffering data outside the library and passing it to
+	                                 --- library via `bgfx::makeRef` calls.
+	.flags "uint8_t"                 --- Frame flags. See: `BGFX_FRAME_*` for more info.
+	 { default = "BGFX_FRAME_NONE" } ---   - `BGFX_FRAME_NONE` - No frame flag.
+	                                 ---   - `BGFX_FRAME_DEBUG_CAPTURE` - Capture frame with graphics debugger.
+	                                 ---   - `BGFX_FRAME_DISCARD` - Discard all draw calls.
 
 --- Returns current renderer backend API type.
 ---
@@ -1233,7 +1277,7 @@ func.getCaps
 --- @attention Pointer returned is valid until `bgfx::frame` is called.
 ---
 func.getStats
-	"const Stats*" -- Performance counters.
+	"const Stats*" --- Performance counters.
 
 --- Allocate buffer to pass to bgfx calls. Data will be freed inside bgfx.
 func.alloc
@@ -1687,6 +1731,8 @@ func.createTexture2D
 	.mem       "const Memory*"                 --- Texture data. If `_mem` is non-NULL, created texture will be immutable. If
 	 { default = NULL }                        --- `_mem` is NULL content of the texture is uninitialized. When `_numLayers` is more than
 	                                           --- 1, expected memory layout is texture and all mips together for each array element.
+	.external  "uint64_t"                      --- Native API pointer to texture.
+	{ default = 0 }
 
 --- Create texture with size based on back-buffer ratio. Texture will maintain ratio
 --- if back buffer resolution changes.
@@ -1723,6 +1769,8 @@ func.createTexture3D
 	.mem       "const Memory*"                 --- Texture data. If `_mem` is non-NULL, created texture will be immutable. If
 	 { default = NULL }                        --- `_mem` is NULL content of the texture is uninitialized. When `_numLayers` is more than
 	                                           --- 1, expected memory layout is texture and all mips together for each array element.
+	.external  "uint64_t"                      --- Native API pointer to texture.
+	{ default = 0 }
 
 --- Create Cube texture.
 func.createTextureCube
@@ -1741,7 +1789,8 @@ func.createTextureCube
 	                                           ---   sampling.
 	.mem       "const Memory*"                 --- Texture data. If `_mem` is non-NULL, created texture will be immutable. If
 	 { default = NULL }                        --- `_mem` is NULL content of the texture is uninitialized. When `_numLayers` is more than
-	                                           --- 1, expected memory layout is texture and all mips together for each array element.
+	.external  "uint64_t"                      --- Native API pointer to texture.
+	{ default = 0 }
 
 --- Update 2D texture.
 ---
@@ -1968,6 +2017,41 @@ func.createUniform
 	.num  "uint16_t"          --- Number of elements in array.
 	 { default = 1 }
 
+--- Create shader uniform parameter.
+---
+--- @remarks
+---   1. Uniform names are unique. It's valid to call `bgfx::createUniform`
+---      multiple times with the same uniform name. The library will always
+---      return the same handle, but the handle reference count will be
+---      incremented. This means that the same number of `bgfx::destroyUniform`
+---      must be called to properly destroy the uniform.
+---
+---   2. Predefined uniforms (declared in `bgfx_shader.sh`):
+---      - `u_viewRect vec4(x, y, width, height)` - view rectangle for current
+---        view, in pixels.
+---      - `u_viewTexel vec4(1.0/width, 1.0/height, undef, undef)` - inverse
+---        width and height
+---      - `u_view mat4` - view matrix
+---      - `u_invView mat4` - inverted view matrix
+---      - `u_proj mat4` - projection matrix
+---      - `u_invProj mat4` - inverted projection matrix
+---      - `u_viewProj mat4` - concatenated view projection matrix
+---      - `u_invViewProj mat4` - concatenated inverted view projection matrix
+---      - `u_model mat4[BGFX_CONFIG_MAX_BONES]` - array of model matrices.
+---      - `u_modelView mat4` - concatenated model view matrix, only first
+---        model matrix from array is used.
+---      - `u_invModelView mat4` - inverted concatenated model view matrix.
+---      - `u_modelViewProj mat4` - concatenated model view projection matrix.
+---      - `u_alphaRef float` - alpha reference value for alpha test.
+---
+func.createUniform { cname = "create_uniform_with_freq" }
+	"UniformHandle"           --- Handle to uniform object.
+	.name "const char*"       --- Uniform name in shader.
+	.freq "UniformFreq::Enum" --- Uniform change frequency (See: `bgfx::UniformFreq`).
+	.type "UniformType::Enum" --- Type of uniform (See: `bgfx::UniformType`).
+	.num  "uint16_t"          --- Number of elements in array.
+	 { default = 1 }
+
 --- Retrieve uniform info.
 func.getUniformInfo
 	"void"
@@ -2150,10 +2234,20 @@ func.setViewOrder
 	                       --- to default state.
 	 { default = NULL }
 
+--- Set view shading rate.
+---
+--- @attention Availability depends on: `BGFX_CAPS_VARIABLE_RATE_SHADING`.
+---
+func.setViewShadingRate
+	"void"
+	.id          "ViewId"            --- View id.
+	.shadingRate "ShadingRate::Enum" --- Shading rate.
+	 { default = "ShadingRate::Rate1x1" }
+
 --- Reset all view settings to default.
 func.resetView
 	"void"
-	.id "ViewId" -- _id View id.
+	.id "ViewId" --- _id View id.
 
 --- Begin submitting draw calls from thread.
 func.begin { cname = "encoder_begin" }
@@ -2265,6 +2359,31 @@ func.Encoder.allocTransform
 
 --- Set shader uniform parameter for draw primitive.
 func.Encoder.setUniform
+	"void"
+	.handle "UniformHandle" --- Uniform.
+	.value  "const void*"   --- Pointer to uniform data.
+	.num    "uint16_t"      --- Number of elements. Passing `UINT16_MAX` will
+	                        --- use the _num passed on uniform creation.
+	 { default = 1 }
+
+--- Set shader uniform parameter for view.
+---
+--- @attention Uniform must be created with `bgfx::UniformFreq::View` argument.
+---
+func.setViewUniform
+	"void"
+	.id     "ViewId"        --- View id.
+	.handle "UniformHandle" --- Uniform.
+	.value  "const void*"   --- Pointer to uniform data.
+	.num    "uint16_t"      --- Number of elements. Passing `UINT16_MAX` will
+	                        --- use the _num passed on uniform creation.
+	 { default = 1 }
+
+--- Set shader uniform parameter for frame.
+---
+--- @attention Uniform must be created with `bgfx::UniformFreq::View` argument.
+---
+func.setFrameUniform
 	"void"
 	.handle "UniformHandle" --- Uniform.
 	.value  "const void*"   --- Pointer to uniform data.
@@ -2427,7 +2546,7 @@ func.Encoder.setInstanceDataBuffer { cname = "set_instance_data_from_dynamic_ver
 ---
 func.Encoder.setInstanceCount
 	"void"
-	.numInstances "uint32_t" -- Number of instances.
+	.numInstances "uint32_t" --- Number of instances.
 
 --- Set texture stage for draw primitive.
 func.Encoder.setTexture
@@ -3003,7 +3122,7 @@ func.setInstanceDataBuffer { cname = "set_instance_data_from_dynamic_vertex_buff
 ---
 func.setInstanceCount
 	"void"
-	.numInstances "uint32_t" -- Number of instances.
+	.numInstances "uint32_t" --- Number of instances.
 
 --- Set texture stage for draw primitive.
 func.setTexture

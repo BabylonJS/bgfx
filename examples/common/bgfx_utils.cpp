@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2025 Branimir Karadzic. All rights reserved.
+ * Copyright 2011-2026 Branimir Karadzic. All rights reserved.
  * License: https://github.com/bkaradzic/bgfx/blob/master/LICENSE
  */
 
@@ -103,8 +103,8 @@ static bgfx::ShaderHandle loadShader(bx::FileReaderI* _reader, const bx::StringV
 	switch (bgfx::getRendererType() )
 	{
 	case bgfx::RendererType::Noop:
-	case bgfx::RendererType::Direct3D11:
-	case bgfx::RendererType::Direct3D12: filePath.join("dx11");  break;
+	case bgfx::RendererType::Direct3D11: filePath.join("dxbc");  break;
+	case bgfx::RendererType::Direct3D12: filePath.join("dxil");  break;
 	case bgfx::RendererType::Agc:
 	case bgfx::RendererType::Gnm:        filePath.join("pssl");  break;
 	case bgfx::RendererType::Metal:      filePath.join("metal"); break;
@@ -112,6 +112,7 @@ static bgfx::ShaderHandle loadShader(bx::FileReaderI* _reader, const bx::StringV
 	case bgfx::RendererType::OpenGL:     filePath.join("glsl");  break;
 	case bgfx::RendererType::OpenGLES:   filePath.join("essl");  break;
 	case bgfx::RendererType::Vulkan:     filePath.join("spirv"); break;
+	case bgfx::RendererType::WebGPU:     filePath.join("wgsl");  break;
 
 	case bgfx::RendererType::Count:
 		BX_ASSERT(false, "You should not be here!");

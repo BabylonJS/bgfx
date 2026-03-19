@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2025 Branimir Karadzic. All rights reserved.
+ * Copyright 2011-2026 Branimir Karadzic. All rights reserved.
  * License: https://github.com/bkaradzic/bgfx/blob/master/LICENSE
  */
 
@@ -63,6 +63,7 @@ namespace bgfx
 			OpenGLES,     //!< OpenGL ES 2.0+
 			OpenGL,       //!< OpenGL 2.1+
 			Vulkan,       //!< Vulkan
+			WebGPU,       //!< WebGPU
 
 			Count
 		};
@@ -172,6 +173,10 @@ namespace bgfx
 			ETC2,         //!< ETC2 RGB8
 			ETC2A,        //!< ETC2 RGBA8
 			ETC2A1,       //!< ETC2 RGB8A1
+			EACR11,       //!< EAC R11 UNORM
+			EACR11S,      //!< EAC R11 SNORM
+			EACRG11,      //!< EAC RG11 UNORM
+			EACRG11S,     //!< EAC RG11 SNORM
 			PTC12,        //!< PVRTC1 RGB 2BPP
 			PTC14,        //!< PVRTC1 RGB 4BPP
 			PTC12A,       //!< PVRTC1 RGBA 2BPP
@@ -281,6 +286,23 @@ namespace bgfx
 			Vec4,    //!< 4 floats vector.
 			Mat3,    //!< 3x3 matrix.
 			Mat4,    //!< 4x4 matrix.
+
+			Count
+		};
+	};
+
+	/// Uniform frequency enum.
+	///
+	/// @attention C99's equivalent binding is `bgfx_bgfx_uniform_freq_t`.
+	///
+	struct UniformFreq
+	{
+		/// Uniform frequency:
+		enum Enum
+		{
+			Draw,  //!< Changing per draw call.
+			View,  //!< Changing per view.
+			Frame, //!< Changing per frame.
 
 			Count
 		};
@@ -405,11 +427,31 @@ namespace bgfx
 		};
 	};
 
+	/// Shading Rate.
+	///
+	/// @attention C99's equivalent binding is `bgfx_bgfx_shading_rate_t`.
+	///
+	struct ShadingRate
+	{
+		/// Shading rate:
+		enum Enum
+		{
+			Rate1x1,
+			Rate1x2,
+			Rate2x1,
+			Rate2x2,
+			Rate2x4,
+			Rate4x2,
+			Rate4x4,
+
+			Count
+		};
+	};
+
 	/// Native window handle type.
 	///
 	/// @attention C99's equivalent binding is `bgfx_native_window_handle_type_t`.
 	///
-
 	struct NativeWindowHandleType
 	{
 		enum Enum
@@ -577,6 +619,7 @@ namespace bgfx
 		/// @param[in] _height Image height.
 		/// @param[in] _pitch Number of bytes to skip between the start of
 		///   each horizontal line of the image.
+		/// @param[in] _format Texture format. See: `TextureFormat::Enum`.
 		/// @param[in] _data Image data.
 		/// @param[in] _size Image size.
 		/// @param[in] _yflip If true, image origin is bottom left.
@@ -588,6 +631,7 @@ namespace bgfx
 			, uint32_t _width
 			, uint32_t _height
 			, uint32_t _pitch
+			, TextureFormat::Enum _format
 			, const void* _data
 			, uint32_t _size
 			, bool _yflip
@@ -645,6 +689,7 @@ namespace bgfx
 		                                   ///  context/device, provided the rendering API supports it.
 		void* context;                     //!< GL context, D3D device, or Vulkan device. If `NULL`, bgfx
 		                                   ///  will create context/device.
+		void* queue;                       ///
 		void* backBuffer;                  //!< GL back-buffer, or D3D render target view. If `NULL` bgfx will
 		                                   ///  create back-buffer color surface.
 		void* backBufferDS;                //!< Backbuffer depth/stencil. If `NULL`, bgfx will create a back-buffer
@@ -700,8 +745,9 @@ namespace bgfx
 
 		uint64_t capabilities; //!< Capabilities initialization mask (default: UINT64_MAX).
 
-		bool debug;   //!< Enable device for debugging.
-		bool profile; //!< Enable device for profiling.
+		bool debug;    //!< Enable device for debugging.
+		bool profile;  //!< Enable device for profiling.
+		bool fallback; //!< Enable fallback to next available renderer.
 
 		/// Platform data.
 		PlatformData platformData;
@@ -850,7 +896,8 @@ namespace bgfx
 		///   - `BGFX_CAPS_FORMAT_TEXTURE_MSAA` - Texture can be sampled as MSAA.
 		///   - `BGFX_CAPS_FORMAT_TEXTURE_MIP_AUTOGEN` - Texture format supports auto-generated
 		///     mips.
-		uint16_t formats[TextureFormat::Count];
+		///   - `BGFX_CAPS_FORMAT_TEXTURE_BACKBUFFER` - Texture format can be used as back buffer format.
+		uint32_t formats[TextureFormat::Count];
 	};
 
 	/// Transient index buffer.
@@ -2090,7 +2137,7 @@ namespace bgfx
 	/// just swaps internal buffers, kicks render thread, and returns. In
 	/// singlethreaded renderer this call does frame rendering.
 	///
-	/// @param[in] _capture Capture frame with graphics debugger.
+	/// @param[in] _flags Frame flags. See: `BGFX_FRAME_*`.
 	///
 	/// @returns Current frame number. This might be used in conjunction with
 	///   double/multi buffering data outside the library and passing it to
@@ -2098,7 +2145,7 @@ namespace bgfx
 	///
 	/// @attention C99's equivalent binding is `bgfx_frame`.
 	///
-	uint32_t frame(bool _capture = false);
+	uint32_t frame(uint8_t _flags = BGFX_FRAME_NONE);
 
 	/// Returns current renderer backend API type.
 	///
@@ -2815,6 +2862,7 @@ namespace bgfx
 	/// @param[in] _mem Texture data. If `_mem` is non-NULL, created texture will be immutable. If
 	///   `_mem` is NULL content of the texture is uninitialized. When `_numLayers` is more than
 	///   1, expected memory layout is texture and all mips together for each array element.
+	/// @param[in] _external Native API pointer to texture.
 	///
 	/// @attention C99's equivalent binding is `bgfx_create_texture_2d`.
 	///
@@ -2826,6 +2874,7 @@ namespace bgfx
 		, TextureFormat::Enum _format
 		, uint64_t _flags = BGFX_TEXTURE_NONE|BGFX_SAMPLER_NONE
 		, const Memory* _mem = NULL
+		, uint64_t _external = 0
 		);
 
 	/// Create texture with size based on back-buffer ratio. Texture will maintain ratio
@@ -2870,6 +2919,7 @@ namespace bgfx
 	///
 	/// @param[in] _mem Texture data. If `_mem` is non-NULL, created texture will be immutable. If
 	///   `_mem` is NULL content of the texture is uninitialized.
+	/// @param[in] _external Native API pointer to texture.
 	///
 	/// @attention C99's equivalent binding is `bgfx_create_texture_3d`.
 	///
@@ -2881,6 +2931,7 @@ namespace bgfx
 		, TextureFormat::Enum _format
 		, uint64_t _flags = BGFX_TEXTURE_NONE|BGFX_SAMPLER_NONE
 		, const Memory* _mem = NULL
+		, uint64_t _external = 0
 		);
 
 	/// Create Cube texture.
@@ -2900,6 +2951,7 @@ namespace bgfx
 	/// @param[in] _mem Texture data. If `_mem` is non-NULL, created texture will be immutable. If
 	///   `_mem` is NULL content of the texture is uninitialized. When `_numLayers` is more than
 	///   1, expected memory layout is texture and all mips together for each array element.
+	/// @param[in] _external Native API pointer to texture.
 	///
 	/// @attention C99's equivalent binding is `bgfx_create_texture_cube`.
 	///
@@ -2910,6 +2962,7 @@ namespace bgfx
 		, TextureFormat::Enum _format
 		, uint64_t _flags = BGFX_TEXTURE_NONE|BGFX_SAMPLER_NONE
 		, const Memory* _mem = NULL
+		, uint64_t _external = 0
 		);
 
 	/// Update 2D texture.
@@ -3261,6 +3314,48 @@ namespace bgfx
 		, uint16_t _num = 1
 		);
 
+	/// Create shader uniform parameter.
+	///
+	/// @param[in] _name Uniform name in shader.
+	/// @param[in] _freq Uniform change frequency (See: `bgfx::UniformFreq`).
+	/// @param[in] _type Type of uniform (See: `bgfx::UniformType`).
+	/// @param[in] _num Number of elements in array.
+	///
+	/// @returns Handle to uniform object.
+	///
+	/// @remarks
+	///   1. Uniform names are unique. It's valid to call `bgfx::createUniform`
+	///      multiple times with the same uniform name. The library will always
+	///      return the same handle, but the handle reference count will be
+	///      incremented. This means that the same number of `bgfx::destroyUniform`
+	///      must be called to properly destroy the uniform.
+	///   2. Predefined uniforms (declared in `bgfx_shader.sh`):
+	///      - `u_viewRect vec4(x, y, width, height)` - view rectangle for current
+	///        view, in pixels.
+	///      - `u_viewTexel vec4(1.0/width, 1.0/height, undef, undef)` - inverse
+	///        width and height
+	///      - `u_view mat4` - view matrix
+	///      - `u_invView mat4` - inverted view matrix
+	///      - `u_proj mat4` - projection matrix
+	///      - `u_invProj mat4` - inverted projection matrix
+	///      - `u_viewProj mat4` - concatenated view projection matrix
+	///      - `u_invViewProj mat4` - concatenated inverted view projection matrix
+	///      - `u_model mat4[BGFX_CONFIG_MAX_BONES]` - array of model matrices.
+	///      - `u_modelView mat4` - concatenated model view matrix, only first
+	///        model matrix from array is used.
+	///      - `u_invModelView mat4` - inverted concatenated model view matrix.
+	///      - `u_modelViewProj mat4` - concatenated model view projection matrix.
+	///      - `u_alphaRef float` - alpha reference value for alpha test.
+	///
+	/// @attention C99's equivalent binding is `bgfx_create_uniform_with_freq`.
+	///
+	UniformHandle createUniform(
+		  const char* _name
+		, UniformFreq::Enum _freq
+		, UniformType::Enum _type
+		, uint16_t _num = 1
+		);
+
 	/// Retrieve uniform info.
 	///
 	/// @param[in] _handle Handle to uniform object.
@@ -3549,6 +3644,19 @@ namespace bgfx
 		, const ViewId* _remap = NULL
 		);
 
+	/// Set view shading rate.
+	///
+	/// @param[in] _id View id.
+	/// @param[in] _shadingRate Shading rate.
+	///
+	/// @attention Availability depends on: `BGFX_CAPS_VARIABLE_RATE_SHADING`.
+	/// @attention C99's equivalent binding is `bgfx_set_view_shading_rate`.
+	///
+	void setViewShadingRate(
+		  ViewId _id
+		, ShadingRate::Enum _shadingRate = ShadingRate::Rate1x1
+		);
+
 	/// Reset all view settings to default.
 	///
 	/// @param[in] _id View id.
@@ -3704,6 +3812,40 @@ namespace bgfx
 	/// @attention C99's equivalent binding is `bgfx_set_uniform`.
 	///
 	void setUniform(
+		  UniformHandle _handle
+		, const void* _value
+		, uint16_t _num = 1
+		);
+
+	/// Set shader uniform parameter for view.
+	///
+	/// @param[in] _id View id.
+	/// @param[in] _handle Uniform.
+	/// @param[in] _value Pointer to uniform data.
+	/// @param[in] _num Number of elements. Passing `UINT16_MAX` will
+	///  use the _num passed on uniform creation.
+	///
+	/// @attention Uniform must be created with `bgfx::UniformFreq::View` argument.
+	/// @attention C99's equivalent binding is `bgfx_set_view_uniform`.
+	///
+	void setViewUniform(
+		  ViewId _id
+		, UniformHandle _handle
+		, const void* _value
+		, uint16_t _num = 1
+		);
+
+	/// Set shader uniform parameter for frame.
+	///
+	/// @param[in] _handle Uniform.
+	/// @param[in] _value Pointer to uniform data.
+	/// @param[in] _num Number of elements. Passing `UINT16_MAX` will
+	///  use the _num passed on uniform creation.
+	///
+	/// @attention Uniform must be created with `bgfx::UniformFreq::View` argument.
+	/// @attention C99's equivalent binding is `bgfx_set_frame_uniform`.
+	///
+	void setFrameUniform(
 		  UniformHandle _handle
 		, const void* _value
 		, uint16_t _num = 1

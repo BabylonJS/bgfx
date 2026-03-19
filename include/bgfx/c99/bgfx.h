@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2025 Branimir Karadzic. All rights reserved.
+ * Copyright 2011-2026 Branimir Karadzic. All rights reserved.
  * License: https://github.com/bkaradzic/bgfx/blob/master/LICENSE
  */
 
@@ -90,6 +90,7 @@ typedef enum bgfx_renderer_type
     BGFX_RENDERER_TYPE_OPENGLES,              /** ( 7) OpenGL ES 2.0+                 */
     BGFX_RENDERER_TYPE_OPENGL,                /** ( 8) OpenGL 2.1+                    */
     BGFX_RENDERER_TYPE_VULKAN,                /** ( 9) Vulkan                         */
+    BGFX_RENDERER_TYPE_WEBGPU,                /** (10) WebGPU                         */
 
     BGFX_RENDERER_TYPE_COUNT
 
@@ -184,91 +185,95 @@ typedef enum bgfx_texture_format
     BGFX_TEXTURE_FORMAT_ETC2,                 /** ( 8) ETC2 RGB8                      */
     BGFX_TEXTURE_FORMAT_ETC2A,                /** ( 9) ETC2 RGBA8                     */
     BGFX_TEXTURE_FORMAT_ETC2A1,               /** (10) ETC2 RGB8A1                    */
-    BGFX_TEXTURE_FORMAT_PTC12,                /** (11) PVRTC1 RGB 2BPP                */
-    BGFX_TEXTURE_FORMAT_PTC14,                /** (12) PVRTC1 RGB 4BPP                */
-    BGFX_TEXTURE_FORMAT_PTC12A,               /** (13) PVRTC1 RGBA 2BPP               */
-    BGFX_TEXTURE_FORMAT_PTC14A,               /** (14) PVRTC1 RGBA 4BPP               */
-    BGFX_TEXTURE_FORMAT_PTC22,                /** (15) PVRTC2 RGBA 2BPP               */
-    BGFX_TEXTURE_FORMAT_PTC24,                /** (16) PVRTC2 RGBA 4BPP               */
-    BGFX_TEXTURE_FORMAT_ATC,                  /** (17) ATC RGB 4BPP                   */
-    BGFX_TEXTURE_FORMAT_ATCE,                 /** (18) ATCE RGBA 8 BPP explicit alpha */
-    BGFX_TEXTURE_FORMAT_ATCI,                 /** (19) ATCI RGBA 8 BPP interpolated alpha */
-    BGFX_TEXTURE_FORMAT_ASTC4X4,              /** (20) ASTC 4x4 8.0 BPP               */
-    BGFX_TEXTURE_FORMAT_ASTC5X4,              /** (21) ASTC 5x4 6.40 BPP              */
-    BGFX_TEXTURE_FORMAT_ASTC5X5,              /** (22) ASTC 5x5 5.12 BPP              */
-    BGFX_TEXTURE_FORMAT_ASTC6X5,              /** (23) ASTC 6x5 4.27 BPP              */
-    BGFX_TEXTURE_FORMAT_ASTC6X6,              /** (24) ASTC 6x6 3.56 BPP              */
-    BGFX_TEXTURE_FORMAT_ASTC8X5,              /** (25) ASTC 8x5 3.20 BPP              */
-    BGFX_TEXTURE_FORMAT_ASTC8X6,              /** (26) ASTC 8x6 2.67 BPP              */
-    BGFX_TEXTURE_FORMAT_ASTC8X8,              /** (27) ASTC 8x8 2.00 BPP              */
-    BGFX_TEXTURE_FORMAT_ASTC10X5,             /** (28) ASTC 10x5 2.56 BPP             */
-    BGFX_TEXTURE_FORMAT_ASTC10X6,             /** (29) ASTC 10x6 2.13 BPP             */
-    BGFX_TEXTURE_FORMAT_ASTC10X8,             /** (30) ASTC 10x8 1.60 BPP             */
-    BGFX_TEXTURE_FORMAT_ASTC10X10,            /** (31) ASTC 10x10 1.28 BPP            */
-    BGFX_TEXTURE_FORMAT_ASTC12X10,            /** (32) ASTC 12x10 1.07 BPP            */
-    BGFX_TEXTURE_FORMAT_ASTC12X12,            /** (33) ASTC 12x12 0.89 BPP            */
-    BGFX_TEXTURE_FORMAT_UNKNOWN,              /** (34) Compressed formats above.      */
-    BGFX_TEXTURE_FORMAT_R1,                   /** (35)                                */
-    BGFX_TEXTURE_FORMAT_A8,                   /** (36)                                */
-    BGFX_TEXTURE_FORMAT_R8,                   /** (37)                                */
-    BGFX_TEXTURE_FORMAT_R8I,                  /** (38)                                */
-    BGFX_TEXTURE_FORMAT_R8U,                  /** (39)                                */
-    BGFX_TEXTURE_FORMAT_R8S,                  /** (40)                                */
-    BGFX_TEXTURE_FORMAT_R16,                  /** (41)                                */
-    BGFX_TEXTURE_FORMAT_R16I,                 /** (42)                                */
-    BGFX_TEXTURE_FORMAT_R16U,                 /** (43)                                */
-    BGFX_TEXTURE_FORMAT_R16F,                 /** (44)                                */
-    BGFX_TEXTURE_FORMAT_R16S,                 /** (45)                                */
-    BGFX_TEXTURE_FORMAT_R32I,                 /** (46)                                */
-    BGFX_TEXTURE_FORMAT_R32U,                 /** (47)                                */
-    BGFX_TEXTURE_FORMAT_R32F,                 /** (48)                                */
-    BGFX_TEXTURE_FORMAT_RG8,                  /** (49)                                */
-    BGFX_TEXTURE_FORMAT_RG8I,                 /** (50)                                */
-    BGFX_TEXTURE_FORMAT_RG8U,                 /** (51)                                */
-    BGFX_TEXTURE_FORMAT_RG8S,                 /** (52)                                */
-    BGFX_TEXTURE_FORMAT_RG16,                 /** (53)                                */
-    BGFX_TEXTURE_FORMAT_RG16I,                /** (54)                                */
-    BGFX_TEXTURE_FORMAT_RG16U,                /** (55)                                */
-    BGFX_TEXTURE_FORMAT_RG16F,                /** (56)                                */
-    BGFX_TEXTURE_FORMAT_RG16S,                /** (57)                                */
-    BGFX_TEXTURE_FORMAT_RG32I,                /** (58)                                */
-    BGFX_TEXTURE_FORMAT_RG32U,                /** (59)                                */
-    BGFX_TEXTURE_FORMAT_RG32F,                /** (60)                                */
-    BGFX_TEXTURE_FORMAT_RGB8,                 /** (61)                                */
-    BGFX_TEXTURE_FORMAT_RGB8I,                /** (62)                                */
-    BGFX_TEXTURE_FORMAT_RGB8U,                /** (63)                                */
-    BGFX_TEXTURE_FORMAT_RGB8S,                /** (64)                                */
-    BGFX_TEXTURE_FORMAT_RGB9E5F,              /** (65)                                */
-    BGFX_TEXTURE_FORMAT_BGRA8,                /** (66)                                */
-    BGFX_TEXTURE_FORMAT_RGBA8,                /** (67)                                */
-    BGFX_TEXTURE_FORMAT_RGBA8I,               /** (68)                                */
-    BGFX_TEXTURE_FORMAT_RGBA8U,               /** (69)                                */
-    BGFX_TEXTURE_FORMAT_RGBA8S,               /** (70)                                */
-    BGFX_TEXTURE_FORMAT_RGBA16,               /** (71)                                */
-    BGFX_TEXTURE_FORMAT_RGBA16I,              /** (72)                                */
-    BGFX_TEXTURE_FORMAT_RGBA16U,              /** (73)                                */
-    BGFX_TEXTURE_FORMAT_RGBA16F,              /** (74)                                */
-    BGFX_TEXTURE_FORMAT_RGBA16S,              /** (75)                                */
-    BGFX_TEXTURE_FORMAT_RGBA32I,              /** (76)                                */
-    BGFX_TEXTURE_FORMAT_RGBA32U,              /** (77)                                */
-    BGFX_TEXTURE_FORMAT_RGBA32F,              /** (78)                                */
-    BGFX_TEXTURE_FORMAT_B5G6R5,               /** (79)                                */
-    BGFX_TEXTURE_FORMAT_R5G6B5,               /** (80)                                */
-    BGFX_TEXTURE_FORMAT_BGRA4,                /** (81)                                */
-    BGFX_TEXTURE_FORMAT_RGBA4,                /** (82)                                */
-    BGFX_TEXTURE_FORMAT_BGR5A1,               /** (83)                                */
-    BGFX_TEXTURE_FORMAT_RGB5A1,               /** (84)                                */
-    BGFX_TEXTURE_FORMAT_RGB10A2,              /** (85)                                */
-    BGFX_TEXTURE_FORMAT_RG11B10F,             /** (86)                                */
-    BGFX_TEXTURE_FORMAT_UNKNOWNDEPTH,         /** (87) Depth formats below.           */
-    BGFX_TEXTURE_FORMAT_D16,                  /** (88)                                */
-    BGFX_TEXTURE_FORMAT_D24,                  /** (89)                                */
-    BGFX_TEXTURE_FORMAT_D24S8,                /** (90)                                */
-    BGFX_TEXTURE_FORMAT_D32,                  /** (91)                                */
-    BGFX_TEXTURE_FORMAT_D16F,                 /** (92)                                */
-    BGFX_TEXTURE_FORMAT_D24F,                 /** (93)                                */
-    BGFX_TEXTURE_FORMAT_D32F,                 /** (94)                                */
-    BGFX_TEXTURE_FORMAT_D0S8,                 /** (95)                                */
+    BGFX_TEXTURE_FORMAT_EACR11,               /** (11) EAC R11 UNORM                  */
+    BGFX_TEXTURE_FORMAT_EACR11S,              /** (12) EAC R11 SNORM                  */
+    BGFX_TEXTURE_FORMAT_EACRG11,              /** (13) EAC RG11 UNORM                 */
+    BGFX_TEXTURE_FORMAT_EACRG11S,             /** (14) EAC RG11 SNORM                 */
+    BGFX_TEXTURE_FORMAT_PTC12,                /** (15) PVRTC1 RGB 2BPP                */
+    BGFX_TEXTURE_FORMAT_PTC14,                /** (16) PVRTC1 RGB 4BPP                */
+    BGFX_TEXTURE_FORMAT_PTC12A,               /** (17) PVRTC1 RGBA 2BPP               */
+    BGFX_TEXTURE_FORMAT_PTC14A,               /** (18) PVRTC1 RGBA 4BPP               */
+    BGFX_TEXTURE_FORMAT_PTC22,                /** (19) PVRTC2 RGBA 2BPP               */
+    BGFX_TEXTURE_FORMAT_PTC24,                /** (20) PVRTC2 RGBA 4BPP               */
+    BGFX_TEXTURE_FORMAT_ATC,                  /** (21) ATC RGB 4BPP                   */
+    BGFX_TEXTURE_FORMAT_ATCE,                 /** (22) ATCE RGBA 8 BPP explicit alpha */
+    BGFX_TEXTURE_FORMAT_ATCI,                 /** (23) ATCI RGBA 8 BPP interpolated alpha */
+    BGFX_TEXTURE_FORMAT_ASTC4X4,              /** (24) ASTC 4x4 8.0 BPP               */
+    BGFX_TEXTURE_FORMAT_ASTC5X4,              /** (25) ASTC 5x4 6.40 BPP              */
+    BGFX_TEXTURE_FORMAT_ASTC5X5,              /** (26) ASTC 5x5 5.12 BPP              */
+    BGFX_TEXTURE_FORMAT_ASTC6X5,              /** (27) ASTC 6x5 4.27 BPP              */
+    BGFX_TEXTURE_FORMAT_ASTC6X6,              /** (28) ASTC 6x6 3.56 BPP              */
+    BGFX_TEXTURE_FORMAT_ASTC8X5,              /** (29) ASTC 8x5 3.20 BPP              */
+    BGFX_TEXTURE_FORMAT_ASTC8X6,              /** (30) ASTC 8x6 2.67 BPP              */
+    BGFX_TEXTURE_FORMAT_ASTC8X8,              /** (31) ASTC 8x8 2.00 BPP              */
+    BGFX_TEXTURE_FORMAT_ASTC10X5,             /** (32) ASTC 10x5 2.56 BPP             */
+    BGFX_TEXTURE_FORMAT_ASTC10X6,             /** (33) ASTC 10x6 2.13 BPP             */
+    BGFX_TEXTURE_FORMAT_ASTC10X8,             /** (34) ASTC 10x8 1.60 BPP             */
+    BGFX_TEXTURE_FORMAT_ASTC10X10,            /** (35) ASTC 10x10 1.28 BPP            */
+    BGFX_TEXTURE_FORMAT_ASTC12X10,            /** (36) ASTC 12x10 1.07 BPP            */
+    BGFX_TEXTURE_FORMAT_ASTC12X12,            /** (37) ASTC 12x12 0.89 BPP            */
+    BGFX_TEXTURE_FORMAT_UNKNOWN,              /** (38) Compressed formats above.      */
+    BGFX_TEXTURE_FORMAT_R1,                   /** (39)                                */
+    BGFX_TEXTURE_FORMAT_A8,                   /** (40)                                */
+    BGFX_TEXTURE_FORMAT_R8,                   /** (41)                                */
+    BGFX_TEXTURE_FORMAT_R8I,                  /** (42)                                */
+    BGFX_TEXTURE_FORMAT_R8U,                  /** (43)                                */
+    BGFX_TEXTURE_FORMAT_R8S,                  /** (44)                                */
+    BGFX_TEXTURE_FORMAT_R16,                  /** (45)                                */
+    BGFX_TEXTURE_FORMAT_R16I,                 /** (46)                                */
+    BGFX_TEXTURE_FORMAT_R16U,                 /** (47)                                */
+    BGFX_TEXTURE_FORMAT_R16F,                 /** (48)                                */
+    BGFX_TEXTURE_FORMAT_R16S,                 /** (49)                                */
+    BGFX_TEXTURE_FORMAT_R32I,                 /** (50)                                */
+    BGFX_TEXTURE_FORMAT_R32U,                 /** (51)                                */
+    BGFX_TEXTURE_FORMAT_R32F,                 /** (52)                                */
+    BGFX_TEXTURE_FORMAT_RG8,                  /** (53)                                */
+    BGFX_TEXTURE_FORMAT_RG8I,                 /** (54)                                */
+    BGFX_TEXTURE_FORMAT_RG8U,                 /** (55)                                */
+    BGFX_TEXTURE_FORMAT_RG8S,                 /** (56)                                */
+    BGFX_TEXTURE_FORMAT_RG16,                 /** (57)                                */
+    BGFX_TEXTURE_FORMAT_RG16I,                /** (58)                                */
+    BGFX_TEXTURE_FORMAT_RG16U,                /** (59)                                */
+    BGFX_TEXTURE_FORMAT_RG16F,                /** (60)                                */
+    BGFX_TEXTURE_FORMAT_RG16S,                /** (61)                                */
+    BGFX_TEXTURE_FORMAT_RG32I,                /** (62)                                */
+    BGFX_TEXTURE_FORMAT_RG32U,                /** (63)                                */
+    BGFX_TEXTURE_FORMAT_RG32F,                /** (64)                                */
+    BGFX_TEXTURE_FORMAT_RGB8,                 /** (65)                                */
+    BGFX_TEXTURE_FORMAT_RGB8I,                /** (66)                                */
+    BGFX_TEXTURE_FORMAT_RGB8U,                /** (67)                                */
+    BGFX_TEXTURE_FORMAT_RGB8S,                /** (68)                                */
+    BGFX_TEXTURE_FORMAT_RGB9E5F,              /** (69)                                */
+    BGFX_TEXTURE_FORMAT_BGRA8,                /** (70)                                */
+    BGFX_TEXTURE_FORMAT_RGBA8,                /** (71)                                */
+    BGFX_TEXTURE_FORMAT_RGBA8I,               /** (72)                                */
+    BGFX_TEXTURE_FORMAT_RGBA8U,               /** (73)                                */
+    BGFX_TEXTURE_FORMAT_RGBA8S,               /** (74)                                */
+    BGFX_TEXTURE_FORMAT_RGBA16,               /** (75)                                */
+    BGFX_TEXTURE_FORMAT_RGBA16I,              /** (76)                                */
+    BGFX_TEXTURE_FORMAT_RGBA16U,              /** (77)                                */
+    BGFX_TEXTURE_FORMAT_RGBA16F,              /** (78)                                */
+    BGFX_TEXTURE_FORMAT_RGBA16S,              /** (79)                                */
+    BGFX_TEXTURE_FORMAT_RGBA32I,              /** (80)                                */
+    BGFX_TEXTURE_FORMAT_RGBA32U,              /** (81)                                */
+    BGFX_TEXTURE_FORMAT_RGBA32F,              /** (82)                                */
+    BGFX_TEXTURE_FORMAT_B5G6R5,               /** (83)                                */
+    BGFX_TEXTURE_FORMAT_R5G6B5,               /** (84)                                */
+    BGFX_TEXTURE_FORMAT_BGRA4,                /** (85)                                */
+    BGFX_TEXTURE_FORMAT_RGBA4,                /** (86)                                */
+    BGFX_TEXTURE_FORMAT_BGR5A1,               /** (87)                                */
+    BGFX_TEXTURE_FORMAT_RGB5A1,               /** (88)                                */
+    BGFX_TEXTURE_FORMAT_RGB10A2,              /** (89)                                */
+    BGFX_TEXTURE_FORMAT_RG11B10F,             /** (90)                                */
+    BGFX_TEXTURE_FORMAT_UNKNOWNDEPTH,         /** (91) Depth formats below.           */
+    BGFX_TEXTURE_FORMAT_D16,                  /** (92)                                */
+    BGFX_TEXTURE_FORMAT_D24,                  /** (93)                                */
+    BGFX_TEXTURE_FORMAT_D24S8,                /** (94)                                */
+    BGFX_TEXTURE_FORMAT_D32,                  /** (95)                                */
+    BGFX_TEXTURE_FORMAT_D16F,                 /** (96)                                */
+    BGFX_TEXTURE_FORMAT_D24F,                 /** (97)                                */
+    BGFX_TEXTURE_FORMAT_D32F,                 /** (98)                                */
+    BGFX_TEXTURE_FORMAT_D0S8,                 /** (99)                                */
 
     BGFX_TEXTURE_FORMAT_COUNT
 
@@ -289,6 +294,20 @@ typedef enum bgfx_uniform_type
     BGFX_UNIFORM_TYPE_COUNT
 
 } bgfx_uniform_type_t;
+
+/**
+ * Uniform frequency enum.
+ *
+ */
+typedef enum bgfx_uniform_freq
+{
+    BGFX_UNIFORM_FREQ_DRAW,                   /** ( 0) Changing per draw call.        */
+    BGFX_UNIFORM_FREQ_VIEW,                   /** ( 1) Changing per view.             */
+    BGFX_UNIFORM_FREQ_FRAME,                  /** ( 2) Changing per frame.            */
+
+    BGFX_UNIFORM_FREQ_COUNT
+
+} bgfx_uniform_freq_t;
 
 /**
  * Backbuffer ratio enum.
@@ -392,6 +411,24 @@ typedef enum bgfx_view_mode
 } bgfx_view_mode_t;
 
 /**
+ * Shading Rate.
+ *
+ */
+typedef enum bgfx_shading_rate
+{
+    BGFX_SHADING_RATE_RATE_1X_1,              /** ( 0) 1x1                            */
+    BGFX_SHADING_RATE_RATE_1X_2,              /** ( 1) 1x2                            */
+    BGFX_SHADING_RATE_RATE_2X_1,              /** ( 2) 2x1                            */
+    BGFX_SHADING_RATE_RATE_2X_2,              /** ( 3) 2x2                            */
+    BGFX_SHADING_RATE_RATE_2X_4,              /** ( 4) 2x4                            */
+    BGFX_SHADING_RATE_RATE_4X_2,              /** ( 5) 4x2                            */
+    BGFX_SHADING_RATE_RATE_4X_4,              /** ( 6) 4x4                            */
+
+    BGFX_SHADING_RATE_COUNT
+
+} bgfx_shading_rate_t;
+
+/**
  * Native window handle type.
  *
  */
@@ -458,7 +495,7 @@ typedef struct bgfx_callback_vtbl_s
     uint32_t (*cache_read_size)(bgfx_callback_interface_t* _this, uint64_t _id);
     bool (*cache_read)(bgfx_callback_interface_t* _this, uint64_t _id, void* _data, uint32_t _size);
     void (*cache_write)(bgfx_callback_interface_t* _this, uint64_t _id, const void* _data, uint32_t _size);
-    void (*screen_shot)(bgfx_callback_interface_t* _this, const char* _filePath, uint32_t _width, uint32_t _height, uint32_t _pitch, const void* _data, uint32_t _size, bool _yflip);
+    void (*screen_shot)(bgfx_callback_interface_t* _this, const char* _filePath, uint32_t _width, uint32_t _height, uint32_t _pitch, bgfx_texture_format_t _format, const void* _data, uint32_t _size, bool _yflip);
     void (*capture_begin)(bgfx_callback_interface_t* _this, uint32_t _width, uint32_t _height, uint32_t _pitch, bgfx_texture_format_t _format, bool _yflip);
     void (*capture_end)(bgfx_callback_interface_t* _this);
     void (*capture_frame)(bgfx_callback_interface_t* _this, const void* _data, uint32_t _size);
@@ -591,8 +628,9 @@ typedef struct bgfx_caps_s
      *   - `BGFX_CAPS_FORMAT_TEXTURE_MSAA` - Texture can be sampled as MSAA.
      *   - `BGFX_CAPS_FORMAT_TEXTURE_MIP_AUTOGEN` - Texture format supports auto-generated
      *     mips.
+     *   - `BGFX_CAPS_FORMAT_TEXTURE_BACKBUFFER` - Texture format can be used as back buffer format.
      */
-    uint16_t             formats[BGFX_TEXTURE_FORMAT_COUNT];
+    uint32_t             formats[BGFX_TEXTURE_FORMAT_COUNT];
 
 } bgfx_caps_t;
 
@@ -627,6 +665,7 @@ typedef struct bgfx_platform_data_s
      * will create context/device.
      */
     void*                context;
+    void*                queue;              /** D3D12 Queue. If `NULL` bgfx will create queue. */
     
     /**
      * GL back-buffer, or D3D render target view. If `NULL` bgfx will
@@ -709,6 +748,7 @@ typedef struct bgfx_init_s
     uint64_t             capabilities;       /** Capabilities initialization mask (default: UINT64_MAX). */
     bool                 debug;              /** Enable device for debugging.             */
     bool                 profile;            /** Enable device for profiling.             */
+    bool                 fallback;           /** Enable fallback to next available renderer. */
     bgfx_platform_data_t platformData;       /** Platform data.                           */
     bgfx_resolution_t    resolution;         /** Backbuffer resolution and reset parameters. See: `bgfx::Resolution`. */
     bgfx_init_limits_t   limits;             /** Configurable runtime limits parameters.  */
@@ -1214,14 +1254,17 @@ BGFX_C_API void bgfx_reset(uint32_t _width, uint32_t _height, uint32_t _flags, b
  * just swaps internal buffers, kicks render thread, and returns. In
  * singlethreaded renderer this call does frame rendering.
  *
- * @param[in] _capture Capture frame with graphics debugger.
+ * @param[in] _flags Frame flags. See: `BGFX_FRAME_*` for more info.
+ *    - `BGFX_FRAME_NONE` - No frame flag.
+ *    - `BGFX_FRAME_DEBUG_CAPTURE` - Capture frame with graphics debugger.
+ *    - `BGFX_FRAME_DISCARD` - Discard all draw calls.
  *
  * @returns Current frame number. This might be used in conjunction with
  *  double/multi buffering data outside the library and passing it to
  *  library via `bgfx::makeRef` calls.
  *
  */
-BGFX_C_API uint32_t bgfx_frame(bool _capture);
+BGFX_C_API uint32_t bgfx_frame(uint8_t _flags);
 
 /**
  * Returns current renderer backend API type.
@@ -1849,11 +1892,12 @@ BGFX_C_API bgfx_texture_handle_t bgfx_create_texture(const bgfx_memory_t* _mem, 
  * @param[in] _mem Texture data. If `_mem` is non-NULL, created texture will be immutable. If
  *  `_mem` is NULL content of the texture is uninitialized. When `_numLayers` is more than
  *  1, expected memory layout is texture and all mips together for each array element.
+ * @param[in] _external Native API pointer to texture.
  *
  * @returns Texture handle.
  *
  */
-BGFX_C_API bgfx_texture_handle_t bgfx_create_texture_2d(uint16_t _width, uint16_t _height, bool _hasMips, uint16_t _numLayers, bgfx_texture_format_t _format, uint64_t _flags, const bgfx_memory_t* _mem);
+BGFX_C_API bgfx_texture_handle_t bgfx_create_texture_2d(uint16_t _width, uint16_t _height, bool _hasMips, uint16_t _numLayers, bgfx_texture_format_t _format, uint64_t _flags, const bgfx_memory_t* _mem, uint64_t _external);
 
 /**
  * Create texture with size based on back-buffer ratio. Texture will maintain ratio
@@ -1893,11 +1937,12 @@ BGFX_C_API bgfx_texture_handle_t bgfx_create_texture_2d_scaled(bgfx_backbuffer_r
  * @param[in] _mem Texture data. If `_mem` is non-NULL, created texture will be immutable. If
  *  `_mem` is NULL content of the texture is uninitialized. When `_numLayers` is more than
  *  1, expected memory layout is texture and all mips together for each array element.
+ * @param[in] _external Native API pointer to texture.
  *
  * @returns Texture handle.
  *
  */
-BGFX_C_API bgfx_texture_handle_t bgfx_create_texture_3d(uint16_t _width, uint16_t _height, uint16_t _depth, bool _hasMips, bgfx_texture_format_t _format, uint64_t _flags, const bgfx_memory_t* _mem);
+BGFX_C_API bgfx_texture_handle_t bgfx_create_texture_3d(uint16_t _width, uint16_t _height, uint16_t _depth, bool _hasMips, bgfx_texture_format_t _format, uint64_t _flags, const bgfx_memory_t* _mem, uint64_t _external);
 
 /**
  * Create Cube texture.
@@ -1915,12 +1960,12 @@ BGFX_C_API bgfx_texture_handle_t bgfx_create_texture_3d(uint16_t _width, uint16_
  *    sampling.
  * @param[in] _mem Texture data. If `_mem` is non-NULL, created texture will be immutable. If
  *  `_mem` is NULL content of the texture is uninitialized. When `_numLayers` is more than
- *  1, expected memory layout is texture and all mips together for each array element.
+ * @param[in] _external Native API pointer to texture.
  *
  * @returns Texture handle.
  *
  */
-BGFX_C_API bgfx_texture_handle_t bgfx_create_texture_cube(uint16_t _size, bool _hasMips, uint16_t _numLayers, bgfx_texture_format_t _format, uint64_t _flags, const bgfx_memory_t* _mem);
+BGFX_C_API bgfx_texture_handle_t bgfx_create_texture_cube(uint16_t _size, bool _hasMips, uint16_t _numLayers, bgfx_texture_format_t _format, uint64_t _flags, const bgfx_memory_t* _mem, uint64_t _external);
 
 /**
  * Update 2D texture.
@@ -2186,6 +2231,42 @@ BGFX_C_API void bgfx_destroy_frame_buffer(bgfx_frame_buffer_handle_t _handle);
 BGFX_C_API bgfx_uniform_handle_t bgfx_create_uniform(const char* _name, bgfx_uniform_type_t _type, uint16_t _num);
 
 /**
+ * Create shader uniform parameter.
+ * @remarks
+ *   1. Uniform names are unique. It's valid to call `bgfx::createUniform`
+ *      multiple times with the same uniform name. The library will always
+ *      return the same handle, but the handle reference count will be
+ *      incremented. This means that the same number of `bgfx::destroyUniform`
+ *      must be called to properly destroy the uniform.
+ *   2. Predefined uniforms (declared in `bgfx_shader.sh`):
+ *      - `u_viewRect vec4(x, y, width, height)` - view rectangle for current
+ *        view, in pixels.
+ *      - `u_viewTexel vec4(1.0/width, 1.0/height, undef, undef)` - inverse
+ *        width and height
+ *      - `u_view mat4` - view matrix
+ *      - `u_invView mat4` - inverted view matrix
+ *      - `u_proj mat4` - projection matrix
+ *      - `u_invProj mat4` - inverted projection matrix
+ *      - `u_viewProj mat4` - concatenated view projection matrix
+ *      - `u_invViewProj mat4` - concatenated inverted view projection matrix
+ *      - `u_model mat4[BGFX_CONFIG_MAX_BONES]` - array of model matrices.
+ *      - `u_modelView mat4` - concatenated model view matrix, only first
+ *        model matrix from array is used.
+ *      - `u_invModelView mat4` - inverted concatenated model view matrix.
+ *      - `u_modelViewProj mat4` - concatenated model view projection matrix.
+ *      - `u_alphaRef float` - alpha reference value for alpha test.
+ *
+ * @param[in] _name Uniform name in shader.
+ * @param[in] _freq Uniform change frequency (See: `bgfx::UniformFreq`).
+ * @param[in] _type Type of uniform (See: `bgfx::UniformType`).
+ * @param[in] _num Number of elements in array.
+ *
+ * @returns Handle to uniform object.
+ *
+ */
+BGFX_C_API bgfx_uniform_handle_t bgfx_create_uniform_with_freq(const char* _name, bgfx_uniform_freq_t _freq, bgfx_uniform_type_t _type, uint16_t _num);
+
+/**
  * Retrieve uniform info.
  *
  * @param[in] _handle Handle to uniform object.
@@ -2395,9 +2476,19 @@ BGFX_C_API void bgfx_set_view_transform(bgfx_view_id_t _id, const void* _view, c
 BGFX_C_API void bgfx_set_view_order(bgfx_view_id_t _id, uint16_t _num, const bgfx_view_id_t* _order);
 
 /**
+ * Set view shading rate.
+ * @attention Availability depends on: `BGFX_CAPS_VARIABLE_RATE_SHADING`.
+ *
+ * @param[in] _id View id.
+ * @param[in] _shadingRate Shading rate.
+ *
+ */
+BGFX_C_API void bgfx_set_view_shading_rate(bgfx_view_id_t _id, bgfx_shading_rate_t _shadingRate);
+
+/**
  * Reset all view settings to default.
  *
- * @param[in] _id
+ * @param[in] _id _id View id.
  *
  */
 BGFX_C_API void bgfx_reset_view(bgfx_view_id_t _id);
@@ -2549,6 +2640,31 @@ BGFX_C_API uint32_t bgfx_encoder_alloc_transform(bgfx_encoder_t* _this, bgfx_tra
 BGFX_C_API void bgfx_encoder_set_uniform(bgfx_encoder_t* _this, bgfx_uniform_handle_t _handle, const void* _value, uint16_t _num);
 
 /**
+ * Set shader uniform parameter for view.
+ * @attention Uniform must be created with `bgfx::UniformFreq::View` argument.
+ *
+ * @param[in] _id View id.
+ * @param[in] _handle Uniform.
+ * @param[in] _value Pointer to uniform data.
+ * @param[in] _num Number of elements. Passing `UINT16_MAX` will
+ *  use the _num passed on uniform creation.
+ *
+ */
+BGFX_C_API void bgfx_set_view_uniform(bgfx_view_id_t _id, bgfx_uniform_handle_t _handle, const void* _value, uint16_t _num);
+
+/**
+ * Set shader uniform parameter for frame.
+ * @attention Uniform must be created with `bgfx::UniformFreq::View` argument.
+ *
+ * @param[in] _handle Uniform.
+ * @param[in] _value Pointer to uniform data.
+ * @param[in] _num Number of elements. Passing `UINT16_MAX` will
+ *  use the _num passed on uniform creation.
+ *
+ */
+BGFX_C_API void bgfx_set_frame_uniform(bgfx_uniform_handle_t _handle, const void* _value, uint16_t _num);
+
+/**
  * Set index buffer for draw primitive.
  *
  * @param[in] _handle Index buffer.
@@ -2685,7 +2801,7 @@ BGFX_C_API void bgfx_encoder_set_instance_data_from_dynamic_vertex_buffer(bgfx_e
  * with gl_InstanceID.
  * @attention Availability depends on: `BGFX_CAPS_VERTEX_ID`.
  *
- * @param[in] _numInstances
+ * @param[in] _numInstances Number of instances.
  *
  */
 BGFX_C_API void bgfx_encoder_set_instance_count(bgfx_encoder_t* _this, uint32_t _numInstances);
@@ -3271,7 +3387,7 @@ BGFX_C_API void bgfx_set_instance_data_from_dynamic_vertex_buffer(bgfx_dynamic_v
  * with gl_InstanceID.
  * @attention Availability depends on: `BGFX_CAPS_VERTEX_ID`.
  *
- * @param[in] _numInstances
+ * @param[in] _numInstances Number of instances.
  *
  */
 BGFX_C_API void bgfx_set_instance_count(uint32_t _numInstances);
@@ -3579,6 +3695,7 @@ typedef enum bgfx_function_id
     BGFX_FUNCTION_ID_GET_TEXTURE,
     BGFX_FUNCTION_ID_DESTROY_FRAME_BUFFER,
     BGFX_FUNCTION_ID_CREATE_UNIFORM,
+    BGFX_FUNCTION_ID_CREATE_UNIFORM_WITH_FREQ,
     BGFX_FUNCTION_ID_GET_UNIFORM_INFO,
     BGFX_FUNCTION_ID_DESTROY_UNIFORM,
     BGFX_FUNCTION_ID_CREATE_OCCLUSION_QUERY,
@@ -3597,6 +3714,7 @@ typedef enum bgfx_function_id
     BGFX_FUNCTION_ID_SET_VIEW_FRAME_BUFFER,
     BGFX_FUNCTION_ID_SET_VIEW_TRANSFORM,
     BGFX_FUNCTION_ID_SET_VIEW_ORDER,
+    BGFX_FUNCTION_ID_SET_VIEW_SHADING_RATE,
     BGFX_FUNCTION_ID_RESET_VIEW,
     BGFX_FUNCTION_ID_ENCODER_BEGIN,
     BGFX_FUNCTION_ID_ENCODER_END,
@@ -3610,6 +3728,8 @@ typedef enum bgfx_function_id
     BGFX_FUNCTION_ID_ENCODER_SET_TRANSFORM_CACHED,
     BGFX_FUNCTION_ID_ENCODER_ALLOC_TRANSFORM,
     BGFX_FUNCTION_ID_ENCODER_SET_UNIFORM,
+    BGFX_FUNCTION_ID_SET_VIEW_UNIFORM,
+    BGFX_FUNCTION_ID_SET_FRAME_UNIFORM,
     BGFX_FUNCTION_ID_ENCODER_SET_INDEX_BUFFER,
     BGFX_FUNCTION_ID_ENCODER_SET_DYNAMIC_INDEX_BUFFER,
     BGFX_FUNCTION_ID_ENCODER_SET_TRANSIENT_INDEX_BUFFER,
@@ -3716,7 +3836,7 @@ struct bgfx_interface_vtbl
     bool (*init)(const bgfx_init_t * _init);
     void (*shutdown)(void);
     void (*reset)(uint32_t _width, uint32_t _height, uint32_t _flags, bgfx_texture_format_t _format);
-    uint32_t (*frame)(bool _capture);
+    uint32_t (*frame)(uint8_t _flags);
     bgfx_renderer_type_t (*get_renderer_type)(void);
     const bgfx_caps_t* (*get_caps)(void);
     const bgfx_stats_t* (*get_stats)(void);
@@ -3765,10 +3885,10 @@ struct bgfx_interface_vtbl
     bool (*is_frame_buffer_valid)(uint8_t _num, const bgfx_attachment_t* _attachment);
     void (*calc_texture_size)(bgfx_texture_info_t * _info, uint16_t _width, uint16_t _height, uint16_t _depth, bool _cubeMap, bool _hasMips, uint16_t _numLayers, bgfx_texture_format_t _format);
     bgfx_texture_handle_t (*create_texture)(const bgfx_memory_t* _mem, uint64_t _flags, uint8_t _skip, bgfx_texture_info_t* _info);
-    bgfx_texture_handle_t (*create_texture_2d)(uint16_t _width, uint16_t _height, bool _hasMips, uint16_t _numLayers, bgfx_texture_format_t _format, uint64_t _flags, const bgfx_memory_t* _mem);
+    bgfx_texture_handle_t (*create_texture_2d)(uint16_t _width, uint16_t _height, bool _hasMips, uint16_t _numLayers, bgfx_texture_format_t _format, uint64_t _flags, const bgfx_memory_t* _mem, uint64_t _external);
     bgfx_texture_handle_t (*create_texture_2d_scaled)(bgfx_backbuffer_ratio_t _ratio, bool _hasMips, uint16_t _numLayers, bgfx_texture_format_t _format, uint64_t _flags);
-    bgfx_texture_handle_t (*create_texture_3d)(uint16_t _width, uint16_t _height, uint16_t _depth, bool _hasMips, bgfx_texture_format_t _format, uint64_t _flags, const bgfx_memory_t* _mem);
-    bgfx_texture_handle_t (*create_texture_cube)(uint16_t _size, bool _hasMips, uint16_t _numLayers, bgfx_texture_format_t _format, uint64_t _flags, const bgfx_memory_t* _mem);
+    bgfx_texture_handle_t (*create_texture_3d)(uint16_t _width, uint16_t _height, uint16_t _depth, bool _hasMips, bgfx_texture_format_t _format, uint64_t _flags, const bgfx_memory_t* _mem, uint64_t _external);
+    bgfx_texture_handle_t (*create_texture_cube)(uint16_t _size, bool _hasMips, uint16_t _numLayers, bgfx_texture_format_t _format, uint64_t _flags, const bgfx_memory_t* _mem, uint64_t _external);
     void (*update_texture_2d)(bgfx_texture_handle_t _handle, uint16_t _layer, uint8_t _mip, uint16_t _x, uint16_t _y, uint16_t _width, uint16_t _height, const bgfx_memory_t* _mem, uint16_t _pitch);
     void (*update_texture_3d)(bgfx_texture_handle_t _handle, uint8_t _mip, uint16_t _x, uint16_t _y, uint16_t _z, uint16_t _width, uint16_t _height, uint16_t _depth, const bgfx_memory_t* _mem);
     void (*update_texture_cube)(bgfx_texture_handle_t _handle, uint16_t _layer, uint8_t _side, uint8_t _mip, uint16_t _x, uint16_t _y, uint16_t _width, uint16_t _height, const bgfx_memory_t* _mem, uint16_t _pitch);
@@ -3785,6 +3905,7 @@ struct bgfx_interface_vtbl
     bgfx_texture_handle_t (*get_texture)(bgfx_frame_buffer_handle_t _handle, uint8_t _attachment);
     void (*destroy_frame_buffer)(bgfx_frame_buffer_handle_t _handle);
     bgfx_uniform_handle_t (*create_uniform)(const char* _name, bgfx_uniform_type_t _type, uint16_t _num);
+    bgfx_uniform_handle_t (*create_uniform_with_freq)(const char* _name, bgfx_uniform_freq_t _freq, bgfx_uniform_type_t _type, uint16_t _num);
     void (*get_uniform_info)(bgfx_uniform_handle_t _handle, bgfx_uniform_info_t * _info);
     void (*destroy_uniform)(bgfx_uniform_handle_t _handle);
     bgfx_occlusion_query_handle_t (*create_occlusion_query)(void);
@@ -3803,6 +3924,7 @@ struct bgfx_interface_vtbl
     void (*set_view_frame_buffer)(bgfx_view_id_t _id, bgfx_frame_buffer_handle_t _handle);
     void (*set_view_transform)(bgfx_view_id_t _id, const void* _view, const void* _proj);
     void (*set_view_order)(bgfx_view_id_t _id, uint16_t _num, const bgfx_view_id_t* _order);
+    void (*set_view_shading_rate)(bgfx_view_id_t _id, bgfx_shading_rate_t _shadingRate);
     void (*reset_view)(bgfx_view_id_t _id);
     bgfx_encoder_t* (*encoder_begin)(bool _forThread);
     void (*encoder_end)(bgfx_encoder_t* _encoder);
@@ -3816,6 +3938,8 @@ struct bgfx_interface_vtbl
     void (*encoder_set_transform_cached)(bgfx_encoder_t* _this, uint32_t _cache, uint16_t _num);
     uint32_t (*encoder_alloc_transform)(bgfx_encoder_t* _this, bgfx_transform_t* _transform, uint16_t _num);
     void (*encoder_set_uniform)(bgfx_encoder_t* _this, bgfx_uniform_handle_t _handle, const void* _value, uint16_t _num);
+    void (*set_view_uniform)(bgfx_view_id_t _id, bgfx_uniform_handle_t _handle, const void* _value, uint16_t _num);
+    void (*set_frame_uniform)(bgfx_uniform_handle_t _handle, const void* _value, uint16_t _num);
     void (*encoder_set_index_buffer)(bgfx_encoder_t* _this, bgfx_index_buffer_handle_t _handle, uint32_t _firstIndex, uint32_t _numIndices);
     void (*encoder_set_dynamic_index_buffer)(bgfx_encoder_t* _this, bgfx_dynamic_index_buffer_handle_t _handle, uint32_t _firstIndex, uint32_t _numIndices);
     void (*encoder_set_transient_index_buffer)(bgfx_encoder_t* _this, const bgfx_transient_index_buffer_t* _tib, uint32_t _firstIndex, uint32_t _numIndices);
