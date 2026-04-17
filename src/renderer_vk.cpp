@@ -8,7 +8,6 @@
 #if BGFX_CONFIG_RENDERER_VULKAN
 #	include <bx/pixelformat.h>
 #	include "renderer_vk.h"
-#	include "shader_spirv.h"
 
 #if BX_PLATFORM_OSX
 #	import <Cocoa/Cocoa.h>
@@ -475,7 +474,7 @@ VK_IMPORT_DEVICE
 
 	static const VkFormat s_attribType[][4][2] =
 	{
-		{ // Int8 - Untested
+		{ // Int8
 			{ VK_FORMAT_R8_SINT,                 VK_FORMAT_R8_SNORM                 },
 			{ VK_FORMAT_R8G8_SINT,               VK_FORMAT_R8G8_SNORM               },
 			{ VK_FORMAT_R8G8B8A8_SINT,           VK_FORMAT_R8G8B8A8_SNORM           },
@@ -499,7 +498,7 @@ VK_IMPORT_DEVICE
 			{ VK_FORMAT_R16G16B16_SINT,          VK_FORMAT_R16G16B16_SNORM          },
 			{ VK_FORMAT_R16G16B16A16_SINT,       VK_FORMAT_R16G16B16A16_SNORM       },
 		},
-		{ // Uint16 - Untested
+		{ // Uint16
 			{ VK_FORMAT_R16_UINT,                VK_FORMAT_R16_UNORM                },
 			{ VK_FORMAT_R16G16_UINT,             VK_FORMAT_R16G16_UNORM             },
 			{ VK_FORMAT_R16G16B16_UINT,          VK_FORMAT_R16G16B16_UNORM          },
@@ -806,7 +805,7 @@ VK_IMPORT_DEVICE
 					BX_TRACE("\tv%-3d %s%s"
 						, extensionProperties[extension].specVersion
 						, extensionProperties[extension].extensionName
-						, supported ? " (supported)" : "", extensionProperties[extension].extensionName
+						, supported ? " (supported)" : ""
 						);
 
 					BX_UNUSED(supported);
@@ -879,7 +878,7 @@ VK_IMPORT_DEVICE
 							, indent
 							, extensionProperties[extension].extensionName
 							, extensionProperties[extension].specVersion
-							, supported ? " (supported)" : "", extensionProperties[extension].extensionName
+							, supported ? " (supported)" : ""
 							);
 
 						BX_UNUSED(supported);
@@ -1744,6 +1743,7 @@ VK_IMPORT_INSTANCE
 					| (m_deviceFeatures.imageCubeArray ? BGFX_CAPS_TEXTURE_CUBE_ARRAY : 0)
 					| BGFX_CAPS_TEXTURE_EXTERNAL
 					| BGFX_CAPS_TEXTURE_READ_BACK
+					| BGFX_CAPS_TRANSPARENT_BACKBUFFER
 					| BGFX_CAPS_VERTEX_ATTRIB_HALF
 					| BGFX_CAPS_VERTEX_ATTRIB_UINT10
 					| BGFX_CAPS_VERTEX_ID
@@ -2768,7 +2768,7 @@ VK_IMPORT_DEVICE
 
 		void submitUniformCache(UniformCacheState& _ucs, uint16_t _view);
 
-		void submit(Frame* _render, ClearQuad& _clearQuad, TextVideoMemBlitter& _textVideoMemBlitter) override;
+		void submit(Frame* _render, const ClearQuad& _clearQuad, const MipGen& _mipGen, TextVideoMemBlitter& _textVideoMemBlitter) override;
 
 		void dbgTextRenderBegin(TextVideoMemBlitter& _blitter) override
 		{
@@ -3357,7 +3357,7 @@ VK_IMPORT_DEVICE
 			}
 		}
 
-		VkResult getRenderPass(uint8_t _num, const VkFormat* _formats, const VkImageAspectFlags* _aspects, const bool* _resolve, VkSampleCountFlagBits _samples, ::VkRenderPass* _renderPass, uint16_t _clearFlags)
+		VkResult getRenderPass(uint8_t _num, const VkFormat* _formats, const VkImageAspectFlags* _aspects, const bool* _resolve, VkSampleCountFlagBits _samples, uint16_t _clearFlags, ::VkRenderPass* _outRenderPass, uint32_t* _outHashKey)
 		{
 			VkResult result = VK_SUCCESS;
 
@@ -3377,11 +3377,16 @@ VK_IMPORT_DEVICE
 			}
 			uint32_t hashKey = hash.end();
 
+			if (NULL != _outHashKey)
+			{
+				*_outHashKey = hashKey;
+			}
+
 			VkRenderPass renderPass = m_renderPassCache.find(hashKey);
 
 			if (VK_NULL_HANDLE != renderPass)
 			{
-				*_renderPass = renderPass;
+				*_outRenderPass = renderPass;
 				return result;
 			}
 
@@ -3526,12 +3531,12 @@ VK_IMPORT_DEVICE
 
 			m_renderPassCache.add(hashKey, renderPass);
 
-			*_renderPass = renderPass;
+			*_outRenderPass = renderPass;
 
 			return result;
 		}
 
-		VkResult getRenderPass(uint8_t _num, const Attachment* _attachments, ::VkRenderPass* _renderPass, uint16_t _clearFlags)
+		VkResult getRenderPass(uint8_t _num, const Attachment* _attachments, uint16_t _clearFlags, ::VkRenderPass* _outRenderPass, uint32_t* _outHashKey = NULL)
 		{
 			VkFormat formats[BGFX_CONFIG_MAX_FRAME_BUFFER_ATTACHMENTS];
 			VkImageAspectFlags aspects[BGFX_CONFIG_MAX_FRAME_BUFFER_ATTACHMENTS];
@@ -3545,10 +3550,10 @@ VK_IMPORT_DEVICE
 				samples = texture.m_sampler.Sample;
 			}
 
-			return getRenderPass(_num, formats, aspects, NULL, samples, _renderPass, _clearFlags);
+			return getRenderPass(_num, formats, aspects, NULL, samples, _clearFlags, _outRenderPass, _outHashKey);
 		}
 
-		VkResult getRenderPass(const SwapChainVK& swapChain, ::VkRenderPass* _renderPass, uint16_t _clearFlags)
+		VkResult getRenderPass(const SwapChainVK& swapChain, uint16_t _clearFlags, ::VkRenderPass* _outRenderPass, uint32_t* _outHashKey = NULL)
 		{
 			const VkFormat formats[2] =
 			{
@@ -3575,7 +3580,7 @@ VK_IMPORT_DEVICE
 				: 1
 				;
 
-			return getRenderPass(num, formats, aspects, resolve, samples, _renderPass, _clearFlags);
+			return getRenderPass(num, formats, aspects, resolve, samples, _clearFlags, _outRenderPass, _outHashKey);
 		}
 
 		VkSampler getSampler(uint32_t _flags, VkFormat _format, const float _palette[][4])
@@ -3818,7 +3823,7 @@ VK_IMPORT_DEVICE
 
 			murmur.add(layout.m_attributes, sizeof(layout.m_attributes) );
 			murmur.add(_numInstanceData);
-			murmur.add(frameBuffer.m_renderPass);
+			murmur.add(frameBuffer.m_renderPassHashKey);
 			const uint32_t hash = murmur.end();
 
 			VkPipeline pipeline = m_pipelineStateCache.find(hash);
@@ -4065,7 +4070,7 @@ VK_IMPORT_DEVICE
 							wds[wdsCount].pBufferInfo      = NULL;
 							wds[wdsCount].pTexelBufferView = NULL;
 
-							const TextureVK& texture = m_textures[bind.m_idx];
+							TextureVK& texture = m_textures[bind.m_idx];
 
 							VkImageViewType type = texture.m_type;
 							if (UINT32_MAX != bindInfo.index)
@@ -4078,10 +4083,7 @@ VK_IMPORT_DEVICE
 								type = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
 							}
 
-							BX_ASSERT(
-								  texture.m_currentImageLayout == texture.m_sampledLayout
-								, "Mismatching image layout. Texture currently used as a framebuffer attachment?"
-								);
+							texture.setState(m_commandBuffer, texture.m_sampledLayout);
 
 							imageInfo[imageCount].imageLayout = texture.m_sampledLayout;
 							imageInfo[imageCount].sampler     = VK_NULL_HANDLE;
@@ -4142,10 +4144,7 @@ VK_IMPORT_DEVICE
 								: _program.m_textures[bindInfo.index].type
 								;
 
-							BX_ASSERT(
-								  texture.m_currentImageLayout == texture.m_sampledLayout
-								, "Mismatching image layout. Texture currently used as a framebuffer attachment?"
-								);
+							texture.setState(m_commandBuffer, texture.m_sampledLayout);
 
 							imageInfo[imageCount].imageLayout = texture.m_sampledLayout;
 							imageInfo[imageCount].sampler     = sampler;
@@ -6808,6 +6807,10 @@ retry:
 					s_renderVK->recycleMemory(stagingBuffer.m_deviceMem);
 				}
 			}
+			else if (0 == _external)
+			{
+				setState(_commandBuffer, m_sampledLayout);
+			}
 
 			bx::free(g_allocator, bufferCopyInfo);
 
@@ -7738,17 +7741,20 @@ retry:
 
 		VkCompositeAlphaFlagBitsKHR compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
 
-		if (surfaceCapabilities.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR)
+		if (m_resolution.reset & BGFX_RESET_TRANSPARENT_BACKBUFFER)
 		{
-			compositeAlpha = VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR;
-		}
-		else if (surfaceCapabilities.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR)
-		{
-			compositeAlpha = VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR;
-		}
-		else if (surfaceCapabilities.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR)
-		{
-			compositeAlpha = VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR;
+			if (surfaceCapabilities.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR)
+			{
+				compositeAlpha = VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR;
+			}
+			else if (surfaceCapabilities.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR)
+			{
+				compositeAlpha = VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR;
+			}
+			else if (surfaceCapabilities.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR)
+			{
+				compositeAlpha = VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR;
+			}
 		}
 
 		const VkImageUsageFlags imageUsageMask = 0
@@ -8028,7 +8034,7 @@ retry:
 		const VkAllocationCallbacks* allocatorCb = s_renderVK->m_allocatorCb;
 
 		VkRenderPass renderPass;
-		result = s_renderVK->getRenderPass(*this, &renderPass, 0);
+		result = s_renderVK->getRenderPass(*this, 0, &renderPass);
 
 		if (VK_SUCCESS != result)
 		{
@@ -8335,7 +8341,7 @@ retry:
 			return result;
 		}
 
-		result = s_renderVK->getRenderPass(m_swapChain, &m_renderPass, 0);
+		result = s_renderVK->getRenderPass(m_swapChain, 0, &m_renderPass, &m_renderPassHashKey);
 
 		if (VK_SUCCESS != result)
 		{
@@ -8357,11 +8363,11 @@ retry:
 
 		if (m_numTh > 0)
 		{
-			VK_CHECK(s_renderVK->getRenderPass(m_numTh, m_attachment, &renderPass, _clearFlags) );
+			VK_CHECK(s_renderVK->getRenderPass(m_numTh, m_attachment, _clearFlags, &renderPass) );
 		}
 		else
 		{
-			VK_CHECK(s_renderVK->getRenderPass(m_swapChain, &renderPass, _clearFlags) );
+			VK_CHECK(s_renderVK->getRenderPass(m_swapChain, _clearFlags, &renderPass) );
 		}
 
 		return renderPass;
@@ -8391,7 +8397,7 @@ retry:
 			const VkDevice device = s_renderVK->m_device;
 			const VkAllocationCallbacks* allocatorCb = s_renderVK->m_allocatorCb;
 
-			VK_CHECK(s_renderVK->getRenderPass(m_numTh, m_attachment, &m_renderPass, 0) );
+			VK_CHECK(s_renderVK->getRenderPass(m_numTh, m_attachment, 0, &m_renderPass, &m_renderPassHashKey) );
 
 			m_depth = BGFX_INVALID_HANDLE;
 			m_num = 0;
@@ -8449,7 +8455,7 @@ retry:
 		BGFX_PROFILER_SCOPE("FrameBufferVK::update", kColorResource);
 
 		m_swapChain.update(_commandBuffer, m_nwh, _resolution);
-		VK_CHECK(s_renderVK->getRenderPass(m_swapChain, &m_renderPass, 0) );
+		VK_CHECK(s_renderVK->getRenderPass(m_swapChain, 0, &m_renderPass, &m_renderPassHashKey) );
 		// Don't believe the passed Resolution, as the Vulkan driver might have
 		// specified another resolution, which we had to obey.
 		m_width   = m_swapChain.m_sci.imageExtent.width;
@@ -8717,21 +8723,28 @@ retry:
 		return result;
 	}
 
-	void CommandQueueVK::addWaitSemaphore(VkSemaphore _semaphore, VkPipelineStageFlags _waitFlags)
+	void CommandQueueVK::addSwapChain(SwapChainVK& _swapChain)
 	{
-		BX_ASSERT(m_numWaitSemaphores < BX_COUNTOF(m_waitSemaphores), "Too many wait semaphores.");
+		if (VK_NULL_HANDLE != _swapChain.m_lastImageAcquiredSemaphore)
+		{
+			BX_ASSERT(m_numWaitSemaphores < BX_COUNTOF(m_waitSemaphores), "Too many wait semaphores.");
 
-		m_waitSemaphores[m_numWaitSemaphores]      = _semaphore;
-		m_waitSemaphoreStages[m_numWaitSemaphores] = _waitFlags;
-		m_numWaitSemaphores++;
-	}
+			m_waitSemaphores[m_numWaitSemaphores]      = _swapChain.m_lastImageAcquiredSemaphore;
+			m_waitSemaphoreStages[m_numWaitSemaphores] = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+			m_numWaitSemaphores++;
 
-	void CommandQueueVK::addSignalSemaphore(VkSemaphore _semaphore)
-	{
-		BX_ASSERT(m_numSignalSemaphores < BX_COUNTOF(m_signalSemaphores), "Too many signal semaphores.");
+			_swapChain.m_lastImageAcquiredSemaphore = VK_NULL_HANDLE;
+		}
 
-		m_signalSemaphores[m_numSignalSemaphores] = _semaphore;
-		m_numSignalSemaphores++;
+		if (VK_NULL_HANDLE != _swapChain.m_lastImageRenderedSemaphore)
+		{
+			BX_ASSERT(m_numSignalSemaphores < BX_COUNTOF(m_signalSemaphores), "Too many signal semaphores.");
+
+			m_signalSemaphores[m_numSignalSemaphores] = _swapChain.m_lastImageRenderedSemaphore;
+			m_numSignalSemaphores++;
+		}
+
+		_swapChain.m_backBufferFence[_swapChain.m_backBufferColorIdx] = m_currentFence;
 	}
 
 	void CommandQueueVK::kick(bool _wait)
@@ -9018,10 +9031,8 @@ retry:
 		}
 	}
 
-	void RendererContextVK::submit(Frame* _render, ClearQuad& _clearQuad, TextVideoMemBlitter& _textVideoMemBlitter)
+	void RendererContextVK::submit(Frame* _render, const ClearQuad& /*_clearQuad*/, const MipGen& /*_mipGen*/, TextVideoMemBlitter& _textVideoMemBlitter)
 	{
-		BX_UNUSED(_clearQuad);
-
 		if (updateResolution(_render->m_resolution) )
 		{
 			return;
@@ -10224,24 +10235,23 @@ retry:
 			stagingScratchBuffer.flush();
 		}
 
-		for (uint16_t ii = 0; ii < m_numWindows; ++ii)
+		if (!_render->m_flush)
 		{
-			FrameBufferVK& fb = isValid(m_windows[ii])
-				? m_frameBuffers[m_windows[ii].idx]
-				: m_backBuffer
-				;
-
-			if (fb.m_needPresent)
+			for (uint16_t ii = 0; ii < m_numWindows; ++ii)
 			{
-				fb.resolve();
+				FrameBufferVK& fb = isValid(m_windows[ii])
+					? m_frameBuffers[m_windows[ii].idx]
+					: m_backBuffer
+					;
 
-				fb.m_swapChain.transitionImage(m_commandBuffer);
+				if (fb.m_needPresent)
+				{
+					fb.resolve();
 
-				m_cmd.addWaitSemaphore(fb.m_swapChain.m_lastImageAcquiredSemaphore, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
-				m_cmd.addSignalSemaphore(fb.m_swapChain.m_lastImageRenderedSemaphore);
-				fb.m_swapChain.m_lastImageAcquiredSemaphore = VK_NULL_HANDLE;
+					fb.m_swapChain.transitionImage(m_commandBuffer);
 
-				fb.m_swapChain.m_backBufferFence[fb.m_swapChain.m_backBufferColorIdx] = m_cmd.m_currentFence;
+					m_cmd.addSwapChain(fb.m_swapChain);
+				}
 			}
 		}
 

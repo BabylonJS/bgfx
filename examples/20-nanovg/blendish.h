@@ -2248,7 +2248,7 @@ static void bndCaretPosition(NVGcontext *ctx, float x, float y,
     if (nrows == 0) return;
     *cx = rows[r].minx;
     nglyphs = nvgTextGlyphPositions(
-        ctx, x, y, rows[r].start, rows[r].end+1, glyphs, BND_MAX_GLYPHS);
+        ctx, x, y, rows[r].start, rows[r].end, glyphs, BND_MAX_GLYPHS);
     for (int i=0; i < nglyphs; ++i) {
         *cx=glyphs[i].x;
         if (glyphs[i].str == caret) break;

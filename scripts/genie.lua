@@ -65,7 +65,7 @@ newaction {
 		end
 
 		generate("temp.bgfx.h" ,      "../include/bgfx/c99/bgfx.h", "    ")
---		generate("temp.bgfx.hpp" ,    "../include/bgfx/bgfx.hpp",   "\t")
+		generate("temp.bgfx.hpp" ,    "../include/bgfx/bgfx.h",     "\t")
 		generate("temp.bgfx.idl.inl", "../src/bgfx.idl.inl",        "\t")
 		generate("temp.defines.h",    "../include/bgfx/defines.h",  "\t")
 
@@ -86,6 +86,9 @@ newaction {
 
 			local c3gen = require "bindings-c3"
 			c3gen.write(c3gen.gen(), "../bindings/c3/bgfx.c3")
+
+			local docsgen = require "docs-rst"
+			docsgen.write(docsgen.gen(), "../docs/bgfx.rst")
 		end
 
 		os.exit()
@@ -148,7 +151,12 @@ solution "bgfx"
 	end
 
 	language "C++"
-	startproject "example-00-helloworld"
+
+	if _OPTIONS["with-combined-examples"] then
+		startproject "examples"
+	else
+		startproject "example-00-helloworld"
+	end
 
 BGFX_DIR   = path.getabsolute("..")
 BX_DIR     = os.getenv("BX_DIR")
@@ -566,6 +574,7 @@ or _OPTIONS["with-combined-examples"] then
 		, "47-pixelformats"
 		, "48-drawindirect"
 		, "49-hextile"
+		, "51-gpufont"
 		)
 
 

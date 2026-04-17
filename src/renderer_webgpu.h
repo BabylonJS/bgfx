@@ -15,7 +15,6 @@
 		)
 
 #include "debug_renderdoc.h"
-#include "shader_spirv.h"
 
 #define _WGPU_CHECK(_call) _call; BX_ASSERT(!wgpuErrorCheck(), "" #_call " failed!")
 
@@ -760,6 +759,8 @@ namespace bgfx { namespace wgpu
 		void update(const Resolution& _resolution);
 
 		void present();
+
+		void resolve(WGPUCommandEncoder _cmdEncoder);
 
 		bool isSwapChain() const
 		{

@@ -1744,6 +1744,7 @@ namespace bgfx { namespace d3d11
 			m_agsDll = NULL;
 
 			m_deviceCtx->ClearState();
+			m_deviceCtx->Flush();
 
 			invalidateCache();
 
@@ -2195,7 +2196,7 @@ namespace bgfx { namespace d3d11
 
 		void submitUniformCache(UniformCacheState& _ucs, uint16_t _view);
 
-		void submit(Frame* _render, ClearQuad& _clearQuad, TextVideoMemBlitter& _textVideoMemBlitter) override;
+		void submit(Frame* _render, const ClearQuad& _clearQuad, const MipGen& _mipGen, TextVideoMemBlitter& _textVideoMemBlitter) override;
 
 		void dbgTextRenderBegin(TextVideoMemBlitter& _blitter) override
 		{
@@ -4064,125 +4065,6 @@ namespace bgfx { namespace d3d11
 		BufferD3D11::create(_size, _data, _flags, stride, true);
 	}
 
-	static bool hasDepthOp(const void* _code, uint32_t _size)
-	{
-		bx::MemoryReader rd(_code, _size);
-
-		bx::Error err;
-		DxbcContext dxbc;
-		read(&rd, dxbc, &err);
-
-		struct FindDepthOp
-		{
-			FindDepthOp()
-				: m_found(false)
-			{
-			}
-
-			static bool find(uint32_t /*_offset*/, const DxbcInstruction& _instruction, void* _userData)
-			{
-				FindDepthOp& out = *reinterpret_cast<FindDepthOp*>(_userData);
-				if (_instruction.opcode == DxbcOpcode::DISCARD
-				|| (0 != _instruction.numOperands &&  DxbcOperandType::OutputDepth == _instruction.operand[0].type) )
-				{
-					out.m_found = true;
-					return false;
-				}
-
-				return true;
-			}
-
-			bool m_found;
-
-		} find;
-
-		parse(dxbc.shader, FindDepthOp::find, &find);
-
-		return find.m_found;
-	}
-
-	static void patchUAVRegisterByteCode(DxbcInstruction& _instruction, void* _userData)
-	{
-		BX_UNUSED(_userData);
-
-		switch (_instruction.opcode)
-		{
-		case DxbcOpcode::DCL_UNORDERED_ACCESS_VIEW_TYPED:
-			{
-				DxbcOperand& operand = _instruction.operand[0];
-				operand.regIndex[0] += 16;
-
-				BX_ASSERT(operand.regIndex[1] == 0 && operand.regIndex[2] == 0, "Unexpected values");
-			}
-			break;
-
-		case DxbcOpcode::DCL_UNORDERED_ACCESS_VIEW_RAW:
-			BX_ASSERT(false, "Unsupported UAV access");
-			break;
-
-		case DxbcOpcode::DCL_UNORDERED_ACCESS_VIEW_STRUCTURED:
-			BX_ASSERT(false, "Unsupported UAV access");
-			break;
-
-		case DxbcOpcode::LD_UAV_TYPED:
-			{
-				DxbcOperand& operand = _instruction.operand[2];
-				operand.regIndex[0] += 16;
-
-				BX_ASSERT(operand.regIndex[1] == 0 && operand.regIndex[2] == 0, "Unexpected values");
-			}
-			break;
-
-		case DxbcOpcode::STORE_UAV_TYPED:
-			{
-				DxbcOperand& operand = _instruction.operand[0];
-				operand.regIndex[0] += 16;
-
-				BX_ASSERT(operand.regIndex[1] == 0 && operand.regIndex[2] == 0, "Unexpected values");
-			}
-			break;
-
-		default:
-			break;
-		}
-	}
-
-	static void patchUAVRegisterDebugInfo(DxbcSPDB& _spdb)
-	{
-		if (!_spdb.debugCode.empty())
-		{
-			// 'register( u[xx] )'
-			char* ptr = (char*)_spdb.debugCode.data();
-			while (ptr < (char*)_spdb.debugCode.data() + _spdb.debugCode.size() - 3)
-			{
-				if (*(ptr+1) == ' '
-				&&	*(ptr+2) == 'u'
-				&&	*(ptr+3) == '[')
-				{
-					char* startPtr = ptr+4;
-					char* endPtr = ptr+4;
-
-					while (*endPtr != ']')
-					{
-						endPtr++;
-					}
-
-					uint32_t regNum = 0;
-					uint32_t regLen = uint32_t(endPtr - startPtr);
-					bx::fromString(&regNum, bx::StringView(startPtr, regLen));
-
-					regNum += 16;
-					uint32_t len = bx::toString(startPtr, regLen+2, regNum);
-					*(startPtr + len) = ']';
-
-					break;
-				}
-
-				++ptr;
-			}
-		}
-	}
-
 	void ShaderD3D11::create(const Memory* _mem)
 	{
 		bx::MemoryReader reader(_mem->data, _mem->size);
@@ -4313,33 +4195,8 @@ namespace bgfx { namespace d3d11
 
 		const Memory* temp = NULL;
 
-		if (!isShaderType(magic, 'C'))
-		{
-			bx::MemoryReader rd(code, shaderSize);
-
-			DxbcContext dxbc;
-			read(&rd, dxbc, bx::ErrorAssert{});
-
-			bool patchShader = !dxbc.shader.aon9;
-			if (patchShader)
-			{
-				union { uint32_t offset; void* ptr; } cast = { 0 };
-				filter(dxbc.shader, dxbc.shader, patchUAVRegisterByteCode, cast.ptr);
-				patchUAVRegisterDebugInfo(dxbc.spdb);
-
-				temp = alloc(shaderSize);
-				bx::StaticMemoryBlockWriter wr(temp->data, temp->size);
-
-				int32_t size = write(&wr, dxbc, &err);
-				dxbcHash(temp->data + 20, size - 20, temp->data + 4);
-
-				code = temp->data;
-			}
-		}
-
 		if (isShaderType(magic, 'F') )
 		{
-			m_hasDepthOp = hasDepthOp(code, shaderSize);
 			DX_CHECK(s_renderD3D11->m_device->CreatePixelShader(code, shaderSize, NULL, &m_pixelShader) );
 			BGFX_FATAL(NULL != m_ptr, bgfx::Fatal::InvalidShader, "Failed to create fragment shader.");
 		}
@@ -4627,14 +4484,17 @@ namespace bgfx { namespace d3d11
 				srvd.Format = getSrvFormat();
 			}
 
+			const bool external = 0 != _external;
 			const bool directAccess = s_renderD3D11->m_directAccessSupport
 				&& !renderTarget
 				&& !readBack
 				&& !blit
 				&& !writeOnly
+				&& !external
+				&& !externalShared
 				;
 
-			if (0 != _external)
+			if (external)
 			{
 				if (externalShared)
 				{
@@ -4647,106 +4507,107 @@ namespace bgfx { namespace d3d11
 
 				m_flags |= BGFX_SAMPLER_INTERNAL_SHARED;
 			}
-			else
+
+			switch (m_type)
 			{
-				switch (m_type)
+			case Texture2D:
+			case TextureCube:
 				{
-				case Texture2D:
-				case TextureCube:
+					D3D11_TEXTURE2D_DESC desc = {};
+					desc.Width      = ti.width;
+					desc.Height     = ti.height;
+					desc.MipLevels  = ti.numMips;
+					desc.ArraySize  = numSides;
+					desc.Format     = format;
+					desc.SampleDesc = msaa;
+					desc.Usage      = kk == 0 || blit ? D3D11_USAGE_DEFAULT : D3D11_USAGE_IMMUTABLE;
+					desc.BindFlags  = writeOnly ? 0 : D3D11_BIND_SHADER_RESOURCE;
+					desc.CPUAccessFlags = 0;
+					desc.MiscFlags      = 0;
+
+					if (bimg::isDepth(bimg::TextureFormat::Enum(m_textureFormat) ) )
 					{
-						D3D11_TEXTURE2D_DESC desc = {};
-						desc.Width      = ti.width;
-						desc.Height     = ti.height;
-						desc.MipLevels  = ti.numMips;
-						desc.ArraySize  = numSides;
-						desc.Format     = format;
-						desc.SampleDesc = msaa;
-						desc.Usage      = kk == 0 || blit ? D3D11_USAGE_DEFAULT : D3D11_USAGE_IMMUTABLE;
-						desc.BindFlags  = writeOnly ? 0 : D3D11_BIND_SHADER_RESOURCE;
-						desc.CPUAccessFlags = 0;
-						desc.MiscFlags      = 0;
+						desc.BindFlags |= D3D11_BIND_DEPTH_STENCIL;
+						desc.Usage = D3D11_USAGE_DEFAULT;
+					}
+					else if (renderTarget)
+					{
+						desc.BindFlags |= D3D11_BIND_RENDER_TARGET;
+						desc.Usage = D3D11_USAGE_DEFAULT;
+						desc.MiscFlags |= 0
+							| (1 < ti.numMips ? D3D11_RESOURCE_MISC_GENERATE_MIPS : 0)
+							;
+					}
 
-						if (bimg::isDepth(bimg::TextureFormat::Enum(m_textureFormat) ) )
-						{
-							desc.BindFlags |= D3D11_BIND_DEPTH_STENCIL;
-							desc.Usage = D3D11_USAGE_DEFAULT;
-						}
-						else if (renderTarget)
-						{
-							desc.BindFlags |= D3D11_BIND_RENDER_TARGET;
-							desc.Usage = D3D11_USAGE_DEFAULT;
-							desc.MiscFlags |= 0
-								| (1 < ti.numMips ? D3D11_RESOURCE_MISC_GENERATE_MIPS : 0)
-								;
-						}
+					if (computeWrite)
+					{
+						desc.BindFlags |= D3D11_BIND_UNORDERED_ACCESS;
+						desc.Usage = D3D11_USAGE_DEFAULT;
+					}
 
-						if (computeWrite)
-						{
-							desc.BindFlags |= D3D11_BIND_UNORDERED_ACCESS;
-							desc.Usage = D3D11_USAGE_DEFAULT;
-						}
+					if (readBack)
+					{
+						desc.BindFlags      = 0;
+						desc.Usage          = D3D11_USAGE_STAGING;
+						desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+					}
 
-						if (readBack)
+					if (imageContainer.m_cubeMap)
+					{
+						desc.MiscFlags |= D3D11_RESOURCE_MISC_TEXTURECUBE;
+						if (1 < ti.numLayers)
 						{
-							desc.BindFlags      = 0;
-							desc.Usage          = D3D11_USAGE_STAGING;
-							desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+							srvd.ViewDimension = D3D11_SRV_DIMENSION_TEXTURECUBEARRAY;
+							srvd.TextureCubeArray.MipLevels = ti.numMips;
+							srvd.TextureCubeArray.NumCubes  = ti.numLayers;
 						}
-
-						if (imageContainer.m_cubeMap)
+						else
 						{
-							desc.MiscFlags |= D3D11_RESOURCE_MISC_TEXTURECUBE;
+							srvd.ViewDimension = D3D11_SRV_DIMENSION_TEXTURECUBE;
+							srvd.TextureCube.MipLevels = ti.numMips;
+						}
+					}
+					else
+					{
+						if (msaaSample)
+						{
 							if (1 < ti.numLayers)
 							{
-								srvd.ViewDimension = D3D11_SRV_DIMENSION_TEXTURECUBEARRAY;
-								srvd.TextureCubeArray.MipLevels = ti.numMips;
-								srvd.TextureCubeArray.NumCubes  = ti.numLayers;
+								srvd.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DMSARRAY;
+								srvd.Texture2DMSArray.ArraySize = ti.numLayers;
 							}
 							else
 							{
-								srvd.ViewDimension = D3D11_SRV_DIMENSION_TEXTURECUBE;
-								srvd.TextureCube.MipLevels = ti.numMips;
+								srvd.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DMS;
 							}
 						}
 						else
 						{
-							if (msaaSample)
+							if (1 < ti.numLayers)
 							{
-								if (1 < ti.numLayers)
-								{
-									srvd.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DMSARRAY;
-									srvd.Texture2DMSArray.ArraySize = ti.numLayers;
-								}
-								else
-								{
-									srvd.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DMS;
-								}
+								srvd.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
+								srvd.Texture2DArray.MipLevels = ti.numMips;
+								srvd.Texture2DArray.ArraySize = ti.numLayers;
 							}
 							else
 							{
-								if (1 < ti.numLayers)
-								{
-									srvd.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
-									srvd.Texture2DArray.MipLevels = ti.numMips;
-									srvd.Texture2DArray.ArraySize = ti.numLayers;
-								}
-								else
-								{
-									srvd.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-									srvd.Texture2D.MipLevels = ti.numMips;
-								}
+								srvd.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+								srvd.Texture2D.MipLevels = ti.numMips;
 							}
 						}
+					}
 
-						desc.MiscFlags |= externalShared ? D3D11_RESOURCE_MISC_SHARED : 0;
+					desc.MiscFlags |= externalShared ? D3D11_RESOURCE_MISC_SHARED : 0;
 
-						if (needResolve)
-						{
-							DX_CHECK(s_renderD3D11->m_device->CreateTexture2D(&desc, NULL, &m_rt2d) );
-							desc.BindFlags &= ~(D3D11_BIND_RENDER_TARGET|D3D11_BIND_DEPTH_STENCIL);
-							desc.SampleDesc = s_msaa[0];
-						}
+					if (needResolve)
+					{
+						DX_CHECK(s_renderD3D11->m_device->CreateTexture2D(&desc, NULL, &m_rt2d) );
+						desc.BindFlags &= ~(D3D11_BIND_RENDER_TARGET|D3D11_BIND_DEPTH_STENCIL);
+						desc.SampleDesc = s_msaa[0];
+					}
 
+					if (!external)
+					{
 						if (directAccess)
 						{
 							directAccessPtr = m_dar.createTexture2D(&desc, kk == 0 ? NULL : srd, &m_texture2d);
@@ -4756,48 +4617,51 @@ namespace bgfx { namespace d3d11
 							DX_CHECK(s_renderD3D11->m_device->CreateTexture2D(&desc, kk == 0 ? NULL : srd, &m_texture2d) );
 						}
 					}
-					break;
+				}
+				break;
 
-				case Texture3D:
+			case Texture3D:
+				{
+					D3D11_TEXTURE3D_DESC desc = {};
+					desc.Width     = ti.width;
+					desc.Height    = ti.height;
+					desc.Depth     = ti.depth;
+					desc.MipLevels = ti.numMips;
+					desc.Format    = format;
+					desc.Usage     = kk == 0 || blit ? D3D11_USAGE_DEFAULT : D3D11_USAGE_IMMUTABLE;
+					desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+					desc.CPUAccessFlags = 0;
+					desc.MiscFlags      = 0;
+
+					if (renderTarget)
 					{
-						D3D11_TEXTURE3D_DESC desc = {};
-						desc.Width     = ti.width;
-						desc.Height    = ti.height;
-						desc.Depth     = ti.depth;
-						desc.MipLevels = ti.numMips;
-						desc.Format    = format;
-						desc.Usage     = kk == 0 || blit ? D3D11_USAGE_DEFAULT : D3D11_USAGE_IMMUTABLE;
-						desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-						desc.CPUAccessFlags = 0;
-						desc.MiscFlags      = 0;
+						desc.BindFlags |= D3D11_BIND_RENDER_TARGET;
+						desc.Usage = D3D11_USAGE_DEFAULT;
+						desc.MiscFlags |= 0
+							| (1 < ti.numMips ? D3D11_RESOURCE_MISC_GENERATE_MIPS : 0)
+							;
+					}
 
-						if (renderTarget)
-						{
-							desc.BindFlags |= D3D11_BIND_RENDER_TARGET;
-							desc.Usage = D3D11_USAGE_DEFAULT;
-							desc.MiscFlags |= 0
-								| (1 < ti.numMips ? D3D11_RESOURCE_MISC_GENERATE_MIPS : 0)
-								;
-						}
+					if (computeWrite)
+					{
+						desc.BindFlags |= D3D11_BIND_UNORDERED_ACCESS;
+						desc.Usage = D3D11_USAGE_DEFAULT;
+					}
 
-						if (computeWrite)
-						{
-							desc.BindFlags |= D3D11_BIND_UNORDERED_ACCESS;
-							desc.Usage = D3D11_USAGE_DEFAULT;
-						}
+					if (readBack)
+					{
+						desc.BindFlags = 0;
+						desc.Usage = D3D11_USAGE_STAGING;
+						desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+					}
 
-						if (readBack)
-						{
-							desc.BindFlags = 0;
-							desc.Usage = D3D11_USAGE_STAGING;
-							desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
-						}
+					srvd.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE3D;
+					srvd.Texture3D.MipLevels = ti.numMips;
 
-						srvd.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE3D;
-						srvd.Texture3D.MipLevels = ti.numMips;
+					desc.MiscFlags |= externalShared ? D3D11_RESOURCE_MISC_SHARED : 0;
 
-						desc.MiscFlags |= externalShared ? D3D11_RESOURCE_MISC_SHARED : 0;
-
+					if (!external)
+					{
 						if (directAccess)
 						{
 							directAccessPtr = m_dar.createTexture3D(&desc, kk == 0 ? NULL : srd, &m_texture3d);
@@ -4807,12 +4671,12 @@ namespace bgfx { namespace d3d11
 							DX_CHECK(s_renderD3D11->m_device->CreateTexture3D(&desc, kk == 0 ? NULL : srd, &m_texture3d) );
 						}
 					}
-					break;
 				}
+				break;
+			}
 
-				if (externalShared)
-				{
-				}
+			if (externalShared)
+			{
 			}
 
 			if (!writeOnly)
@@ -5002,10 +4866,13 @@ namespace bgfx { namespace d3d11
 			}
 		}
 
-		const bool renderTarget = 0 != (m_flags&BGFX_TEXTURE_RT_MASK);
-		if (renderTarget
+		const bool renderTarget = 0 != (m_flags  & BGFX_TEXTURE_RT_MASK);
+		const bool autoGenMips  = 0 != (_resolve & BGFX_RESOLVE_AUTO_GEN_MIPS);
+
+		if (autoGenMips
+		&&  renderTarget
 		&&  1 < m_numMips
-		&&  0 != (_resolve & BGFX_RESOLVE_AUTO_GEN_MIPS) )
+		   )
 		{
 			deviceCtx->GenerateMips(m_srv);
 		}
@@ -5714,7 +5581,7 @@ namespace bgfx { namespace d3d11
 		}
 	}
 
-	void RendererContextD3D11::submit(Frame* _render, ClearQuad& _clearQuad, TextVideoMemBlitter& _textVideoMemBlitter)
+	void RendererContextD3D11::submit(Frame* _render, const ClearQuad& _clearQuad, const MipGen& /*_mipGen*/, TextVideoMemBlitter& _textVideoMemBlitter)
 	{
 		if (m_lost)
 		{
@@ -6230,7 +6097,7 @@ namespace bgfx { namespace d3d11
 
 						const ShaderD3D11* fsh = program.m_fsh;
 						if (NULL != fsh
-						&& (NULL != m_currentColor || fsh->m_hasDepthOp) )
+						&& (NULL != m_currentColor) )
 						{
 							deviceCtx->PSSetShader(fsh->m_pixelShader, NULL, 0);
 							deviceCtx->PSSetConstantBuffers(0, 1, &fsh->m_buffer);
