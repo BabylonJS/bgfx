@@ -1391,6 +1391,11 @@ public static class bgfx
 		/// Discard all draw calls.
 		/// </summary>
 		Discard                = 0x00000002,
+	
+		/// <summary>
+		/// Execute all rendering commands without presenting the backbuffer.
+		/// </summary>
+		Flush                  = 0x00000004,
 	}
 	
 	[AllowDuplicates]
@@ -1587,6 +1592,11 @@ public static class bgfx
 	public enum AttribType : uint32
 	{
 		/// <summary>
+		/// Int8
+		/// </summary>
+		Int8,
+	
+		/// <summary>
 		/// Uint8
 		/// </summary>
 		Uint8,
@@ -1600,6 +1610,11 @@ public static class bgfx
 		/// Int16
 		/// </summary>
 		Int16,
+	
+		/// <summary>
+		/// Uint16
+		/// </summary>
+		Uint16,
 	
 		/// <summary>
 		/// Half, availability depends on: `BGFX_CAPS_VERTEX_ATTRIB_HALF`.
@@ -1618,192 +1633,192 @@ public static class bgfx
 	public enum TextureFormat : uint32
 	{
 		/// <summary>
-		/// DXT1 R5G6B5A1
+		/// Block Compression 1. 5-bit R, 6-bit G, 5-bit B, 1-bit A. 4 BPP.
 		/// </summary>
 		BC1,
 	
 		/// <summary>
-		/// DXT3 R5G6B5A4
+		/// Block Compression 2. 5-bit R, 6-bit G, 5-bit B, 4-bit explicit A. 8 BPP.
 		/// </summary>
 		BC2,
 	
 		/// <summary>
-		/// DXT5 R5G6B5A8
+		/// Block Compression 3. 5-bit R, 6-bit G, 5-bit B, 8-bit interpolated A. 8 BPP.
 		/// </summary>
 		BC3,
 	
 		/// <summary>
-		/// LATC1/ATI1 R8
+		/// Block Compression 4. Single 8-bit red channel, unsigned normalized. 4 BPP.
 		/// </summary>
 		BC4,
 	
 		/// <summary>
-		/// LATC2/ATI2 RG8
+		/// Block Compression 5. Two 8-bit channels (RG), unsigned normalized. 8 BPP.
 		/// </summary>
 		BC5,
 	
 		/// <summary>
-		/// BC6H RGB16F
+		/// Block Compression 6H. Three 16-bit floating-point channels (RGB), HDR. 8 BPP.
 		/// </summary>
 		BC6H,
 	
 		/// <summary>
-		/// BC7 RGB 4-7 bits per color channel, 0-8 bits alpha
+		/// RGB 4-7 bits per color channel, 0-8 bits alpha. Block Compression 7. High-quality RGBA, 4-7 bits per color, 0-8 bits alpha. 8 BPP.
 		/// </summary>
 		BC7,
 	
 		/// <summary>
-		/// ETC1 RGB8
+		/// Ericsson Texture Compression 1. 8-bit per channel RGB. 4 BPP.
 		/// </summary>
 		ETC1,
 	
 		/// <summary>
-		/// ETC2 RGB8
+		/// Ericsson Texture Compression 2. 8-bit per channel RGB. 4 BPP.
 		/// </summary>
 		ETC2,
 	
 		/// <summary>
-		/// ETC2 RGBA8
+		/// Ericsson Texture Compression 2 with full alpha. 8-bit per channel RGBA. 8 BPP.
 		/// </summary>
 		ETC2A,
 	
 		/// <summary>
-		/// ETC2 RGB8A1
+		/// Ericsson Texture Compression 2 with 1-bit punch-through alpha. 4 BPP.
 		/// </summary>
 		ETC2A1,
 	
 		/// <summary>
-		/// EAC R11 UNORM
+		/// ETC2 Alpha Compression, single 11-bit red channel, unsigned normalized. 4 BPP.
 		/// </summary>
 		EACR11,
 	
 		/// <summary>
-		/// EAC R11 SNORM
+		/// ETC2 Alpha Compression, single 11-bit red channel, signed normalized. 4 BPP.
 		/// </summary>
 		EACR11S,
 	
 		/// <summary>
-		/// EAC RG11 UNORM
+		/// ETC2 Alpha Compression, two 11-bit channels (RG), unsigned normalized. 8 BPP.
 		/// </summary>
 		EACRG11,
 	
 		/// <summary>
-		/// EAC RG11 SNORM
+		/// ETC2 Alpha Compression, two 11-bit channels (RG), signed normalized. 8 BPP.
 		/// </summary>
 		EACRG11S,
 	
 		/// <summary>
-		/// PVRTC1 RGB 2BPP
+		/// PowerVR Texture Compression v1. 3-channel RGB. 2 BPP.
 		/// </summary>
 		PTC12,
 	
 		/// <summary>
-		/// PVRTC1 RGB 4BPP
+		/// PowerVR Texture Compression v1. 3-channel RGB. 4 BPP.
 		/// </summary>
 		PTC14,
 	
 		/// <summary>
-		/// PVRTC1 RGBA 2BPP
+		/// PowerVR Texture Compression v1. 4-channel RGBA. 2 BPP.
 		/// </summary>
 		PTC12A,
 	
 		/// <summary>
-		/// PVRTC1 RGBA 4BPP
+		/// PowerVR Texture Compression v1. 4-channel RGBA. 4 BPP.
 		/// </summary>
 		PTC14A,
 	
 		/// <summary>
-		/// PVRTC2 RGBA 2BPP
+		/// PowerVR Texture Compression v2. 4-channel RGBA. 2 BPP.
 		/// </summary>
 		PTC22,
 	
 		/// <summary>
-		/// PVRTC2 RGBA 4BPP
+		/// PowerVR Texture Compression v2. 4-channel RGBA. 4 BPP.
 		/// </summary>
 		PTC24,
 	
 		/// <summary>
-		/// ATC RGB 4BPP
+		/// AMD Texture Compression. 3-channel RGB. 4 BPP.
 		/// </summary>
 		ATC,
 	
 		/// <summary>
-		/// ATCE RGBA 8 BPP explicit alpha
+		/// AMD Texture Compression with explicit alpha. 4-channel RGBA. 8 BPP.
 		/// </summary>
 		ATCE,
 	
 		/// <summary>
-		/// ATCI RGBA 8 BPP interpolated alpha
+		/// AMD Texture Compression with interpolated alpha. 4-channel RGBA. 8 BPP.
 		/// </summary>
 		ATCI,
 	
 		/// <summary>
-		/// ASTC 4x4 8.0 BPP
+		/// Adaptive Scalable Texture Compression, 4x4 block, RGBA. 8.00 BPP.
 		/// </summary>
 		ASTC4x4,
 	
 		/// <summary>
-		/// ASTC 5x4 6.40 BPP
+		/// Adaptive Scalable Texture Compression, 5x4 block, RGBA. 6.40 BPP.
 		/// </summary>
 		ASTC5x4,
 	
 		/// <summary>
-		/// ASTC 5x5 5.12 BPP
+		/// Adaptive Scalable Texture Compression, 5x5 block, RGBA. 5.12 BPP.
 		/// </summary>
 		ASTC5x5,
 	
 		/// <summary>
-		/// ASTC 6x5 4.27 BPP
+		/// Adaptive Scalable Texture Compression, 6x5 block, RGBA. 4.27 BPP.
 		/// </summary>
 		ASTC6x5,
 	
 		/// <summary>
-		/// ASTC 6x6 3.56 BPP
+		/// Adaptive Scalable Texture Compression, 6x6 block, RGBA. 3.56 BPP.
 		/// </summary>
 		ASTC6x6,
 	
 		/// <summary>
-		/// ASTC 8x5 3.20 BPP
+		/// Adaptive Scalable Texture Compression, 8x5 block, RGBA. 3.20 BPP.
 		/// </summary>
 		ASTC8x5,
 	
 		/// <summary>
-		/// ASTC 8x6 2.67 BPP
+		/// Adaptive Scalable Texture Compression, 8x6 block, RGBA. 2.67 BPP.
 		/// </summary>
 		ASTC8x6,
 	
 		/// <summary>
-		/// ASTC 8x8 2.00 BPP
+		/// Adaptive Scalable Texture Compression, 8x8 block, RGBA. 2.00 BPP.
 		/// </summary>
 		ASTC8x8,
 	
 		/// <summary>
-		/// ASTC 10x5 2.56 BPP
+		/// Adaptive Scalable Texture Compression, 10x5 block, RGBA. 2.56 BPP.
 		/// </summary>
 		ASTC10x5,
 	
 		/// <summary>
-		/// ASTC 10x6 2.13 BPP
+		/// Adaptive Scalable Texture Compression, 10x6 block, RGBA. 2.13 BPP.
 		/// </summary>
 		ASTC10x6,
 	
 		/// <summary>
-		/// ASTC 10x8 1.60 BPP
+		/// Adaptive Scalable Texture Compression, 10x8 block, RGBA. 1.60 BPP.
 		/// </summary>
 		ASTC10x8,
 	
 		/// <summary>
-		/// ASTC 10x10 1.28 BPP
+		/// Adaptive Scalable Texture Compression, 10x10 block, RGBA. 1.28 BPP.
 		/// </summary>
 		ASTC10x10,
 	
 		/// <summary>
-		/// ASTC 12x10 1.07 BPP
+		/// Adaptive Scalable Texture Compression, 12x10 block, RGBA. 1.07 BPP.
 		/// </summary>
 		ASTC12x10,
 	
 		/// <summary>
-		/// ASTC 12x12 0.89 BPP
+		/// Adaptive Scalable Texture Compression, 12x12 block, RGBA. 0.89 BPP.
 		/// </summary>
 		ASTC12x12,
 	
@@ -1811,70 +1826,310 @@ public static class bgfx
 		/// Compressed formats above.
 		/// </summary>
 		Unknown,
+	
+		/// <summary>
+		/// 1-bit single-channel red. Monochrome, 1-bit per pixel. 1 BPP.
+		/// </summary>
 		R1,
+	
+		/// <summary>
+		/// 8-bit single-channel alpha, unsigned normalized. 8 BPP.
+		/// </summary>
 		A8,
+	
+		/// <summary>
+		/// 8-bit single-channel red, unsigned normalized. 8 BPP.
+		/// </summary>
 		R8,
+	
+		/// <summary>
+		/// 8-bit single-channel red, signed integer. 8 BPP.
+		/// </summary>
 		R8I,
+	
+		/// <summary>
+		/// 8-bit single-channel red, unsigned integer. 8 BPP.
+		/// </summary>
 		R8U,
+	
+		/// <summary>
+		/// 8-bit single-channel red, signed normalized. 8 BPP.
+		/// </summary>
 		R8S,
+	
+		/// <summary>
+		/// 16-bit single-channel red, unsigned normalized. 16 BPP.
+		/// </summary>
 		R16,
+	
+		/// <summary>
+		/// 16-bit single-channel red, signed integer. 16 BPP.
+		/// </summary>
 		R16I,
+	
+		/// <summary>
+		/// 16-bit single-channel red, unsigned integer. 16 BPP.
+		/// </summary>
 		R16U,
+	
+		/// <summary>
+		/// 16-bit single-channel red, half-precision floating point. 16 BPP.
+		/// </summary>
 		R16F,
+	
+		/// <summary>
+		/// 16-bit single-channel red, signed normalized. 16 BPP.
+		/// </summary>
 		R16S,
+	
+		/// <summary>
+		/// 32-bit single-channel red, signed integer. 32 BPP.
+		/// </summary>
 		R32I,
+	
+		/// <summary>
+		/// 32-bit single-channel red, unsigned integer. 32 BPP.
+		/// </summary>
 		R32U,
+	
+		/// <summary>
+		/// 32-bit single-channel red, full-precision floating point. 32 BPP.
+		/// </summary>
 		R32F,
+	
+		/// <summary>
+		/// Two 8-bit channels (red, green), unsigned normalized. 16 BPP.
+		/// </summary>
 		RG8,
+	
+		/// <summary>
+		/// Two 8-bit channels (red, green), signed integer. 16 BPP.
+		/// </summary>
 		RG8I,
+	
+		/// <summary>
+		/// Two 8-bit channels (red, green), unsigned integer. 16 BPP.
+		/// </summary>
 		RG8U,
+	
+		/// <summary>
+		/// Two 8-bit channels (red, green), signed normalized. 16 BPP.
+		/// </summary>
 		RG8S,
+	
+		/// <summary>
+		/// Two 16-bit channels (red, green), unsigned normalized. 32 BPP.
+		/// </summary>
 		RG16,
+	
+		/// <summary>
+		/// Two 16-bit channels (red, green), signed integer. 32 BPP.
+		/// </summary>
 		RG16I,
+	
+		/// <summary>
+		/// Two 16-bit channels (red, green), unsigned integer. 32 BPP.
+		/// </summary>
 		RG16U,
+	
+		/// <summary>
+		/// Two 16-bit channels (red, green), half-precision floating point. 32 BPP.
+		/// </summary>
 		RG16F,
+	
+		/// <summary>
+		/// Two 16-bit channels (red, green), signed normalized. 32 BPP.
+		/// </summary>
 		RG16S,
+	
+		/// <summary>
+		/// Two 32-bit channels (red, green), signed integer. 64 BPP.
+		/// </summary>
 		RG32I,
+	
+		/// <summary>
+		/// Two 32-bit channels (red, green), unsigned integer. 64 BPP.
+		/// </summary>
 		RG32U,
+	
+		/// <summary>
+		/// Two 32-bit channels (red, green), full-precision floating point. 64 BPP.
+		/// </summary>
 		RG32F,
+	
+		/// <summary>
+		/// Three 8-bit channels (red, green, blue), unsigned normalized. 24 BPP.
+		/// </summary>
 		RGB8,
+	
+		/// <summary>
+		/// Three 8-bit channels (red, green, blue), signed integer. 24 BPP.
+		/// </summary>
 		RGB8I,
+	
+		/// <summary>
+		/// Three 8-bit channels (red, green, blue), unsigned integer. 24 BPP.
+		/// </summary>
 		RGB8U,
+	
+		/// <summary>
+		/// Three 8-bit channels (red, green, blue), signed normalized. 24 BPP.
+		/// </summary>
 		RGB8S,
+	
+		/// <summary>
+		/// Shared-exponent RGB. 9 bits per RGB channel with a shared 5-bit exponent, floating point. 32 BPP.
+		/// </summary>
 		RGB9E5F,
+	
+		/// <summary>
+		/// Four 8-bit channels (blue, green, red, alpha), unsigned normalized. BGRA byte order. 32 BPP.
+		/// </summary>
 		BGRA8,
+	
+		/// <summary>
+		/// Four 8-bit channels (red, green, blue, alpha), unsigned normalized. 32 BPP.
+		/// </summary>
 		RGBA8,
+	
+		/// <summary>
+		/// Four 8-bit channels (red, green, blue, alpha), signed integer. 32 BPP.
+		/// </summary>
 		RGBA8I,
+	
+		/// <summary>
+		/// Four 8-bit channels (red, green, blue, alpha), unsigned integer. 32 BPP.
+		/// </summary>
 		RGBA8U,
+	
+		/// <summary>
+		/// Four 8-bit channels (red, green, blue, alpha), signed normalized. 32 BPP.
+		/// </summary>
 		RGBA8S,
+	
+		/// <summary>
+		/// Four 16-bit channels (red, green, blue, alpha), unsigned normalized. 64 BPP.
+		/// </summary>
 		RGBA16,
+	
+		/// <summary>
+		/// Four 16-bit channels (red, green, blue, alpha), signed integer. 64 BPP.
+		/// </summary>
 		RGBA16I,
+	
+		/// <summary>
+		/// Four 16-bit channels (red, green, blue, alpha), unsigned integer. 64 BPP.
+		/// </summary>
 		RGBA16U,
+	
+		/// <summary>
+		/// Four 16-bit channels (red, green, blue, alpha), half-precision floating point. 64 BPP.
+		/// </summary>
 		RGBA16F,
+	
+		/// <summary>
+		/// Four 16-bit channels (red, green, blue, alpha), signed normalized. 64 BPP.
+		/// </summary>
 		RGBA16S,
+	
+		/// <summary>
+		/// Four 32-bit channels (red, green, blue, alpha), signed integer. 128 BPP.
+		/// </summary>
 		RGBA32I,
+	
+		/// <summary>
+		/// Four 32-bit channels (red, green, blue, alpha), unsigned integer. 128 BPP.
+		/// </summary>
 		RGBA32U,
+	
+		/// <summary>
+		/// Four 32-bit channels (red, green, blue, alpha), full-precision floating point. 128 BPP.
+		/// </summary>
 		RGBA32F,
+	
+		/// <summary>
+		/// Packed 16-bit, 5-bit blue, 6-bit green, 5-bit red. BGR byte order, unsigned normalized. 16 BPP.
+		/// </summary>
 		B5G6R5,
+	
+		/// <summary>
+		/// Packed 16-bit, 5-bit red, 6-bit green, 5-bit blue. RGB byte order, unsigned normalized. 16 BPP.
+		/// </summary>
 		R5G6B5,
+	
+		/// <summary>
+		/// Packed 16-bit, 4-bit per channel (blue, green, red, alpha). BGRA byte order, unsigned normalized. 16 BPP.
+		/// </summary>
 		BGRA4,
+	
+		/// <summary>
+		/// Packed 16-bit, 4-bit per channel (red, green, blue, alpha), unsigned normalized. 16 BPP.
+		/// </summary>
 		RGBA4,
+	
+		/// <summary>
+		/// Packed 16-bit, 5-bit blue, 5-bit green, 5-bit red, 1-bit alpha. BGRA byte order, unsigned normalized. 16 BPP.
+		/// </summary>
 		BGR5A1,
+	
+		/// <summary>
+		/// Packed 16-bit, 5-bit red, 5-bit green, 5-bit blue, 1-bit alpha, unsigned normalized. 16 BPP.
+		/// </summary>
 		RGB5A1,
+	
+		/// <summary>
+		/// Packed 32-bit, 10-bit red, 10-bit green, 10-bit blue, 2-bit alpha, unsigned normalized. 32 BPP.
+		/// </summary>
 		RGB10A2,
+	
+		/// <summary>
+		/// Packed 32-bit, 11-bit red, 11-bit green, 10-bit blue, unsigned floating point. No alpha. 32 BPP.
+		/// </summary>
 		RG11B10F,
 	
 		/// <summary>
 		/// Depth formats below.
 		/// </summary>
 		UnknownDepth,
+	
+		/// <summary>
+		/// 16-bit depth, unsigned normalized. 16 BPP.
+		/// </summary>
 		D16,
+	
+		/// <summary>
+		/// 24-bit depth, unsigned normalized (stored as 32-bit with 8 bits unused). 32 BPP.
+		/// </summary>
 		D24,
+	
+		/// <summary>
+		/// 24-bit depth, unsigned normalized, with 8-bit stencil. 32 BPP.
+		/// </summary>
 		D24S8,
+	
+		/// <summary>
+		/// 32-bit depth, unsigned normalized. 32 BPP.
+		/// </summary>
 		D32,
+	
+		/// <summary>
+		/// 16-bit depth, floating point. 16 BPP.
+		/// </summary>
 		D16F,
+	
+		/// <summary>
+		/// 24-bit depth, floating point (stored as 32-bit). 32 BPP.
+		/// </summary>
 		D24F,
+	
+		/// <summary>
+		/// 32-bit depth, floating point. 32 BPP.
+		/// </summary>
 		D32F,
+	
+		/// <summary>
+		/// 8-bit stencil only, no depth. 8 BPP.
+		/// </summary>
 		D0S8,
 	
 		Count
@@ -2215,7 +2470,7 @@ public static class bgfx
 			public uint32 maxEncoders;
 			public uint32 minResourceCbSize;
 			public uint32 maxTransientVbSize;
-			public uint32 maxTansientIbSize;
+			public uint32 maxTransientIbSize;
 			public uint32 minUniformBufferSize;
 		}
 	
@@ -2545,7 +2800,9 @@ public static class bgfx
 	
 	/// <summary>
 	/// Add attribute to VertexLayout.
+	/// 
 	/// @remarks Must be called between begin/end.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_attrib">Attribute semantics. See: `bgfx::Attrib`</param>
@@ -2627,20 +2884,6 @@ public static class bgfx
 	public static extern void vertex_convert(VertexLayout* _dstLayout, void* _dstData, VertexLayout* _srcLayout, void* _srcData, uint32 _num);
 	
 	/// <summary>
-	/// Weld vertices.
-	/// </summary>
-	///
-	/// <param name="_output">Welded vertices remapping table. The size of buffer must be the same as number of vertices.</param>
-	/// <param name="_layout">Vertex stream layout.</param>
-	/// <param name="_data">Vertex stream.</param>
-	/// <param name="_num">Number of vertices in vertex stream.</param>
-	/// <param name="_index32">Set to `true` if input indices are 32-bit.</param>
-	/// <param name="_epsilon">Error tolerance for vertex position comparison.</param>
-	///
-	[LinkName("bgfx_weld_vertices")]
-	public static extern uint32 weld_vertices(void* _output, VertexLayout* _layout, void* _data, uint32 _num, bool _index32, float _epsilon);
-	
-	/// <summary>
 	/// Convert index buffer for use with different primitive topologies.
 	/// </summary>
 	///
@@ -2718,8 +2961,10 @@ public static class bgfx
 	
 	/// <summary>
 	/// Reset graphic settings and back-buffer size.
+	/// 
 	/// @attention This call doesn’t change the window size, it just resizes
 	///   the back-buffer. Your windowing code controls the window size.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_width">Back-buffer width.</param>
@@ -2731,20 +2976,43 @@ public static class bgfx
 	public static extern void reset(uint32 _width, uint32 _height, uint32 _flags, TextureFormat _format);
 	
 	/// <summary>
-	/// Advance to next frame. When using multithreaded renderer, this call
-	/// just swaps internal buffers, kicks render thread, and returns. In
-	/// singlethreaded renderer this call does frame rendering.
+	/// Advance to next frame. This is the main frame-advancement call on the
+	/// API thread (the thread from which `bgfx::init` was called).
+	/// 
+	/// **Multithreaded renderer** (`BGFX_CONFIG_MULTITHREADED=1`, default):
+	/// This call waits for the render thread to finish processing the previous
+	/// frame, then swaps internal submit/render buffers, signals the render
+	/// thread to begin processing the new frame via `bgfx::renderFrame`, and
+	/// returns immediately. The render thread and API thread then run in
+	/// parallel: the API thread builds the next frame while the render thread
+	/// executes GPU commands for the current frame.
+	/// 
+	/// **Single-threaded renderer** (`BGFX_CONFIG_MULTITHREADED=0`, or when
+	/// `bgfx::renderFrame` and `bgfx::init` are called from the same thread):
+	/// This call swaps internal buffers and performs frame rendering inline
+	/// (internally calls `bgfx::renderFrame`), then returns.
+	/// 
+	/// @remarks
+	///   Must be called from the API thread (the thread that called
+	///   `bgfx::init`). In multithreaded mode, this call synchronizes with
+	///   `bgfx::renderFrame` running on the render thread via semaphores:
+	///   `bgfx::frame` waits for the render thread to finish, then posts a
+	///   signal that `bgfx::renderFrame` waits on to begin the next frame.
+	///   See also: `bgfx::renderFrame`.
+	/// 
 	/// </summary>
 	///
-	/// <param name="_flags">Frame flags. See: `BGFX_FRAME_*` for more info.   - `BGFX_FRAME_NONE` - No frame flag.   - `BGFX_FRAME_DEBUG_CAPTURE` - Capture frame with graphics debugger.   - `BGFX_FRAME_DISCARD` - Discard all draw calls.</param>
+	/// <param name="_flags">Frame flags. See: `BGFX_FRAME_*` for more info.   - `BGFX_FRAME_NONE` - No frame flag.   - `BGFX_FRAME_DEBUG_CAPTURE` - Capture frame with graphics debugger.   - `BGFX_FRAME_DISCARD` - Discard all draw calls.   - `BGFX_FRAME_FLUSH` - Execute all rendering commands     without presenting the backbuffer.</param>
 	///
 	[LinkName("bgfx_frame")]
 	public static extern uint32 frame(uint8 _flags);
 	
 	/// <summary>
 	/// Returns current renderer backend API type.
+	/// 
 	/// @remarks
 	///   Library must be initialized.
+	/// 
 	/// </summary>
 	///
 	[LinkName("bgfx_get_renderer_type")]
@@ -2752,8 +3020,10 @@ public static class bgfx
 	
 	/// <summary>
 	/// Returns renderer capabilities.
+	/// 
 	/// @remarks
 	///   Library must be initialized.
+	/// 
 	/// </summary>
 	///
 	[LinkName("bgfx_get_caps")]
@@ -2761,7 +3031,9 @@ public static class bgfx
 	
 	/// <summary>
 	/// Returns performance counters.
+	/// 
 	/// @attention Pointer returned is valid until `bgfx::frame` is called.
+	/// 
 	/// </summary>
 	///
 	[LinkName("bgfx_get_stats")]
@@ -2793,7 +3065,9 @@ public static class bgfx
 	/// consumed, otherwise you must make sure _data is available for at least 2
 	/// `bgfx::frame` calls. `ReleaseFn` function must be able to be called
 	/// from any thread.
+	/// 
 	/// @attention Data passed must be available for at least 2 `bgfx::frame` calls.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_data">Pointer to data.</param>
@@ -2809,7 +3083,9 @@ public static class bgfx
 	/// consumed, otherwise you must make sure _data is available for at least 2
 	/// `bgfx::frame` calls. `ReleaseFn` function must be able to be called
 	/// from any thread.
+	/// 
 	/// @attention Data passed must be available for at least 2 `bgfx::frame` calls.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_data">Pointer to data.</param>
@@ -2909,7 +3185,7 @@ public static class bgfx
 	public static extern void destroy_index_buffer(IndexBufferHandle _handle);
 	
 	/// <summary>
-	/// Create vertex layout.
+	/// Create vertex layout. Vertex layouts are used to describe the format of vertex data.
 	/// </summary>
 	///
 	/// <param name="_layout">Vertex layout.</param>
@@ -3071,6 +3347,7 @@ public static class bgfx
 	
 	/// <summary>
 	/// Allocate transient index buffer.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_tib">TransientIndexBuffer structure will be filled, and will be valid for the duration of frame, and can be reused for multiple draw calls.</param>
@@ -3095,6 +3372,7 @@ public static class bgfx
 	/// Check for required space and allocate transient vertex and index
 	/// buffers. If both space requirements are satisfied function returns
 	/// true.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_tvb">TransientVertexBuffer structure will be filled, and will be valid for the duration of frame, and can be reused for multiple draw calls.</param>
@@ -3138,8 +3416,10 @@ public static class bgfx
 	
 	/// <summary>
 	/// Create shader from memory buffer.
+	/// 
 	/// @remarks
 	///   Shader binary is obtained by compiling shader offline with shaderc command line tool.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_mem">Shader binary.</param>
@@ -3149,8 +3429,10 @@ public static class bgfx
 	
 	/// <summary>
 	/// Returns the number of uniforms and uniform handles used inside a shader.
+	/// 
 	/// @remarks
 	///   Only non-predefined uniforms are returned.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_handle">Shader handle.</param>
@@ -3173,8 +3455,10 @@ public static class bgfx
 	
 	/// <summary>
 	/// Destroy shader.
+	/// 
 	/// @remark Once a shader program is created with _handle,
 	///   it is safe to destroy that shader.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_handle">Shader handle.</param>
@@ -3326,7 +3610,9 @@ public static class bgfx
 	
 	/// <summary>
 	/// Update 2D texture.
+	/// 
 	/// @attention It's valid to update only mutable texture. See `bgfx::createTexture2D` for more info.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_handle">Texture handle.</param>
@@ -3344,7 +3630,9 @@ public static class bgfx
 	
 	/// <summary>
 	/// Update 3D texture.
+	/// 
 	/// @attention It's valid to update only mutable texture. See `bgfx::createTexture3D` for more info.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_handle">Texture handle.</param>
@@ -3362,7 +3650,9 @@ public static class bgfx
 	
 	/// <summary>
 	/// Update Cube texture.
+	/// 
 	/// @attention It's valid to update only mutable texture. See `bgfx::createTextureCube` for more info.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_handle">Texture handle.</param>
@@ -3381,8 +3671,10 @@ public static class bgfx
 	
 	/// <summary>
 	/// Read back texture content.
+	/// 
 	/// @attention Texture must be created with `BGFX_TEXTURE_READ_BACK` flag.
 	/// @attention Availability depends on: `BGFX_CAPS_TEXTURE_READ_BACK`.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_handle">Texture handle.</param>
@@ -3405,8 +3697,10 @@ public static class bgfx
 	
 	/// <summary>
 	/// Returns texture direct access pointer.
+	/// 
 	/// @attention Availability depends on: `BGFX_CAPS_TEXTURE_DIRECT_ACCESS`. This feature
 	///   is available on GPUs that have unified memory architecture (UMA) support.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_handle">Texture handle.</param>
@@ -3472,9 +3766,12 @@ public static class bgfx
 	
 	/// <summary>
 	/// Create frame buffer for multiple window rendering.
+	/// 
 	/// @remarks
 	///   Frame buffer cannot be used for sampling.
+	/// 
 	/// @attention Availability depends on: `BGFX_CAPS_SWAP_CHAIN`.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_nwh">OS' target native window handle.</param>
@@ -3517,12 +3814,14 @@ public static class bgfx
 	
 	/// <summary>
 	/// Create shader uniform parameter.
+	/// 
 	/// @remarks
 	///   1. Uniform names are unique. It's valid to call `bgfx::createUniform`
 	///      multiple times with the same uniform name. The library will always
 	///      return the same handle, but the handle reference count will be
 	///      incremented. This means that the same number of `bgfx::destroyUniform`
 	///      must be called to properly destroy the uniform.
+	/// 
 	///   2. Predefined uniforms (declared in `bgfx_shader.sh`):
 	///      - `u_viewRect vec4(x, y, width, height)` - view rectangle for current
 	///        view, in pixels.
@@ -3540,6 +3839,7 @@ public static class bgfx
 	///      - `u_invModelView mat4` - inverted concatenated model view matrix.
 	///      - `u_modelViewProj mat4` - concatenated model view projection matrix.
 	///      - `u_alphaRef float` - alpha reference value for alpha test.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_name">Uniform name in shader.</param>
@@ -3551,12 +3851,14 @@ public static class bgfx
 	
 	/// <summary>
 	/// Create shader uniform parameter.
+	/// 
 	/// @remarks
 	///   1. Uniform names are unique. It's valid to call `bgfx::createUniform`
 	///      multiple times with the same uniform name. The library will always
 	///      return the same handle, but the handle reference count will be
 	///      incremented. This means that the same number of `bgfx::destroyUniform`
 	///      must be called to properly destroy the uniform.
+	/// 
 	///   2. Predefined uniforms (declared in `bgfx_shader.sh`):
 	///      - `u_viewRect vec4(x, y, width, height)` - view rectangle for current
 	///        view, in pixels.
@@ -3574,6 +3876,7 @@ public static class bgfx
 	///      - `u_invModelView mat4` - inverted concatenated model view matrix.
 	///      - `u_modelViewProj mat4` - concatenated model view projection matrix.
 	///      - `u_alphaRef float` - alpha reference value for alpha test.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_name">Uniform name in shader.</param>
@@ -3604,7 +3907,8 @@ public static class bgfx
 	public static extern void destroy_uniform(UniformHandle _handle);
 	
 	/// <summary>
-	/// Create occlusion query.
+	/// Create occlusion query. Occlusion queries allow the GPU to determine
+	/// if any pixels passed the depth test.
 	/// </summary>
 	///
 	[LinkName("bgfx_create_occlusion_query")]
@@ -3664,13 +3968,17 @@ public static class bgfx
 	
 	/// <summary>
 	/// Set view name.
+	/// 
 	/// @remarks
 	///   This is debug only feature.
+	/// 
 	///   In graphics debugger view name will appear as:
+	/// 
 	///       "nnnc <view name>"
 	///        ^  ^ ^
 	///        |  +--- compute (C)
 	///        +------ view id
+	/// 
 	/// </summary>
 	///
 	/// <param name="_id">View id.</param>
@@ -3756,8 +4064,10 @@ public static class bgfx
 	
 	/// <summary>
 	/// Set view sorting mode.
+	/// 
 	/// @remarks
 	///   View mode must be set prior calling `bgfx::submit` for the view.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_id">View id.</param>
@@ -3768,8 +4078,10 @@ public static class bgfx
 	
 	/// <summary>
 	/// Set view frame buffer.
+	/// 
 	/// @remarks
 	///   Not persistent after `bgfx::reset` call.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_id">View id.</param>
@@ -3803,7 +4115,9 @@ public static class bgfx
 	
 	/// <summary>
 	/// Set view shading rate.
+	/// 
 	/// @attention Availability depends on: `BGFX_CAPS_VARIABLE_RATE_SHADING`.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_id">View id.</param>
@@ -3822,16 +4136,53 @@ public static class bgfx
 	public static extern void reset_view(ViewId _id);
 	
 	/// <summary>
-	/// Begin submitting draw calls from thread.
+	/// Begin submitting draw calls from thread. Obtains an encoder that can be
+	/// used to submit draw calls, compute dispatches, and state changes.
+	/// 
+	/// In multithreaded mode (`BGFX_CONFIG_MULTITHREADED=1`), multiple threads
+	/// can each obtain their own encoder and submit draw calls in parallel.
+	/// Each encoder writes into its own uniform buffer, so there is no
+	/// contention between threads. The maximum number of simultaneous encoders
+	/// is configured via `Limits.maxEncoders` in `bgfx::Init` (default: 8).
+	/// 
+	/// When called from the API thread (the thread that called `bgfx::init`)
+	/// with `_forceNewEncoder` set to `false`, the default internal encoder
+	/// (encoder 0) is returned. This is the same encoder used by the legacy
+	/// non-encoder API (`bgfx::setState`, `bgfx::submit`, etc.). When called
+	/// from a worker thread (or with `_forceNewEncoder` set to `true`), a new
+	/// encoder is allocated from the encoder pool.
+	/// 
+	/// @remarks
+	///   The returned `Encoder` pointer is valid until `bgfx::end` is called
+	///   with it. All encoders must be ended before `bgfx::frame` is called.
+	///   If `bgfx::frame` is called while encoders are still active, it will
+	///   wait for them to finish. Returns `NULL` if no encoder slots are
+	///   available (all `maxEncoders` slots are in use).
+	///   See also: `bgfx::end`, `bgfx::frame`.
+	/// 
 	/// </summary>
 	///
-	/// <param name="_forThread">Explicitly request an encoder for a worker thread.</param>
+	/// <param name="_forceNewEncoder">Force allocation of a new encoder from the pool, even when called from the API thread.</param>
 	///
 	[LinkName("bgfx_encoder_begin")]
-	public static extern Encoder* encoder_begin(bool _forThread);
+	public static extern Encoder* encoder_begin(bool _forceNewEncoder);
 	
 	/// <summary>
-	/// End submitting draw calls from thread.
+	/// End submitting draw calls from thread. Returns the encoder obtained from
+	/// `bgfx::begin` back to the encoder pool.
+	/// 
+	/// After this call the `Encoder` pointer is no longer valid and must not
+	/// be used. The encoder's recorded draw calls and state changes are finalized
+	/// and will be included in the next frame when `bgfx::frame` is called.
+	/// 
+	/// @remarks
+	///   Must be called from the same thread that called `bgfx::begin` for
+	///   this encoder. All encoders must be ended before `bgfx::frame` is
+	///   called. The default encoder (encoder 0, used by the legacy API) is
+	///   managed internally and does not need to be passed to `bgfx::end`;
+	///   passing it is harmless but has no effect.
+	///   See also: `bgfx::begin`, `bgfx::frame`.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_encoder">Encoder.</param>
@@ -3852,6 +4203,7 @@ public static class bgfx
 	
 	/// <summary>
 	/// Set render states for draw primitive.
+	/// 
 	/// @remarks
 	///   1. To set up more complex states use:
 	///      `BGFX_STATE_ALPHA_REF(_ref)`,
@@ -3862,6 +4214,7 @@ public static class bgfx
 	///      `BGFX_STATE_BLEND_EQUATION_SEPARATE(_equationRGB, _equationA)`
 	///   2. `BGFX_STATE_BLEND_EQUATION_ADD` is set when no other blend
 	///      equation is specified.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_state">State flags. Default state for primitive type is   triangles. See: `BGFX_STATE_DEFAULT`.   - `BGFX_STATE_DEPTH_TEST_*` - Depth test function.   - `BGFX_STATE_BLEND_*` - See remark 1 about BGFX_STATE_BLEND_FUNC.   - `BGFX_STATE_BLEND_EQUATION_*` - See remark 2.   - `BGFX_STATE_CULL_*` - Backface culling mode.   - `BGFX_STATE_WRITE_*` - Enable R, G, B, A or Z write.   - `BGFX_STATE_MSAA` - Enable hardware multisample antialiasing.   - `BGFX_STATE_PT_[TRISTRIP/LINES/POINTS]` - Primitive type.</param>
@@ -3892,8 +4245,10 @@ public static class bgfx
 	
 	/// <summary>
 	/// Set scissor for draw primitive.
+	/// 
 	/// @remark
 	///   To scissor for all primitives in view see `bgfx::setViewScissor`.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_x">Position x from the left corner of the window.</param>
@@ -3906,8 +4261,10 @@ public static class bgfx
 	
 	/// <summary>
 	/// Set scissor from cache for draw primitive.
+	/// 
 	/// @remark
 	///   To scissor for all primitives in view see `bgfx::setViewScissor`.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_cache">Index in scissor cache.</param>
@@ -3938,7 +4295,9 @@ public static class bgfx
 	
 	/// <summary>
 	/// Reserve matrices in internal matrix cache.
+	/// 
 	/// @attention Pointer returned can be modified until `bgfx::frame` is called.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_transform">Pointer to `Transform` structure.</param>
@@ -3960,7 +4319,9 @@ public static class bgfx
 	
 	/// <summary>
 	/// Set shader uniform parameter for view.
+	/// 
 	/// @attention Uniform must be created with `bgfx::UniformFreq::View` argument.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_id">View id.</param>
@@ -3973,7 +4334,9 @@ public static class bgfx
 	
 	/// <summary>
 	/// Set shader uniform parameter for frame.
+	/// 
 	/// @attention Uniform must be created with `bgfx::UniformFreq::View` argument.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_handle">Uniform.</param>
@@ -4053,6 +4416,16 @@ public static class bgfx
 	[LinkName("bgfx_encoder_set_dynamic_vertex_buffer")]
 	public static extern void encoder_set_dynamic_vertex_buffer(Encoder* _this, uint8 _stream, DynamicVertexBufferHandle _handle, uint32 _startVertex, uint32 _numVertices);
 	
+	/// <summary>
+	/// Set vertex buffer for draw primitive.
+	/// </summary>
+	///
+	/// <param name="_stream">Vertex stream.</param>
+	/// <param name="_handle">Dynamic vertex buffer.</param>
+	/// <param name="_startVertex">First vertex to render.</param>
+	/// <param name="_numVertices">Number of vertices to render.</param>
+	/// <param name="_layoutHandle">Vertex layout for aliasing vertex buffer. If invalid handle is used, vertex layout used for creation of vertex buffer will be used.</param>
+	///
 	[LinkName("bgfx_encoder_set_dynamic_vertex_buffer_with_layout")]
 	public static extern void encoder_set_dynamic_vertex_buffer_with_layout(Encoder* _this, uint8 _stream, DynamicVertexBufferHandle _handle, uint32 _startVertex, uint32 _numVertices, VertexLayoutHandle _layoutHandle);
 	
@@ -4084,7 +4457,9 @@ public static class bgfx
 	/// <summary>
 	/// Set number of vertices for auto generated vertices use in conjunction
 	/// with gl_VertexID.
+	/// 
 	/// @attention Availability depends on: `BGFX_CAPS_VERTEX_ID`.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_numVertices">Number of vertices.</param>
@@ -4128,7 +4503,9 @@ public static class bgfx
 	/// <summary>
 	/// Set number of instances for auto generated instances use in conjunction
 	/// with gl_InstanceID.
+	/// 
 	/// @attention Availability depends on: `BGFX_CAPS_VERTEX_ID`.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_numInstances">Number of instances.</param>
@@ -4153,8 +4530,10 @@ public static class bgfx
 	/// will be applied but no geometry will be submitted. Useful in cases
 	/// when no other draw/compute primitive is submitted to view, but it's
 	/// desired to execute clear view.
+	/// 
 	/// @remark
 	///   These empty draw calls will sort before ordinary draw calls.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_id">View id.</param>
@@ -4190,7 +4569,9 @@ public static class bgfx
 	/// <summary>
 	/// Submit primitive for rendering with index and instance data info from
 	/// indirect buffer.
+	/// 
 	/// @attention Availability depends on: `BGFX_CAPS_DRAW_INDIRECT`.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_id">View id.</param>
@@ -4207,7 +4588,9 @@ public static class bgfx
 	/// <summary>
 	/// Submit primitive for rendering with index and instance data info and
 	/// draw count from indirect buffers.
+	/// 
 	/// @attention Availability depends on: `BGFX_CAPS_DRAW_INDIRECT_COUNT`.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_id">View id.</param>
@@ -4330,8 +4713,10 @@ public static class bgfx
 	
 	/// <summary>
 	/// Blit 2D texture region between two 2D textures.
+	/// 
 	/// @attention Destination texture must be created with `BGFX_TEXTURE_BLIT_DST` flag.
 	/// @attention Availability depends on: `BGFX_CAPS_TEXTURE_BLIT`.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_id">View id.</param>
@@ -4354,9 +4739,11 @@ public static class bgfx
 	
 	/// <summary>
 	/// Request screen shot of window back buffer.
+	/// 
 	/// @remarks
 	///   `bgfx::CallbackI::screenShot` must be implemented.
 	/// @attention Frame buffer handle must be created with OS' target native window handle.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_handle">Frame buffer handle. If handle is `BGFX_INVALID_HANDLE` request will be made for main window back buffer.</param>
@@ -4366,14 +4753,44 @@ public static class bgfx
 	public static extern void request_screen_shot(FrameBufferHandle _handle, char8* _filePath);
 	
 	/// <summary>
-	/// Render frame.
-	/// @attention `bgfx::renderFrame` is blocking call. It waits for
-	///   `bgfx::frame` to be called from API thread to process frame.
-	///   If timeout value is passed call will timeout and return even
-	///   if `bgfx::frame` is not called.
-	/// @warning This call should be only used on platforms that don't
-	///   allow creating separate rendering thread. If it is called before
-	///   to bgfx::init, render thread won't be created by bgfx::init call.
+	/// Render frame. Executes the actual GPU rendering work for one frame.
+	/// 
+	/// In the default **multithreaded** configuration, `bgfx::renderFrame` runs
+	/// on the **render thread** while `bgfx::frame` runs on the **API thread**.
+	/// Their interaction is as follows:
+	/// 
+	///   1. The render thread calls `bgfx::renderFrame`, which blocks waiting
+	///      for the API thread to signal that a new frame is ready.
+	///   2. On the API thread, `bgfx::frame` finishes building the frame,
+	///      swaps internal submit/render buffers, and signals the render thread.
+	///   3. `bgfx::renderFrame` wakes up, executes pre-render commands,
+	///      submits GPU draw calls, executes post-render commands, flips the
+	///      back buffer, then signals back to the API thread that rendering
+	///      is complete.
+	///   4. The API thread's next `bgfx::frame` call waits for this completion
+	///      signal before swapping buffers again.
+	/// 
+	/// This double-buffered semaphore handshake allows the API thread and
+	/// render thread to run in parallel, overlapping CPU frame building with
+	/// GPU rendering.
+	/// 
+	/// @attention `bgfx::renderFrame` is a blocking call. It waits for
+	///   `bgfx::frame` to be called from the API thread to process the frame.
+	///   If a timeout value is passed, the call will return
+	///   `RenderFrame::Timeout` even if `bgfx::frame` has not been called.
+	///   A value of -1 (default) means wait indefinitely (up to
+	///   `BGFX_CONFIG_API_SEMAPHORE_TIMEOUT`).
+	/// 
+	/// @warning This call should only be used on platforms that don't allow
+	///   creating a separate rendering thread. If it is called before
+	///   `bgfx::init`, the internal render thread won't be created by the
+	///   `bgfx::init` call, and the user is responsible for calling
+	///   `bgfx::renderFrame` on the render thread each frame. If both
+	///   `bgfx::renderFrame` and `bgfx::init` are called from the same
+	///   thread, bgfx operates in single-threaded mode and `bgfx::frame`
+	///   will internally invoke `bgfx::renderFrame` automatically.
+	///   See also: `bgfx::frame`.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_msecs">Timeout in milliseconds.</param>
@@ -4383,7 +4800,9 @@ public static class bgfx
 	
 	/// <summary>
 	/// Set platform data.
+	/// 
 	/// @warning Must be called before `bgfx::init`.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_data">Platform data.</param>
@@ -4393,9 +4812,12 @@ public static class bgfx
 	
 	/// <summary>
 	/// Get internal data for interop.
+	/// 
 	/// @attention It's expected you understand some bgfx internals before you
 	///   use this call.
+	/// 
 	/// @warning Must be called only on render thread.
+	/// 
 	/// </summary>
 	///
 	[LinkName("bgfx_get_internal_data")]
@@ -4404,9 +4826,12 @@ public static class bgfx
 	/// <summary>
 	/// Override internal texture with externally created texture. Previously
 	/// created internal texture will released.
+	/// 
 	/// @attention It's expected you understand some bgfx internals before you
 	///   use this call.
+	/// 
 	/// @warning Must be called only on render thread.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_handle">Texture handle.</param>
@@ -4419,11 +4844,15 @@ public static class bgfx
 	/// <summary>
 	/// Override internal texture by creating new texture. Previously created
 	/// internal texture will released.
+	/// 
 	/// @attention It's expected you understand some bgfx internals before you
 	///   use this call.
+	/// 
 	/// @returns Native API pointer to texture. If result is 0, texture is not created yet from the
 	///   main thread.
+	/// 
 	/// @warning Must be called only on render thread.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_handle">Texture handle.</param>
@@ -4449,6 +4878,7 @@ public static class bgfx
 	
 	/// <summary>
 	/// Set render states for draw primitive.
+	/// 
 	/// @remarks
 	///   1. To set up more complex states use:
 	///      `BGFX_STATE_ALPHA_REF(_ref)`,
@@ -4459,6 +4889,7 @@ public static class bgfx
 	///      `BGFX_STATE_BLEND_EQUATION_SEPARATE(_equationRGB, _equationA)`
 	///   2. `BGFX_STATE_BLEND_EQUATION_ADD` is set when no other blend
 	///      equation is specified.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_state">State flags. Default state for primitive type is   triangles. See: `BGFX_STATE_DEFAULT`.   - `BGFX_STATE_DEPTH_TEST_*` - Depth test function.   - `BGFX_STATE_BLEND_*` - See remark 1 about BGFX_STATE_BLEND_FUNC.   - `BGFX_STATE_BLEND_EQUATION_*` - See remark 2.   - `BGFX_STATE_CULL_*` - Backface culling mode.   - `BGFX_STATE_WRITE_*` - Enable R, G, B, A or Z write.   - `BGFX_STATE_MSAA` - Enable hardware multisample antialiasing.   - `BGFX_STATE_PT_[TRISTRIP/LINES/POINTS]` - Primitive type.</param>
@@ -4489,8 +4920,10 @@ public static class bgfx
 	
 	/// <summary>
 	/// Set scissor for draw primitive.
+	/// 
 	/// @remark
 	///   To scissor for all primitives in view see `bgfx::setViewScissor`.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_x">Position x from the left corner of the window.</param>
@@ -4503,8 +4936,10 @@ public static class bgfx
 	
 	/// <summary>
 	/// Set scissor from cache for draw primitive.
+	/// 
 	/// @remark
 	///   To scissor for all primitives in view see `bgfx::setViewScissor`.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_cache">Index in scissor cache.</param>
@@ -4535,7 +4970,9 @@ public static class bgfx
 	
 	/// <summary>
 	/// Reserve matrices in internal matrix cache.
+	/// 
 	/// @attention Pointer returned can be modified until `bgfx::frame` is called.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_transform">Pointer to `Transform` structure.</param>
@@ -4666,7 +5103,9 @@ public static class bgfx
 	/// <summary>
 	/// Set number of vertices for auto generated vertices use in conjunction
 	/// with gl_VertexID.
+	/// 
 	/// @attention Availability depends on: `BGFX_CAPS_VERTEX_ID`.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_numVertices">Number of vertices.</param>
@@ -4710,7 +5149,9 @@ public static class bgfx
 	/// <summary>
 	/// Set number of instances for auto generated instances use in conjunction
 	/// with gl_InstanceID.
+	/// 
 	/// @attention Availability depends on: `BGFX_CAPS_VERTEX_ID`.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_numInstances">Number of instances.</param>
@@ -4733,8 +5174,10 @@ public static class bgfx
 	/// <summary>
 	/// Submit an empty primitive for rendering. Uniforms and draw state
 	/// will be applied but no geometry will be submitted.
+	/// 
 	/// @remark
 	///   These empty draw calls will sort before ordinary draw calls.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_id">View id.</param>
@@ -4770,7 +5213,9 @@ public static class bgfx
 	/// <summary>
 	/// Submit primitive for rendering with index and instance data info from
 	/// indirect buffer.
+	/// 
 	/// @attention Availability depends on: `BGFX_CAPS_DRAW_INDIRECT`.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_id">View id.</param>
@@ -4787,7 +5232,9 @@ public static class bgfx
 	/// <summary>
 	/// Submit primitive for rendering with index and instance data info and
 	/// draw count from indirect buffers.
+	/// 
 	/// @attention Availability depends on: `BGFX_CAPS_DRAW_INDIRECT_COUNT`.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_id">View id.</param>
@@ -4910,8 +5357,10 @@ public static class bgfx
 	
 	/// <summary>
 	/// Blit 2D texture region between two 2D textures.
+	/// 
 	/// @attention Destination texture must be created with `BGFX_TEXTURE_BLIT_DST` flag.
 	/// @attention Availability depends on: `BGFX_CAPS_TEXTURE_BLIT`.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_id">View id.</param>

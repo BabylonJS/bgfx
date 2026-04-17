@@ -89,7 +89,7 @@ namespace bgfx { namespace gl
 		GL_UNSIGNED_BYTE,            // Uint8
 		GL_UNSIGNED_INT_10_10_10_2,  // Uint10
 		GL_SHORT,                    // Int16
-		GL_UNSIGNED_SHORT,           // UInt16
+		GL_UNSIGNED_SHORT,           // Uint16
 		GL_HALF_FLOAT,               // Half
 		GL_FLOAT,                    // Float
 	};
@@ -3706,7 +3706,7 @@ namespace bgfx { namespace gl
 
 		void submitUniformCache(UniformCacheState& _ucs, uint16_t _view);
 
-		void submit(Frame* _render, ClearQuad& _clearQuad, TextVideoMemBlitter& _textVideoMemBlitter) override;
+		void submit(Frame* _render, const ClearQuad& _clearQuad, const MipGen& _mipGen, TextVideoMemBlitter& _textVideoMemBlitter) override;
 
 		void dbgTextRenderBegin(TextVideoMemBlitter& _blitter) override
 		{
@@ -4540,7 +4540,7 @@ namespace bgfx { namespace gl
 			}
 		}
 
-		void clearQuad(ClearQuad& _clearQuad, const Rect& _rect, const Clear& _clear, uint32_t _height, const float _palette[][4])
+		void clearQuad(const ClearQuad& _clearQuad, const Rect& _rect, const Clear& _clear, uint32_t _height, const float _palette[][4])
 		{
 			uint32_t numMrt = 1;
 			FrameBufferHandle fbh = m_fbh;
@@ -7515,7 +7515,7 @@ namespace bgfx { namespace gl
 		}
 	}
 
-	void RendererContextGL::submit(Frame* _render, ClearQuad& _clearQuad, TextVideoMemBlitter& _textVideoMemBlitter)
+	void RendererContextGL::submit(Frame* _render, const ClearQuad& _clearQuad, const MipGen& /*_mipGen*/, TextVideoMemBlitter& _textVideoMemBlitter)
 	{
 		if (_render->m_capture)
 		{

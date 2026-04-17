@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2019 Branimir Karadzic. All rights reserved.
+ * Copyright 2011-2026 Branimir Karadzic. All rights reserved.
  * License: https://github.com/bkaradzic/bgfx/blob/master/LICENSE
  */
 
@@ -35,8 +35,7 @@ namespace bgfx
 	struct CallbackI;
 
 $enums
-
-static const uint16_t kInvalidHandle = UINT16_MAX;
+	constexpr uint16_t kInvalidHandle = UINT16_MAX;
 
 	/// View id.
 	typedef uint16_t ViewId;
@@ -44,7 +43,6 @@ static const uint16_t kInvalidHandle = UINT16_MAX;
 $handles
 
 $structs
-
 	/// Callback interface to implement application specific behavior.
 	/// Cached items are currently used for OpenGL and Direct3D 12 binary
 	/// shaders.
@@ -246,15 +244,6 @@ $structs
 $funcptrs
 
 $cppdecl
-
-inline bool VertexLayout::has(Attrib::Enum _attrib) const { return UINT16_MAX != m_attributes[_attrib]; }
-
-inline uint16_t VertexLayout::getOffset(Attrib::Enum _attrib) const { return m_offset[_attrib]; }
-
-inline uint16_t VertexLayout::getStride() const { return m_stride; }
-
-inline uint32_t VertexLayout::getSize(uint32_t _num) const { return _num*m_stride; }
-
 } // namespace bgfx
 
 #endif // BGFX_H_HEADER_GUARD

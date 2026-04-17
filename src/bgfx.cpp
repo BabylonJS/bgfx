@@ -579,6 +579,10 @@ namespace bgfx
 #include "fs_clear5.bin.h"
 #include "fs_clear6.bin.h"
 #include "fs_clear7.bin.h"
+#include "cs_mipgen_pow2.bin.h"
+#include "cs_mipgen_oddx.bin.h"
+#include "cs_mipgen_oddy.bin.h"
+#include "cs_mipgen_oddxy.bin.h"
 
 	static const EmbeddedShader s_embeddedShaders[] =
 	{
@@ -593,6 +597,10 @@ namespace bgfx
 		BGFX_EMBEDDED_SHADER(fs_clear5),
 		BGFX_EMBEDDED_SHADER(fs_clear6),
 		BGFX_EMBEDDED_SHADER(fs_clear7),
+		BGFX_EMBEDDED_SHADER(cs_mipgen_pow2),
+		BGFX_EMBEDDED_SHADER(cs_mipgen_oddx),
+		BGFX_EMBEDDED_SHADER(cs_mipgen_oddy),
+		BGFX_EMBEDDED_SHADER(cs_mipgen_oddxy),
 
 		BGFX_EMBEDDED_SHADER_END()
 	};
@@ -809,9 +817,12 @@ namespace bgfx
 		if (isValid(m_program) )
 		{
 			destroy(m_program);
+			m_program = BGFX_INVALID_HANDLE;
 		}
 
 		destroy(m_texture);
+		m_texture = BGFX_INVALID_HANDLE;
+
 		s_ctx->destroyTransientVertexBuffer(m_vb);
 		s_ctx->destroyTransientIndexBuffer(m_ib);
 	}
@@ -959,7 +970,15 @@ namespace bgfx
 	{
 		BGFX_CHECK_API_THREAD();
 
-		if (RendererType::Noop != g_caps.rendererType)
+		const RendererType::Enum rendererType = g_caps.rendererType;
+
+		if (false
+		||  RendererType::Direct3D11 == rendererType
+		||  RendererType::OpenGL     == rendererType
+		||  RendererType::OpenGLES   == rendererType
+		||  RendererType::Metal      == rendererType
+		||  RendererType::WebGPU     == rendererType
+		   )
 		{
 			VertexLayout layout;
 			layout
@@ -1016,19 +1035,87 @@ namespace bgfx
 	{
 		BGFX_CHECK_API_THREAD();
 
-		if (RendererType::Noop != g_caps.rendererType)
+		for (uint32_t ii = 0, num = g_caps.limits.maxFBAttachments; ii < num; ++ii)
 		{
-			for (uint32_t ii = 0, num = g_caps.limits.maxFBAttachments; ii < num; ++ii)
+			if (isValid(m_program[ii]) )
 			{
-				if (isValid(m_program[ii]) )
+				destroy(m_program[ii]);
+				m_program[ii] = BGFX_INVALID_HANDLE;
+			}
+		}
+
+		if (isValid(m_vb) )
+		{
+			s_ctx->destroyVertexBuffer(m_vb);
+			m_vb = BGFX_INVALID_HANDLE;
+		}
+
+		if (isValid(m_layout) )
+		{
+			s_ctx->destroyVertexLayout(m_layout);
+			m_layout = BGFX_INVALID_HANDLE;
+		}
+	}
+
+	void MipGen::init()
+	{
+		BGFX_CHECK_API_THREAD();
+
+		const RendererType::Enum rendererType = g_caps.rendererType;
+
+		if (false
+		||  RendererType::Direct3D12 == rendererType
+		||  RendererType::WebGPU     == rendererType
+		   )
+		{
+			static const char* cs_mipgen[] =
+			{
+				"cs_mipgen_pow2",
+				"cs_mipgen_oddx",
+				"cs_mipgen_oddy",
+				"cs_mipgen_oddxy",
+			};
+
+			for (uint32_t ii = 0; ii < BX_COUNTOF(m_program); ++ii)
+			{
+				ShaderHandle csh = createEmbeddedShader(s_embeddedShaders, g_caps.rendererType, cs_mipgen[ii]);
+				BX_ASSERT(isValid(csh), "Failed to create mip generate embedded compute shader \"%s\"", cs_mipgen[ii]);
+
+				if (isValid(csh) )
 				{
-					destroy(m_program[ii]);
-					m_program[ii] = BGFX_INVALID_HANDLE;
+					m_program[ii] = createProgram(csh, true);
+					BX_ASSERT(isValid(m_program[ii]), "Failed to create mip generate program.");
 				}
 			}
 
-			s_ctx->destroyVertexBuffer(m_vb);
-			s_ctx->destroyVertexLayout(m_layout);
+			u_mipGen    = createUniform("bgfx_mipGen",    bgfx::UniformType::Vec4);
+			s_texMipSrc = createUniform("bgfx_texMipSrc", bgfx::UniformType::Sampler);
+		}
+	}
+
+	void MipGen::shutdown()
+	{
+		BGFX_CHECK_API_THREAD();
+
+		for (uint32_t ii = 0; ii < BX_COUNTOF(m_program); ++ii)
+		{
+			if (isValid(m_program[ii]) )
+			{
+				destroy(m_program[ii]);
+				m_program[ii] = BGFX_INVALID_HANDLE;
+			}
+		}
+
+		if (isValid(u_mipGen) )
+		{
+			destroy(u_mipGen);
+			u_mipGen = BGFX_INVALID_HANDLE;
+		}
+
+		if (isValid(s_texMipSrc) )
+		{
+			destroy(s_texMipSrc);
+			s_texMipSrc = BGFX_INVALID_HANDLE;
 		}
 	}
 
@@ -2172,6 +2259,7 @@ namespace bgfx
 
 		m_textVideoMemBlitter.init(m_init.resolution.debugTextScale);
 		m_clearQuad.init();
+		m_mipGen.init();
 
 		m_submit->m_transientVb = createTransientVertexBuffer(_init.limits.maxTransientVbSize);
 		m_submit->m_transientIb = createTransientIndexBuffer(_init.limits.maxTransientIbSize);
@@ -2198,6 +2286,7 @@ namespace bgfx
 		destroyTransientIndexBuffer(m_submit->m_transientIb);
 		m_textVideoMemBlitter.shutdown();
 		m_clearQuad.shutdown();
+		m_mipGen.shutdown();
 		frame();
 
 		if (BX_ENABLED(BGFX_CONFIG_MULTITHREADED) )
@@ -2224,9 +2313,6 @@ namespace bgfx
 
 		bx::alignedFree(g_allocator, m_encoder, BX_ALIGNOF(EncoderImpl) );
 		bx::free(g_allocator, m_encoderStats);
-
-		m_dynVertexBufferAllocator.compact();
-		m_dynIndexBufferAllocator.compact();
 
 		BX_ASSERT(
 			  m_layoutHandle.getNumHandles() == m_vertexLayoutRef.m_vertexLayoutMap.getNumElements()
@@ -2468,6 +2554,7 @@ namespace bgfx
 		}
 
 		m_submit->m_capture = 0 != (_flags & BGFX_FRAME_DEBUG_CAPTURE);
+		m_submit->m_flush   = 0 != (_flags & BGFX_FRAME_FLUSH);
 
 		uint32_t frameNum = m_submit->m_frameNum;
 
@@ -2598,8 +2685,11 @@ namespace bgfx
 
 		if (!m_flipAfterRender)
 		{
-			BGFX_PROFILER_SCOPE("bgfx/flip", kColorSubmit);
-			flip();
+			if (!m_render->m_flush)
+			{
+				BGFX_PROFILER_SCOPE("bgfx/flip", kColorSubmit);
+				flip();
+			}
 		}
 
 		if (apiSemWait(_msecs) )
@@ -2613,7 +2703,7 @@ namespace bgfx
 			{
 				{
 					BGFX_PROFILER_SCOPE("bgfx/Render submit", kColorSubmit);
-					m_renderCtx->submit(m_render, m_clearQuad, m_textVideoMemBlitter);
+					m_renderCtx->submit(m_render, m_clearQuad, m_mipGen, m_textVideoMemBlitter);
 					m_flipped = false;
 				}
 
@@ -2636,8 +2726,11 @@ namespace bgfx
 
 			if (m_flipAfterRender)
 			{
-				BGFX_PROFILER_SCOPE("bgfx/flip", kColorSubmit);
-				flip();
+				if (!m_render->m_flush)
+				{
+					BGFX_PROFILER_SCOPE("bgfx/flip", kColorSubmit);
+					flip();
+				}
 			}
 		}
 		else
@@ -3604,11 +3697,6 @@ namespace bgfx
 		flushTextureUpdateBatch(_cmdbuf);
 	}
 
-	uint32_t weldVertices(void* _output, const VertexLayout& _layout, const void* _data, uint32_t _num, bool _index32, float _epsilon)
-	{
-		return weldVertices(_output, _layout, _data, _num, _index32, _epsilon, g_allocator);
-	}
-
 	uint32_t topologyConvert(TopologyConvert::Enum _conversion, void* _dst, uint32_t _dstSize, const void* _indices, uint32_t _numIndices, bool _index32)
 	{
 		return topologyConvert(_conversion, _dst, _dstSize, _indices, _numIndices, _index32, g_allocator);
@@ -3879,9 +3967,9 @@ namespace bgfx
 		s_ctx->reset(_width, _height, _flags, _format);
 	}
 
-	Encoder* begin(bool _forThread)
+	Encoder* begin(bool _forceNewEncoder)
 	{
-		return s_ctx->begin(_forThread);
+		return s_ctx->begin(_forceNewEncoder);
 	}
 
 #define BGFX_ENCODER(_func) reinterpret_cast<EncoderImpl*>(this)->_func
@@ -4801,6 +4889,20 @@ namespace bgfx
 				, "Attachment %d, texture flags 0x%016" PRIx64 "."
 				, ii
 				, tr.m_flags
+				);
+
+			BGFX_ERROR_CHECK(true
+				&& (0 == (at.resolve & BGFX_RESOLVE_AUTO_GEN_MIPS)
+					|| 1 == tr.m_numMips
+					|| 0 != (g_caps.formats[tr.m_format] & BGFX_CAPS_FORMAT_TEXTURE_MIP_AUTOGEN) )
+				, _err
+				, BGFX_ERROR_FRAME_BUFFER_VALIDATION
+				, "Frame buffer attachment with `BGFX_RESOLVE_AUTO_GEN_MIPS` requires a format supporting `BGFX_CAPS_FORMAT_TEXTURE_MIP_AUTOGEN`."
+				, "Attachment %d, format %s, num mips %d, format caps 0x%08x."
+				, ii
+				, getName(TextureFormat::Enum(tr.m_format) )
+				, tr.m_numMips
+				, g_caps.formats[tr.m_format]
 				);
 		}
 
