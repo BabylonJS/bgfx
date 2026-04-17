@@ -924,6 +924,7 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 			m_gpuTimer.init();
 
 			g_internalData.context = m_device;
+			g_internalData.commandQueue = m_cmd.m_commandQueue;
 
 			return true;
 		}
