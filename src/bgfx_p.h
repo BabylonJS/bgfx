@@ -907,6 +907,17 @@ namespace bgfx
 		void init();
 		void shutdown();
 
+		static bool isSupported(TextureFormat::Enum _format)
+		{
+			return false
+				|| TextureFormat::RGBA8   == _format
+				|| TextureFormat::BGRA8   == _format
+				|| TextureFormat::RGBA16  == _format
+				|| TextureFormat::RGBA16F == _format
+				|| TextureFormat::RGBA32F == _format
+				;
+		}
+
 		ProgramHandle m_program[4];
 		UniformHandle u_mipGen;
 		UniformHandle s_texMipSrc;
@@ -1915,11 +1926,11 @@ namespace bgfx
 		uint32_t m_startIndirect;
 		uint32_t m_numIndirect;
 		uint32_t m_numIndirectIndex;
+		uint32_t m_streamMask;
 		uint16_t m_instanceDataStride;
 		uint16_t m_numMatrices;
 		uint16_t m_scissor;
 		uint8_t  m_submitFlags;
-		uint32_t m_streamMask;
 		uint8_t  m_uniformIdx;
 
 		IndexBufferHandle    m_indexBuffer;
