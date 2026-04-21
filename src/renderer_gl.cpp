@@ -2847,7 +2847,6 @@ namespace bgfx { namespace gl
 					? BGFX_CAPS_VERTEX_ATTRIB_UINT10
 					: 0
 					;
-				g_caps.supported |= BGFX_CAPS_VERTEX_ATTRIB_INT8 | BGFX_CAPS_VERTEX_ATTRIB_UINT16;
 				g_caps.supported |= !!(BGFX_CONFIG_RENDERER_OPENGL || m_gles3)
 					|| s_extension[Extension::EXT_frag_depth].m_supported
 					? BGFX_CAPS_FRAGMENT_DEPTH
