@@ -145,11 +145,11 @@ typedef enum bgfx_attrib
  */
 typedef enum bgfx_attrib_type
 {
-    BGFX_ATTRIB_TYPE_INT8,                    /** ( 0) Int8, availability depends on: `BGFX_CAPS_VERTEX_ATTRIB_INT8`. */
+    BGFX_ATTRIB_TYPE_INT8,                    /** ( 0) Int8                           */
     BGFX_ATTRIB_TYPE_UINT8,                   /** ( 1) Uint8                          */
     BGFX_ATTRIB_TYPE_UINT10,                  /** ( 2) Uint10, availability depends on: `BGFX_CAPS_VERTEX_ATTRIB_UINT10`. */
     BGFX_ATTRIB_TYPE_INT16,                   /** ( 3) Int16                          */
-    BGFX_ATTRIB_TYPE_UINT16,                  /** ( 4) Uint16, availability depends on: `BGFX_CAPS_VERTEX_ATTRIB_UINT16`. */
+    BGFX_ATTRIB_TYPE_UINT16,                  /** ( 4) Uint16                         */
     BGFX_ATTRIB_TYPE_HALF,                    /** ( 5) Half, availability depends on: `BGFX_CAPS_VERTEX_ATTRIB_HALF`. */
     BGFX_ATTRIB_TYPE_FLOAT,                   /** ( 6) Float                          */
 
@@ -645,7 +645,7 @@ typedef struct bgfx_internal_data_s
 {
     const bgfx_caps_t*   caps;               /** Renderer capabilities.                   */
     void*                context;            /** GL context, or D3D device.               */
-    void*                commandQueue;       /** Metal command queue, or NULL.             */
+    void*                commandQueue;
 
 } bgfx_internal_data_t;
 

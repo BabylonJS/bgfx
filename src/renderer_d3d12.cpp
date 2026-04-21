@@ -1288,7 +1288,13 @@ namespace bgfx { namespace d3d12
 					? DXGI_SCALING_NONE
 					: DXGI_SCALING_STRETCH
 					;
-				m_scd.swapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
+				m_scd.swapEffect =
+#if BX_PLATFORM_LINUX || BX_PLATFORM_WINDOWS
+					DXGI_SWAP_EFFECT_FLIP_DISCARD
+#else
+					DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL
+#endif // BX_PLATFORM_LINUX || BX_PLATFORM_WINDOWS
+					;
 				m_scd.alphaMode  = DXGI_ALPHA_MODE_IGNORE;
 				m_scd.flags      = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
 
@@ -1797,7 +1803,7 @@ namespace bgfx { namespace d3d12
 
 								support |= 0 != (support & BGFX_CAPS_FORMAT_TEXTURE_FRAMEBUFFER)
 										&& 0 != (data.Support2 & D3D12_FORMAT_SUPPORT2_UAV_TYPED_STORE)
-										&& (TextureFormat::RGBA8 == ii || TextureFormat::BGRA8 == ii)
+										&& MipGen::isSupported(TextureFormat::Enum(ii) )
 										? BGFX_CAPS_FORMAT_TEXTURE_MIP_AUTOGEN
 										: BGFX_CAPS_FORMAT_TEXTURE_NONE
 										;

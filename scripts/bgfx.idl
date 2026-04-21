@@ -815,6 +815,7 @@ struct.Caps { section = "Capabilities" }
 struct.InternalData { section = "Platform specific" }
 	.caps    "const Caps*" --- Renderer capabilities.
 	.context "void*"       --- GL context, or D3D device.
+	.commandQueue "void*"
 
 --- Platform data.
 struct.PlatformData { ctor, section = "Platform specific" }
