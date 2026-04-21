@@ -587,6 +587,7 @@ namespace bgfx
 	{
 		const Caps* caps; //!< Renderer capabilities.
 		void* context;    //!< GL context, or D3D device.
+		void* commandQueue;
 	};
 
 	/// Platform data.

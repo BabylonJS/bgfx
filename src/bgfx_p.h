@@ -2934,7 +2934,7 @@ namespace bgfx
 		}
 
 		void setVertexBuffer(
-			  uint32_t _stream
+			  uint8_t _stream
 			, VertexBufferHandle _handle
 			, uint32_t _startVertex
 			, uint32_t _numVertices
@@ -2954,7 +2954,7 @@ namespace bgfx
 		}
 
 		void setVertexBuffer(
-			  uint32_t _stream
+			  uint8_t _stream
 			, const DynamicVertexBuffer& _dvb
 			, uint32_t _startVertex
 			, uint32_t _numVertices
