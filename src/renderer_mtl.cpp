@@ -98,7 +98,7 @@ namespace bgfx { namespace mtl
 			{ MTL::VertexFormatUChar2,                MTL::VertexFormatUChar2Normalized      },
 			{ MTL::VertexFormatUChar3,                MTL::VertexFormatUChar3Normalized      },
 			{ MTL::VertexFormatUChar4,                MTL::VertexFormatUChar4Normalized      },
-		},	
+		},
 		{ // Uint10
 			{ MTL::VertexFormatUInt1010102Normalized, MTL::VertexFormatUInt1010102Normalized },
 			{ MTL::VertexFormatUInt1010102Normalized, MTL::VertexFormatUInt1010102Normalized },
@@ -4752,17 +4752,15 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 											desc->setLoadAction(MTL::LoadActionLoad);
 										}
 
-										if (NULL != m_capture
-										&&  !isValid(fbh)
-										&&  m_hasStoreActionStoreAndMultisampleResolve)
-										{
-											desc->setStoreAction(desc->texture()->sampleCount() > 1 ? MTL::StoreActionStoreAndMultisampleResolve : MTL::StoreActionStore);
+										const MTL::StoreAction multisampleStoreAction = m_hasStoreActionStoreAndMultisampleResolve
+											? MTL::StoreActionStoreAndMultisampleResolve
+											: MTL::StoreActionMultisampleResolve
+											;
 
-										}
-										else
-										{
-											desc->setStoreAction(desc->texture()->sampleCount() > 1 ? MTL::StoreActionMultisampleResolve : MTL::StoreActionStore);
-										}
+										desc->setStoreAction(desc->texture()->sampleCount() > 1
+											? multisampleStoreAction
+											: MTL::StoreActionStore
+											);
 									}
 								}
 
@@ -4775,10 +4773,7 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 										? MTL::LoadActionClear
 										: MTL::LoadActionLoad)
 										;
-										depthAttachment->setStoreAction(NULL != m_mainFrameBuffer.m_swapChain && NULL != m_mainFrameBuffer.m_swapChain->m_backBufferColorMsaa
-										? MTL::StoreActionDontCare
-										: MTL::StoreActionStore)
-										;
+									depthAttachment->setStoreAction(MTL::StoreActionStore);
 								}
 
 								MTL::RenderPassStencilAttachmentDescriptor* stencilAttachment = renderPassDescriptor->stencilAttachment();
@@ -4790,10 +4785,7 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 										? MTL::LoadActionClear
 										: MTL::LoadActionLoad)
 										;
-									stencilAttachment->setStoreAction(NULL != m_mainFrameBuffer.m_swapChain && NULL != m_mainFrameBuffer.m_swapChain->m_backBufferColorMsaa
-										? MTL::StoreActionDontCare
-										: MTL::StoreActionStore)
-										;
+									stencilAttachment->setStoreAction(MTL::StoreActionStore);
 								}
 							}
 							else
@@ -4805,17 +4797,15 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 									{
 										desc->setLoadAction(MTL::LoadActionLoad);
 
-										if (NULL != m_capture
-										&&  !isValid(fbh)
-										&&  m_hasStoreActionStoreAndMultisampleResolve)
-										{
-											desc->setStoreAction(desc->texture()->sampleCount() > 1 ? MTL::StoreActionStoreAndMultisampleResolve : MTL::StoreActionStore);
+										const MTL::StoreAction multisampleStoreAction = m_hasStoreActionStoreAndMultisampleResolve
+											? MTL::StoreActionStoreAndMultisampleResolve
+											: MTL::StoreActionMultisampleResolve
+											;
 
-										}
-										else
-										{
-											desc->setStoreAction(desc->texture()->sampleCount() > 1 ? MTL::StoreActionMultisampleResolve : MTL::StoreActionStore);
-										}
+										desc->setStoreAction(desc->texture()->sampleCount() > 1
+											? multisampleStoreAction
+											: MTL::StoreActionStore
+											);
 									}
 								}
 
