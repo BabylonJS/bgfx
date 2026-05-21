@@ -4598,9 +4598,15 @@ namespace bgfx { namespace d3d11
 
 					if (needResolve)
 					{
+						// D3D11 forbids MipLevels > 1 when SampleDesc.Count > 1 (E_INVALIDARG).
+						// The MSAA render target stays at one mip; the resolved (single-sample)
+						// texture below keeps the requested mip count for sampling.
+						const UINT savedMipLevels = desc.MipLevels;
+						desc.MipLevels = 1;
 						DX_CHECK(s_renderD3D11->m_device->CreateTexture2D(&desc, NULL, &m_rt2d) );
 						desc.BindFlags &= ~(D3D11_BIND_RENDER_TARGET|D3D11_BIND_DEPTH_STENCIL);
 						desc.SampleDesc = s_msaa[0];
+						desc.MipLevels = savedMipLevels;
 					}
 
 					if (!external)

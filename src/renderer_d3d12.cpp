@@ -5751,6 +5751,18 @@ namespace bgfx { namespace d3d12
 			}
 			else
 			{
+				// D3D12 forbids MipLevels > 1 or UAV when SampleDesc.Count > 1.
+				// The MSAA render target stays at one mip and no UAV; the resolved
+				// single-sample texture below keeps the requested mip count and UAV
+				// (used for compute-shader mip generation).
+				const UINT savedMipLevels = resourceDesc.MipLevels;
+				const D3D12_RESOURCE_FLAGS savedFlags = resourceDesc.Flags;
+				if (needResolve)
+				{
+					resourceDesc.MipLevels = 1;
+					resourceDesc.Flags &= ~D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+				}
+
 				m_ptr = createCommittedResource(
 					  device
 					, HeapProperty::Texture
@@ -5761,6 +5773,12 @@ namespace bgfx { namespace d3d12
 						? D3D12_HEAP_FLAG_SHARED
 						: D3D12_HEAP_FLAG_NONE
 					);
+
+				if (needResolve)
+				{
+					resourceDesc.MipLevels = savedMipLevels;
+					resourceDesc.Flags     = savedFlags;
+				}
 
 				if (externalShared)
 				{

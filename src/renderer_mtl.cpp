@@ -3429,8 +3429,12 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 
 			if (sampleCount > 1)
 			{
+				// MSAA textures (MTLTextureType2DMultisample) cannot have mipmaps. The
+				// main m_ptr texture above keeps the requested mip count for sampling;
+				// this MSAA target is one-mip only and gets resolved each frame.
 				desc->setTextureType(MTL::TextureType2DMultisample);
 				desc->setSampleCount(sampleCount);
+				desc->setMipmapLevelCount(1);
 
 				if (s_renderMtl->m_hasCPUCacheModesAndStorageModes)
 				{
