@@ -846,6 +846,9 @@ VK_DESTROY_FUNC(DescriptorSet);
 		TextureFormat::Enum m_colorFormat;
 		TextureFormat::Enum m_depthFormat;
 
+		uint32_t m_presentModeWithVSyncIdx;
+		uint32_t m_presentModeWithoutVSyncIdx;
+
 		VkSurfaceKHR   m_surface;
 		VkSwapchainKHR m_swapChain;
 		uint32_t       m_numSwapChainImages;
@@ -908,6 +911,8 @@ VK_DESTROY_FUNC(DescriptorSet);
 
 		bool acquire(VkCommandBuffer _commandBuffer);
 		void present();
+
+		void markDirty() { m_needResolve = true; }
 
 		bool isRenderable() const;
 

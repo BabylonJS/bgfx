@@ -645,7 +645,6 @@ typedef struct bgfx_internal_data_s
 {
     const bgfx_caps_t*   caps;               /** Renderer capabilities.                   */
     void*                context;            /** GL context, or D3D device.               */
-    void*                commandQueue;
 
 } bgfx_internal_data_t;
 

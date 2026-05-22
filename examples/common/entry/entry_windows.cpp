@@ -14,7 +14,6 @@
 #include <bx/os.h>
 #include <bx/thread.h>
 #include <bx/timer.h>
-#include <bx/uint32_t.h>
 
 #include <tinystl/allocator.h>
 #include <tinystl/string.h>
@@ -678,7 +677,7 @@ namespace entry
 							case WMSZ_RIGHT:
 								{
 									float aspectRatio = 1.0f/m_aspectRatio;
-									width  = bx::uint32_max(ENTRY_DEFAULT_WIDTH/4, width);
+									width  = bx::max(ENTRY_DEFAULT_WIDTH/4, width);
 									height = uint32_t(float(width)*aspectRatio);
 								}
 								break;
@@ -686,7 +685,7 @@ namespace entry
 							default:
 								{
 									float aspectRatio = m_aspectRatio;
-									height = bx::uint32_max(ENTRY_DEFAULT_HEIGHT/4, height);
+									height = bx::max(ENTRY_DEFAULT_HEIGHT/4, height);
 									width  = uint32_t(float(height)*aspectRatio);
 								}
 								break;
@@ -990,7 +989,7 @@ namespace entry
 			if (!_windowFrame)
 			{
 				float aspectRatio = 1.0f/m_aspectRatio;
-				width  = bx::uint32_max(ENTRY_DEFAULT_WIDTH/4, width);
+				width  = bx::max(ENTRY_DEFAULT_WIDTH/4, width);
 				height = uint32_t(float(width)*aspectRatio);
 
 				left   = newrect.left+(newrect.right -newrect.left-width)/2;

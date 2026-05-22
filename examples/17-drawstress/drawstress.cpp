@@ -6,7 +6,6 @@
 #include "common.h"
 #include "bgfx_utils.h"
 
-#include <bx/uint32_t.h>
 #include <bx/thread.h>
 #include <bx/os.h>
 #include "imgui/imgui.h"
@@ -312,11 +311,11 @@ public:
 				{
 					if (m_deltaTimeAvgNs < highwm)
 					{
-						m_dim = bx::uint32_min(m_dim + 2, m_maxDim);
+						m_dim = bx::min(m_dim + 2, m_maxDim);
 					}
 					else if (m_deltaTimeAvgNs > lowwm)
 					{
-						m_dim = bx::uint32_max(m_dim - 1, 2);
+						m_dim = bx::max(m_dim - 1, 2);
 					}
 				}
 
