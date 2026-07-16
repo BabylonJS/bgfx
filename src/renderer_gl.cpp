@@ -2930,6 +2930,11 @@ namespace bgfx { namespace gl
 					: 0
 					;
 
+				// External textures are imported by wrapping an existing GL texture
+				// id (see createTexture/TextureGL::overrideInternal), which is valid
+				// on any GL/GLES context, so the capability is always advertised.
+				g_caps.supported |= BGFX_CAPS_TEXTURE_EXTERNAL;
+
 				g_caps.supported |= false
 					|| s_extension[Extension::EXT_texture_array].m_supported
 					|| s_extension[Extension::EXT_gpu_shader4].m_supported
@@ -3429,8 +3434,18 @@ namespace bgfx { namespace gl
 
 		void* createTexture(TextureHandle _handle, const Memory* _mem, uint64_t _flags, uint8_t _skip, uint64_t _external) override
 		{
-			BX_UNUSED(_external);
-			m_textures[_handle.idx].create(_mem, _flags, _skip);
+			TextureGL& texture = m_textures[_handle.idx];
+			texture.create(_mem, _flags, _skip);
+
+			// When an external native handle is supplied, replace the freshly
+			// allocated GL texture with the caller-owned texture id. overrideInternal
+			// sets BGFX_SAMPLER_INTERNAL_SHARED so TextureGL::destroy will not delete
+			// the externally owned id.
+			if (0 != _external)
+			{
+				texture.overrideInternal(uintptr_t(_external) );
+			}
+
 			return NULL;
 		}
 
