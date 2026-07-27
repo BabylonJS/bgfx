@@ -477,6 +477,32 @@ namespace bgfx { namespace d3d11
 		IID_ID3D11Device1,
 	};
 
+	static const char* s_messageCategory[] =
+	{
+		"APPLICATION_DEFINED",
+		"MISCELLANEOUS",
+		"INITIALIZATION",
+		"CLEANUP",
+		"COMPILATION",
+		"STATE_CREATION",
+		"STATE_SETTING",
+		"STATE_GETTING",
+		"RESOURCE_MANIPULATION",
+		"EXECUTION",
+		"SHADER",
+	};
+	static_assert(BX_COUNTOF(s_messageCategory) == D3D11_MESSAGE_CATEGORY_SHADER+1);
+
+	static const char* s_messageSeverity[] =
+	{
+		"CORRUPTION",
+		"ERROR",
+		"WARNING",
+		"INFO",
+		"MESSAGE",
+	};
+	static_assert(BX_COUNTOF(s_messageSeverity) == D3D11_MESSAGE_SEVERITY_MESSAGE+1);
+
 	inline bool isLost(HRESULT _hr)
 	{
 		return false
@@ -529,6 +555,7 @@ namespace bgfx { namespace d3d11
 			va_end(argList);
 			temp[size] = '\0';
 
+			_interface->SetPrivateData(WKPDID_D3DDebugObjectName, 0, NULL); // destroy first...
 			_interface->SetPrivateData(WKPDID_D3DDebugObjectName, size, temp);
 		}
 	}
@@ -1810,6 +1837,7 @@ namespace bgfx { namespace d3d11
 			}
 
 			DX_RELEASE(m_annotation, 1);
+			dumpInfoQueue();
 			DX_RELEASE_W(m_infoQueue, 0);
 			DX_RELEASE(m_msaaRt, 0);
 
@@ -3746,6 +3774,47 @@ namespace bgfx { namespace d3d11
 			}
 		}
 
+		void dumpInfoQueue()
+		{
+			if (NULL == m_infoQueue)
+			{
+				return;
+			}
+
+			const uint64_t num = m_infoQueue->GetNumStoredMessages();
+
+			if (0 == num)
+			{
+				return;
+			}
+
+			uint8_t buffer[4<<10];
+			D3D11_MESSAGE* msg = (D3D11_MESSAGE*)buffer;
+
+			for (uint64_t ii = 0; ii < num; ++ii)
+			{
+				SIZE_T size = sizeof(buffer);
+
+				if (FAILED(m_infoQueue->GetMessage(ii, msg, &size) ) )
+				{
+					BX_TRACE("D3D11 message %d is too large (%d bytes) to dump.", uint32_t(ii), uint32_t(size) );
+					continue;
+				}
+
+				if (D3D11_MESSAGE_SEVERITY_WARNING >= msg->Severity)
+				{
+					BX_TRACE("D3D11 %s %s #%d: %s"
+						, s_messageSeverity[bx::min<uint32_t>(msg->Severity, BX_COUNTOF(s_messageSeverity)-1)]
+						, s_messageCategory[bx::min<uint32_t>(msg->Category, BX_COUNTOF(s_messageCategory)-1)]
+						, msg->ID
+						, msg->pDescription
+						);
+				}
+			}
+
+			m_infoQueue->ClearStoredMessages();
+		}
+
 		void* m_d3d9Dll;
 		void* m_d3d11Dll;
 		void* m_renderDocDll;
@@ -4849,7 +4918,12 @@ namespace bgfx { namespace d3d11
 						desc.MipLevels = 1;
 						DX_CHECK(s_renderD3D11->m_device->CreateTexture2D(&desc, NULL, &m_rt2d) );
 
-						desc.BindFlags &= ~(D3D11_BIND_RENDER_TARGET|D3D11_BIND_DEPTH_STENCIL);
+						const bool autoGenMips = 0 != (desc.MiscFlags & D3D11_RESOURCE_MISC_GENERATE_MIPS);
+						desc.BindFlags &= ~D3D11_BIND_DEPTH_STENCIL;
+						if (!autoGenMips)
+						{
+							desc.BindFlags &= ~D3D11_BIND_RENDER_TARGET;
+						}
 						desc.SampleDesc = s_msaa[0];
 						desc.MipLevels  = savedMipLevels;
 					}
@@ -6082,10 +6156,11 @@ namespace bgfx { namespace d3d11
 					}
 
 					viewState.m_rect = _render->m_view[view].m_rect;
+					const Rect& clippedRect = _render->m_view[view].m_clippedRect;
 
 					const Rect& scissorRect = _render->m_view[view].m_scissor;
 					viewHasScissor = !scissorRect.isZero();
-					viewScissorRect = viewHasScissor ? scissorRect : viewState.m_rect;
+					viewScissorRect = viewHasScissor ? scissorRect : clippedRect;
 
 					D3D11_VIEWPORT vp;
 					vp.TopLeftX = viewState.m_rect.m_x;
@@ -6099,7 +6174,7 @@ namespace bgfx { namespace d3d11
 
 					if (BGFX_CLEAR_NONE != (clr.m_flags & BGFX_CLEAR_MASK) )
 					{
-						clearQuad(_clearQuad, viewState.m_rect, clr, _render->m_colorPalette);
+						clearQuad(_clearQuad, clippedRect, clr, _render->m_colorPalette);
 						prim = s_primInfo[Topology::Count]; // Force primitive type update after clear quad.
 					}
 
@@ -7066,6 +7141,8 @@ namespace bgfx { namespace d3d11
 			deviceCtx->ResolveSubresource(backBufferColor, 0, m_msaaRt, 0, m_scd.format);
 			DX_RELEASE(backBufferColor, 0);
 		}
+
+		dumpInfoQueue();
 	}
 } /* namespace d3d11 */ } // namespace bgfx
 
