@@ -3744,8 +3744,10 @@ namespace bgfx
 	/// Set view rectangle. Draw primitive outside view will be clipped.
 	///
 	/// @param[in] _id View id.
-	/// @param[in] _x Position x from the left corner of the window.
-	/// @param[in] _y Position y from the top corner of the window.
+	/// @param[in] _x Position x from the left corner of the window. Can be
+	///   negative to place view origin outside of the window.
+	/// @param[in] _y Position y from the top corner of the window. Can be
+	///   negative to place view origin outside of the window.
 	/// @param[in] _width Width of view port region.
 	/// @param[in] _height Height of view port region.
 	///
@@ -3753,8 +3755,8 @@ namespace bgfx
 	///
 	void setViewRect(
 		  ViewId _id
-		, uint16_t _x
-		, uint16_t _y
+		, int16_t _x
+		, int16_t _y
 		, uint16_t _width
 		, uint16_t _height
 		);
@@ -3762,8 +3764,10 @@ namespace bgfx
 	/// Set view rectangle. Draw primitive outside view will be clipped.
 	///
 	/// @param[in] _id View id.
-	/// @param[in] _x Position x from the left corner of the window.
-	/// @param[in] _y Position y from the top corner of the window.
+	/// @param[in] _x Position x from the left corner of the window. Can be
+	///   negative to place view origin outside of the window.
+	/// @param[in] _y Position y from the top corner of the window. Can be
+	///   negative to place view origin outside of the window.
 	/// @param[in] _ratio Width and height will be set in respect to back-buffer size.
 	///   See: `BackbufferRatio::Enum`.
 	///
@@ -3771,8 +3775,8 @@ namespace bgfx
 	///
 	void setViewRect(
 		  ViewId _id
-		, uint16_t _x
-		, uint16_t _y
+		, int16_t _x
+		, int16_t _y
 		, BackbufferRatio::Enum _ratio
 		);
 

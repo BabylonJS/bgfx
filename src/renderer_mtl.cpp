@@ -836,7 +836,6 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 			, m_variableRateShadingSupported(false)
 			, m_supportsDepthClipMode(false)
 			, m_depthClamp(false)
-			, m_screenshotTarget(NULL)
 			, m_screenshotBlitRenderPipelineState(NULL)
 			, m_commandBuffer(NULL)
 			, m_blitCommandEncoder(NULL)
@@ -1547,16 +1546,20 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 
 		void requestScreenShot(FrameBufferHandle _handle, const char* _filePath) override
 		{
-			BX_UNUSED(_handle);
+			SwapChainMtl* swapChain = isValid(_handle)
+				? m_frameBuffers[_handle.idx].m_swapChain
+				: m_mainFrameBuffer.m_swapChain
+				;
 
-			if (NULL == m_screenshotTarget)
+			if (NULL == swapChain
+			||  NULL == swapChain->m_screenshotTarget)
 			{
 				return;
 			}
 
 			m_blitCommandEncoder = getBlitCommandEncoder();
 #if BX_PLATFORM_OSX
-			m_blitCommandEncoder->synchronizeResource(m_screenshotTarget);
+			m_blitCommandEncoder->synchronizeResource(swapChain->m_screenshotTarget);
 #endif  // BX_PLATFORM_OSX
 			m_blitCommandEncoder->endEncoding();
 			m_blitCommandEncoder = NULL;
@@ -1564,23 +1567,24 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 			m_cmd.kick(false, true);
 			m_commandBuffer = 0;
 
-			const uint32_t width  = m_screenshotTarget->width();
-			const uint32_t height = m_screenshotTarget->height();
-			const uint8_t  bpp    = bimg::getBitsPerPixel(bimg::TextureFormat::Enum(m_resolution.formatColor) );
+			const uint32_t width  = swapChain->m_screenshotTarget->width();
+			const uint32_t height = swapChain->m_screenshotTarget->height();
+			const TextureFormat::Enum format = swapChain->m_colorFormat;
+			const uint8_t  bpp    = bimg::getBitsPerPixel(bimg::TextureFormat::Enum(format) );
 			const uint32_t pitch  = width * bpp / 8;
 			const uint32_t size   = height*pitch;
 			uint8_t* data   = (uint8_t*)bx::alloc(g_allocator, size);
 
 			MTL::Region region(0, 0, 0, width, height, 1);
 
-			m_screenshotTarget->getBytes(data, pitch, 0, region, 0, 0);
+			swapChain->m_screenshotTarget->getBytes(data, pitch, 0, region, 0, 0);
 
 			g_callback->screenShot(
 				  _filePath
-				, m_screenshotTarget->width()
-				, m_screenshotTarget->height()
+				, width
+				, height
 				, pitch
-				, m_resolution.formatColor
+				, format
 				, data
 				, size
 				, false
@@ -1944,7 +1948,10 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 		{
 			if (NULL != m_capture)
 			{
-				if (NULL == m_screenshotTarget)
+				SwapChainMtl* swapChain = m_mainFrameBuffer.m_swapChain;
+
+				if (NULL == swapChain
+				||  NULL == swapChain->m_screenshotTarget)
 				{
 					return;
 				}
@@ -1959,7 +1966,7 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 				const uint8_t  bpp   = bimg::getBitsPerPixel(bimg::TextureFormat::Enum(m_resolution.formatColor) );
 				const uint32_t pitch = m_resolution.width * bpp / 8;
 
-				m_screenshotTarget->getBytes(m_capture, pitch, 0, region, 0, 0);
+				swapChain->m_screenshotTarget->getBytes(m_capture, pitch, 0, region, 0, 0);
 
 				m_commandBuffer = m_cmd.alloc();
 
@@ -2275,15 +2282,15 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 					if (NULL != swapChain->m_backBufferColorMsaa)
 					{
 						_renderPassDescriptor->colorAttachments()->object(0)->setTexture(swapChain->m_backBufferColorMsaa);
-						_renderPassDescriptor->colorAttachments()->object(0)->setResolveTexture(NULL != m_screenshotTarget
-							? m_screenshotTarget
+						_renderPassDescriptor->colorAttachments()->object(0)->setResolveTexture(NULL != swapChain->m_screenshotTarget
+							? swapChain->m_screenshotTarget
 							: swapChain->currentDrawableTexture()
 							);
 					}
 					else
 					{
-						_renderPassDescriptor->colorAttachments()->object(0)->setTexture(NULL != m_screenshotTarget
-							? m_screenshotTarget
+						_renderPassDescriptor->colorAttachments()->object(0)->setTexture(NULL != swapChain->m_screenshotTarget
+							? swapChain->m_screenshotTarget
 							: swapChain->currentDrawableTexture()
 							);
 					}
@@ -3342,7 +3349,6 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 		MTL::VertexDescriptor*         m_vertexDescriptor;
 		MTL::SamplerDescriptor*        m_samplerDescriptor;
 
-		MTL::Texture*             m_screenshotTarget;
 		ShaderMtl                 m_screenshotBlitProgramVsh;
 		ShaderMtl                 m_screenshotBlitProgramFsh;
 		ProgramMtl                m_screenshotBlitProgram;
@@ -4287,6 +4293,7 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 		MTL_RELEASE(m_drawable, 0);
 
 		MTL_RELEASE(m_drawableTexture, 0);
+		MTL_RELEASE(m_screenshotTarget, 0);
 
 		releaseBackBuffer();
 	}
@@ -4474,6 +4481,8 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 			? resolution.formatDepthStencil
 			: _depthFormat
 			;
+
+		m_colorFormat = formatColor;
 
 		const int32_t sampleCount = s_msaa[(resetFlags & BGFX_RESET_MSAA_MASK)>>BGFX_RESET_MSAA_SHIFT];
 
@@ -5139,52 +5148,76 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 
 		updateResolution(_render->m_resolution);
 
-		if (0 != _render->m_numScreenShots
-		||  NULL != m_capture)
+		for (uint32_t ii = 0, num = m_numWindows; ii < num; ++ii)
 		{
-			if (m_screenshotTarget)
+			FrameBufferMtl& frameBuffer = 0 == ii
+				? m_mainFrameBuffer
+				: m_frameBuffers[m_windows[ii].idx]
+				;
+
+			SwapChainMtl* swapChain = frameBuffer.m_swapChain;
+
+			if (NULL == swapChain)
 			{
-				if (m_screenshotTarget->width()  != m_resolution.width
-				||  m_screenshotTarget->height() != m_resolution.height)
-				{
-					MTL_RELEASE(m_screenshotTarget, 0);
-				}
+				continue;
 			}
 
-			if (NULL == m_screenshotTarget)
+			const uint16_t fbhIdx = 0 == ii ? kInvalidHandle : m_windows[ii].idx;
+
+			bool needScreenshot = 0 == ii && NULL != m_capture;
+
+			for (uint8_t jj = 0, numShots = _render->m_numScreenShots; jj < numShots && !needScreenshot; ++jj)
 			{
-				MTL::TextureDescriptor* desc = newTextureDescriptor();
+				needScreenshot = _render->m_screenShot[jj].handle.idx == fbhIdx;
+			}
 
-				desc->setTextureType(MTL::TextureType2D);
-				desc->setPixelFormat(getSwapChainPixelFormat(m_mainFrameBuffer.m_swapChain) );
-				desc->setWidth(m_resolution.width);
-				desc->setHeight(m_resolution.height);
-				desc->setDepth(1);
-				desc->setMipmapLevelCount(1);
-				desc->setSampleCount(1);
-				desc->setArrayLength(1);
+			const uint32_t width  = 0 == ii ? m_resolution.width  : frameBuffer.m_width;
+			const uint32_t height = 0 == ii ? m_resolution.height : frameBuffer.m_height;
 
-				if (s_renderMtl->m_hasCPUCacheModesAndStorageModes)
+			if (needScreenshot)
+			{
+				if (NULL != swapChain->m_screenshotTarget
+				&& (swapChain->m_screenshotTarget->width()  != width
+				||  swapChain->m_screenshotTarget->height() != height) )
 				{
-					desc->setCpuCacheMode(MTL::CPUCacheModeDefaultCache);
-					desc->setStorageMode(BX_ENABLED(BX_PLATFORM_IOS) || BX_ENABLED(BX_PLATFORM_VISIONOS)
-						? MTL::StorageModeShared
-						: MTL::StorageModeManaged)
-						;
-
-					desc->setUsage(MTL::TextureUsage(0
-						| MTL::TextureUsageRenderTarget
-						| MTL::TextureUsageShaderRead
-						) );
+					MTL_RELEASE(swapChain->m_screenshotTarget, 0);
 				}
 
-				m_screenshotTarget = m_device->newTexture(desc);
-				MTL_RELEASE(desc, 0);
+				if (NULL == swapChain->m_screenshotTarget)
+				{
+					MTL::TextureDescriptor* desc = newTextureDescriptor();
+
+					desc->setTextureType(MTL::TextureType2D);
+					desc->setPixelFormat(getSwapChainPixelFormat(swapChain) );
+					desc->setWidth(width);
+					desc->setHeight(height);
+					desc->setDepth(1);
+					desc->setMipmapLevelCount(1);
+					desc->setSampleCount(1);
+					desc->setArrayLength(1);
+
+					if (s_renderMtl->m_hasCPUCacheModesAndStorageModes)
+					{
+						desc->setCpuCacheMode(MTL::CPUCacheModeDefaultCache);
+						desc->setStorageMode(BX_ENABLED(BX_PLATFORM_IOS) || BX_ENABLED(BX_PLATFORM_VISIONOS)
+							? MTL::StorageModeShared
+							: MTL::StorageModeManaged)
+							;
+
+						desc->setUsage(MTL::TextureUsage(0
+							| MTL::TextureUsageRenderTarget
+							| MTL::TextureUsageShaderRead
+							) );
+					}
+
+					swapChain->m_screenshotTarget = m_device->newTexture(desc);
+					MTL_RELEASE(desc, 0);
+				}
 			}
-		}
-		else
-		{
-			MTL_RELEASE(m_screenshotTarget, 0);
+			else
+			{
+				MTL_RELEASE(swapChain->m_screenshotTarget, 0);
+			}
 		}
 
 		m_uniformScratchBuffer.begin();
@@ -5302,9 +5335,10 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 
 					if (!isCompute)
 					{
+						const Rect& clippedRect = _render->m_view[view].m_clippedRect;
 						const Rect& scissorRect = _render->m_view[view].m_scissor;
 						viewHasScissor = !scissorRect.isZero();
-						viewScissorRect = viewHasScissor ? scissorRect : viewState.m_rect;
+						viewScissorRect = viewHasScissor ? scissorRect : clippedRect;
 						Clear& clr = _render->m_view[view].m_clear;
 
 						const Rect viewRect = viewState.m_rect;
@@ -5493,10 +5527,10 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 							rce->setViewport(vp);
 
 							MTL::ScissorRect sciRect = {
-								viewState.m_rect.m_x,
-								viewState.m_rect.m_y,
-								viewState.m_rect.m_width,
-								viewState.m_rect.m_height
+								NS::UInteger(clippedRect.m_x),
+								NS::UInteger(clippedRect.m_y),
+								NS::UInteger(clippedRect.m_width),
+								NS::UInteger(clippedRect.m_height)
 							};
 							rce->setScissorRect(sciRect);
 						}
@@ -5504,7 +5538,7 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 						if (BGFX_CLEAR_NONE != (clr.m_flags & BGFX_CLEAR_MASK)
 							&& !clearWithRenderPass)
 						{
-							clearQuad(_clearQuad, viewState.m_rect, clr, _render->m_colorPalette);
+							clearQuad(_clearQuad, clippedRect, clr, _render->m_colorPalette);
 						}
 					}
 				}
@@ -5732,30 +5766,21 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 					MTL::ScissorRect rc;
 					if (UINT16_MAX == scissor)
 					{
-						if (viewHasScissor)
-						{
-							rc.x   = viewScissorRect.m_x;
-							rc.y    = viewScissorRect.m_y;
-							rc.width  = viewScissorRect.m_width;
-							rc.height = viewScissorRect.m_height;
-						}
-						else
-						{   // can't disable: set to view rect
-							rc.x   = viewState.m_rect.m_x;
-							rc.y    = viewState.m_rect.m_y;
-							rc.width  = viewState.m_rect.m_width;
-							rc.height = viewState.m_rect.m_height;
-						}
+						// Can't disable scissor, so it's set to view scissor rect.
+						rc.x      = NS::UInteger(viewScissorRect.m_x);
+						rc.y      = NS::UInteger(viewScissorRect.m_y);
+						rc.width  = NS::UInteger(viewScissorRect.m_width);
+						rc.height = NS::UInteger(viewScissorRect.m_height);
 					}
 					else
 					{
 						Rect scissorRect;
 						scissorRect.setIntersect(viewScissorRect, _render->m_frameCache.m_rectCache.m_cache[scissor]);
 
-						rc.x      = scissorRect.m_x;
-						rc.y      = scissorRect.m_y;
-						rc.width  = scissorRect.m_width;
-						rc.height = scissorRect.m_height;
+						rc.x      = NS::UInteger(scissorRect.m_x);
+						rc.y      = NS::UInteger(scissorRect.m_y);
+						rc.width  = NS::UInteger(scissorRect.m_width);
+						rc.height = NS::UInteger(scissorRect.m_height);
 					}
 
 					rce->setScissorRect(rc);
@@ -6370,10 +6395,23 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 			}
 		}
 
-		if (m_screenshotTarget)
+		for (uint32_t ii = 0, num = m_numWindows; ii < num; ++ii)
 		{
+			FrameBufferMtl& frameBuffer = 0 == ii
+				? m_mainFrameBuffer
+				: m_frameBuffers[m_windows[ii].idx]
+				;
+
+			SwapChainMtl* swapChain = frameBuffer.m_swapChain;
+
+			if (NULL == swapChain
+			||  NULL == swapChain->m_screenshotTarget)
+			{
+				continue;
+			}
+
 			MTL::RenderPassDescriptor* renderPassDescriptor = newRenderPassDescriptor();
-			renderPassDescriptor->colorAttachments()->object(0)->setTexture(NULL != m_mainFrameBuffer.m_swapChain ? m_mainFrameBuffer.m_swapChain->currentDrawableTexture() : NULL);
+			renderPassDescriptor->colorAttachments()->object(0)->setTexture(swapChain->currentDrawableTexture() );
 			renderPassDescriptor->colorAttachments()->object(0)->setStoreAction(MTL::StoreActionStore);
 
 			rce = m_commandBuffer->renderCommandEncoder(renderPassDescriptor);
@@ -6398,7 +6436,7 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 				);
 
 			rce->setFragmentSamplerState(samplerState, 0);
-			rce->setFragmentTexture(m_screenshotTarget, 0);
+			rce->setFragmentTexture(swapChain->m_screenshotTarget, 0);
 
 			rce->drawPrimitives(MTL::PrimitiveTypeTriangle, 0, 3, 1);
 

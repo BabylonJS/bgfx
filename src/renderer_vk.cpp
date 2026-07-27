@@ -4619,11 +4619,13 @@ VK_IMPORT_DEVICE
 
 		void clearQuad(const Rect& _rect, const Clear& _clear, const float _palette[][4])
 		{
+			const Rect clearRect = _rect;
+
 			VkClearRect rect[1];
-			rect[0].rect.offset.x      = _rect.m_x;
-			rect[0].rect.offset.y      = _rect.m_y;
-			rect[0].rect.extent.width  = _rect.m_width;
-			rect[0].rect.extent.height = _rect.m_height;
+			rect[0].rect.offset.x      = clearRect.m_x;
+			rect[0].rect.offset.y      = clearRect.m_y;
+			rect[0].rect.extent.width  = clearRect.m_width;
+			rect[0].rect.extent.height = clearRect.m_height;
 			rect[0].baseArrayLayer = 0;
 			rect[0].layerCount     = 1;
 
@@ -6556,7 +6558,6 @@ VK_DESTROY
 		if (m_sampler.Count > 1)
 		{
 			BX_ASSERT(VK_IMAGE_VIEW_TYPE_3D != m_type, "Can't create multisample 3D image.");
-			BX_ASSERT(m_numMips <= 1, "Can't create multisample image with mip chain.");
 		}
 
 		VkImageCreateInfo ici;
@@ -6613,6 +6614,10 @@ VK_DESTROY
 			? 1
 			: ici.mipLevels
 			;
+
+		BX_ASSERT(1 == m_sampler.Count || ici.mipLevels <= 1
+			, "Can't create multisample image with mip chain."
+			);
 
 		if (0 != _external)
 		{
@@ -7245,6 +7250,84 @@ VK_DESTROY
 				, 1
 				, &resolve
 				);
+
+			const bool autoGenMips = true
+				&& 0 != (_resolve & BGFX_RESOLVE_AUTO_GEN_MIPS)
+				&& 0 == (m_flags  & BGFX_TEXTURE_RT_WRITE_ONLY)
+				&& (_mip + 1) < m_numMips
+				;
+
+			if (autoGenMips)
+			{
+				BGFX_PROFILER_SCOPE("Resolve - Generate Mipmaps (MSAA)", kColorResource);
+
+				int32_t mipWidth  = bx::max<int32_t>(int32_t(m_width)  >> _mip, 1);
+				int32_t mipHeight = bx::max<int32_t>(int32_t(m_height) >> _mip, 1);
+
+				const VkFilter filter = bimg::isDepth(bimg::TextureFormat::Enum(m_textureFormat) )
+					? VK_FILTER_NEAREST
+					: VK_FILTER_LINEAR
+					;
+
+				VkImageBlit blit;
+				blit.srcOffsets[0] = { 0, 0, 0 };
+				blit.srcSubresource.aspectMask     = m_aspectFlags;
+				blit.srcSubresource.baseArrayLayer = _layer;
+				blit.srcSubresource.layerCount     = numLayers;
+				blit.dstOffsets[0] = { 0, 0, 0 };
+				blit.dstSubresource.aspectMask     = m_aspectFlags;
+				blit.dstSubresource.baseArrayLayer = _layer;
+				blit.dstSubresource.layerCount     = numLayers;
+
+				for (uint32_t i = _mip + 1; i < m_numMips; i++)
+				{
+					BGFX_PROFILER_SCOPE("Mipmap", kColorResource);
+
+					blit.srcOffsets[1] = { mipWidth, mipHeight, 1 };
+					blit.srcSubresource.mipLevel = i - 1;
+
+					mipWidth  = bx::max(mipWidth  >> 1, 1);
+					mipHeight = bx::max(mipHeight >> 1, 1);
+
+					blit.dstOffsets[1] = { mipWidth, mipHeight, 1 };
+					blit.dstSubresource.mipLevel = i;
+
+					setImageMemoryBarrier(
+						  _commandBuffer
+						, m_singleMsaaImage
+						, m_aspectFlags
+						, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+						, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
+						, blit.srcSubresource.mipLevel
+						, 1
+						, _layer
+						, numLayers
+						);
+
+					vkCmdBlitImage(
+						  _commandBuffer
+						, m_singleMsaaImage
+						, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
+						, m_singleMsaaImage
+						, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+						, 1
+						, &blit
+						, filter
+						);
+				}
+
+				setImageMemoryBarrier(
+					  _commandBuffer
+					, m_singleMsaaImage
+					, m_aspectFlags
+					, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
+					, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+					, _mip
+					, m_numMips - _mip - 1
+					, _layer
+					, numLayers
+					);
+			}
 		}
 
 		if (needMipGen)
@@ -7856,15 +7939,20 @@ VK_DESTROY
 						typedef xcb_connection_t* (*PFN_XGETXCBCONNECTION)(Display*);
 						PFN_XGETXCBCONNECTION XGetXCBConnection = (PFN_XGETXCBCONNECTION)bx::dlsym(xcbdll, "XGetXCBConnection");
 
-						VkXcbSurfaceCreateInfoKHR sci;
-						sci.sType      = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR;
-						sci.pNext      = NULL;
-						sci.flags      = 0;
-						sci.connection = XGetXCBConnection( (Display*)g_platformData.ndt);
-						sci.window     = bx::narrowCast<xcb_window_t>(uintptr_t(m_nwh) );
-						result = vkCreateXcbSurfaceKHR(instance, &sci, allocatorCb, &m_surface);
-						BX_WARN(VK_SUCCESS == result, "vkCreateXcbSurfaceKHR failed %d: %s.", result, getName(result) );
-
+						if (NULL != XGetXCBConnection)
+						{
+							VkXcbSurfaceCreateInfoKHR sci;
+							sci.sType      = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR;
+							sci.pNext      = NULL;
+							sci.flags      = 0;
+							sci.connection = XGetXCBConnection( (Display*)g_platformData.ndt);
+							if (NULL != sci.connection)
+							{
+								sci.window     = bx::narrowCast<xcb_window_t>(uintptr_t(m_nwh) );
+								result = vkCreateXcbSurfaceKHR(instance, &sci, allocatorCb, &m_surface);
+								BX_WARN(VK_SUCCESS == result, "vkCreateXcbSurfaceKHR failed %d: %s.", result, getName(result) );
+							}
+						}
 						bx::dlclose(xcbdll);
 					}
 				}
@@ -9633,32 +9721,19 @@ VK_DESTROY
 						VkRenderPass renderPass = fb.getRenderPass(_render->m_view[view].m_clear.m_flags);
 
 						viewState.m_rect = _render->m_view[view].m_rect;
-						Rect rect        = _render->m_view[view].m_rect;
+						const Rect& rect        = _render->m_view[view].m_rect;
+						const Rect& renderArea  = _render->m_view[view].m_clippedRect;
 						Rect scissorRect = _render->m_view[view].m_scissor;
 						viewHasScissor  = !scissorRect.isZero();
-						viewScissorRect = viewHasScissor ? scissorRect : rect;
+						viewScissorRect = viewHasScissor ? scissorRect : renderArea;
 						restoreScissor = false;
-
-						// Clamp the rect to what's valid according to Vulkan.
-						rect.m_width  = bx::min(rect.m_width,  bx::narrowCast<uint16_t>(fb.m_width)  - rect.m_x);
-						rect.m_height = bx::min(rect.m_height, bx::narrowCast<uint16_t>(fb.m_height) - rect.m_y);
-						if (_render->m_view[view].m_rect.m_width  != rect.m_width
-						||  _render->m_view[view].m_rect.m_height != rect.m_height)
-						{
-							BX_TRACE("Clamp render pass from %dx%d to %dx%d"
-								, _render->m_view[view].m_rect.m_width
-								, _render->m_view[view].m_rect.m_height
-								, rect.m_width
-								, rect.m_height
-								);
-						}
 
 						rpbi.framebuffer = fb.m_currentFramebuffer;
 						rpbi.renderPass  = renderPass;
-						rpbi.renderArea.offset.x = rect.m_x;
-						rpbi.renderArea.offset.y = rect.m_y;
-						rpbi.renderArea.extent.width  = rect.m_width;
-						rpbi.renderArea.extent.height = rect.m_height;
+						rpbi.renderArea.offset.x = renderArea.m_x;
+						rpbi.renderArea.offset.y = renderArea.m_y;
+						rpbi.renderArea.extent.width  = renderArea.m_width;
+						rpbi.renderArea.extent.height = renderArea.m_height;
 
 						VkViewport vp;
 						vp.x        =  float(rect.m_x);
@@ -9775,8 +9850,8 @@ VK_DESTROY
 							const Clear& clr = _render->m_view[view].m_clear;
 							if (BGFX_CLEAR_NONE != clr.m_flags)
 							{
-								Rect clearRect = rect;
-								clearRect.setIntersect(rect, viewScissorRect);
+								Rect clearRect;
+								clearRect.setIntersect(renderArea, viewScissorRect);
 								clearQuad(clearRect, clr, _render->m_colorPalette);
 
 							}
