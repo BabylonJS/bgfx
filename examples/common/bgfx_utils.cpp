@@ -126,7 +126,10 @@ static bgfx::ShaderHandle loadShader(bx::FileReaderI* _reader, const bx::StringV
 	filePath.join(fileName);
 
 	bgfx::ShaderHandle handle = bgfx::createShader(loadMem(_reader, filePath.getCPtr() ) );
-	bgfx::setName(handle, _name.getPtr(), _name.getLength() );
+	if (bgfx::isValid(handle) )
+	{
+		bgfx::setName(handle, _name.getPtr(), _name.getLength() );
+	}
 
 	return handle;
 }
@@ -224,7 +227,7 @@ bgfx::TextureHandle loadTexture(bx::FileReaderI* _reader, const bx::FilePath& _f
 					, mem
 					);
 			}
-			else if (1 < imageContainer->m_depth)
+			else if (bimg::isVolume(*imageContainer) )
 			{
 				handle = bgfx::createTexture3D(
 					  uint16_t(imageContainer->m_width)

@@ -189,6 +189,7 @@
 			VK_IMPORT_DEVICE_FUNC(false, vkCmdDispatchIndirect);                      \
 			VK_IMPORT_DEVICE_FUNC(false, vkCmdBindPipeline);                          \
 			VK_IMPORT_DEVICE_FUNC(false, vkCmdSetStencilReference);                   \
+			VK_IMPORT_DEVICE_FUNC(false, vkCmdSetStencilCompareMask);                 \
 			VK_IMPORT_DEVICE_FUNC(false, vkCmdSetStencilWriteMask);                   \
 			VK_IMPORT_DEVICE_FUNC(false, vkCmdSetBlendConstants);                     \
 			VK_IMPORT_DEVICE_FUNC(false, vkCmdSetScissor);                            \
@@ -768,9 +769,9 @@ VK_DESTROY_FUNC(DescriptorSet);
 		SwapChainVK()
 			: m_nwh(NULL)
 			, m_swapChain(VK_NULL_HANDLE)
-			, m_needPresent(false)
 			, m_lastImageRenderedSemaphore(VK_NULL_HANDLE)
 			, m_lastImageAcquiredSemaphore(VK_NULL_HANDLE)
+			, m_needPresent(false)
 			, m_backBufferDepthStencilImageView(VK_NULL_HANDLE)
 			, m_backBufferColorMsaaImageView(VK_NULL_HANDLE)
 		{

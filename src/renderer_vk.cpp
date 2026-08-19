@@ -88,7 +88,7 @@ namespace bgfx { namespace vk
 		{ VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA,      VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA      }, // INV_DST_ALPHA
 		{ VK_BLEND_FACTOR_DST_COLOR,                VK_BLEND_FACTOR_DST_ALPHA                }, // DST_COLOR
 		{ VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR,      VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA      }, // INV_DST_COLOR
-		{ VK_BLEND_FACTOR_SRC_ALPHA,                VK_BLEND_FACTOR_ONE                      }, // SRC_ALPHA_SAT
+		{ VK_BLEND_FACTOR_SRC_ALPHA_SATURATE,       VK_BLEND_FACTOR_ONE                      }, // SRC_ALPHA_SAT
 		{ VK_BLEND_FACTOR_CONSTANT_COLOR,           VK_BLEND_FACTOR_CONSTANT_COLOR           }, // FACTOR
 		{ VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR, VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR }, // INV_FACTOR
 	};
@@ -530,10 +530,10 @@ VK_IMPORT_DEVICE
 			{ VK_FORMAT_R8G8B8A8_UINT,           VK_FORMAT_R8G8B8A8_UNORM           },
 		},
 		{ // Uint10
-			{ VK_FORMAT_A2R10G10B10_UINT_PACK32, VK_FORMAT_A2R10G10B10_UNORM_PACK32 },
-			{ VK_FORMAT_A2R10G10B10_UINT_PACK32, VK_FORMAT_A2R10G10B10_UNORM_PACK32 },
-			{ VK_FORMAT_A2R10G10B10_UINT_PACK32, VK_FORMAT_A2R10G10B10_UNORM_PACK32 },
-			{ VK_FORMAT_A2R10G10B10_UINT_PACK32, VK_FORMAT_A2R10G10B10_UNORM_PACK32 },
+			{ VK_FORMAT_A2B10G10R10_UINT_PACK32, VK_FORMAT_A2B10G10R10_UNORM_PACK32 },
+			{ VK_FORMAT_A2B10G10R10_UINT_PACK32, VK_FORMAT_A2B10G10R10_UNORM_PACK32 },
+			{ VK_FORMAT_A2B10G10R10_UINT_PACK32, VK_FORMAT_A2B10G10R10_UNORM_PACK32 },
+			{ VK_FORMAT_A2B10G10R10_UINT_PACK32, VK_FORMAT_A2B10G10R10_UNORM_PACK32 },
 		},
 		{ // Int16
 			{ VK_FORMAT_R16_SINT,                VK_FORMAT_R16_SNORM                },
@@ -2932,6 +2932,7 @@ VK_IMPORT_DEVICE
 			m_cmd.recycleMemory(_alloc);
 		}
 
+		void submitBlitBatch(BlitState& _bs, uint16_t _view);
 		void submitBlit(BlitState& _bs, uint16_t _view);
 
 		void submitUniformCache(UniformCacheState& _ucs, uint16_t _view);
@@ -3660,7 +3661,6 @@ VK_IMPORT_DEVICE
 					ad[ii].storeOp        = 0 != (_clearFlags & BGFX_CLEAR_DISCARD_DEPTH)   ? VK_ATTACHMENT_STORE_OP_DONT_CARE : VK_ATTACHMENT_STORE_OP_STORE;
 					ad[ii].stencilLoadOp  = 0 != (_clearFlags & BGFX_CLEAR_STENCIL)         ? VK_ATTACHMENT_LOAD_OP_CLEAR      : VK_ATTACHMENT_LOAD_OP_LOAD;
 					ad[ii].stencilStoreOp = 0 != (_clearFlags & BGFX_CLEAR_DISCARD_STENCIL) ? VK_ATTACHMENT_STORE_OP_DONT_CARE : VK_ATTACHMENT_STORE_OP_STORE;
-					ad[ii].stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
 					ad[ii].initialLayout  = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 					ad[ii].finalLayout    = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
@@ -4095,6 +4095,7 @@ VK_IMPORT_DEVICE
 				VK_DYNAMIC_STATE_SCISSOR,
 				VK_DYNAMIC_STATE_BLEND_CONSTANTS,
 				VK_DYNAMIC_STATE_STENCIL_REFERENCE,
+				VK_DYNAMIC_STATE_STENCIL_COMPARE_MASK,
 				VK_DYNAMIC_STATE_STENCIL_WRITE_MASK,
 				VK_DYNAMIC_STATE_FRAGMENT_SHADING_RATE_KHR, // optional
 			};
@@ -4364,6 +4365,9 @@ VK_IMPORT_DEVICE
 								, bind.m_firstMip
 								, bind.m_numMips
 								, type
+								, false
+								, bind.m_firstLayer
+								, bind.m_numLayers
 								);
 							wds[wdsCount].pImageInfo = &imageInfo[imageCount];
 							++imageCount;
@@ -6805,7 +6809,7 @@ VK_DESTROY
 					: VK_IMAGE_VIEW_TYPE_CUBE
 					;
 			}
-			else if (imageContainer.m_depth > 1)
+			else if (isVolume(imageContainer) )
 			{
 				m_type = VK_IMAGE_VIEW_TYPE_3D;
 			}
@@ -7600,7 +7604,10 @@ VK_DESTROY
 			;
 		viewInfo.viewType   = _type;
 		viewInfo.format     = m_format;
-		viewInfo.components = m_components;
+		viewInfo.components = _renderTarget
+			? VkComponentMapping{ VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY }
+			: m_components
+			;
 		viewInfo.subresourceRange.aspectMask     = m_aspectFlags & _aspectMask;
 		viewInfo.subresourceRange.baseMipLevel   = _mip;
 		viewInfo.subresourceRange.levelCount     = _numMips;
@@ -8802,7 +8809,28 @@ VK_DESTROY
 		BGFX_PROFILER_SCOPE("FrameBufferVK::create", kColorFrame);
 
 		m_numTh = _num;
-		bx::memCopy(m_attachment, _attachment, sizeof(Attachment) * _num);
+
+		uint8_t num = 0;
+
+		for (uint8_t ii = 0; ii < _num; ++ii)
+		{
+			const TextureVK& texture = s_renderVK->m_textures[_attachment[ii].handle.idx];
+
+			if (0 == (texture.m_aspectFlags & (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT) ) )
+			{
+				m_attachment[num++] = _attachment[ii];
+			}
+		}
+
+		for (uint8_t ii = 0; ii < _num; ++ii)
+		{
+			const TextureVK& texture = s_renderVK->m_textures[_attachment[ii].handle.idx];
+
+			if (0 != (texture.m_aspectFlags & (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT) ) )
+			{
+				m_attachment[num++] = _attachment[ii];
+			}
+		}
 
 		postReset();
 	}
@@ -9400,31 +9428,36 @@ VK_DESTROY
 		BX_ASSERT(false, "Removing external texture failed!");
 	}
 
-	void RendererContextVK::submitBlit(BlitState& _bs, uint16_t _view)
+	void RendererContextVK::submitBlitBatch(BlitState& _bs, uint16_t _view)
 	{
-		BGFX_PROFILER_SCOPE("RendererContextVK::submitBlit", kColorFrame);
+		constexpr uint32_t kMaxItems = 128;
+		VkImageLayout srcLayouts[kMaxItems];
+		VkImageLayout dstLayouts[kMaxItems];
 
-		VkImageLayout srcLayouts[BGFX_CONFIG_MAX_BLIT_ITEMS];
-		VkImageLayout dstLayouts[BGFX_CONFIG_MAX_BLIT_ITEMS];
+		uint32_t numItems = 0;
 
 		BlitState bs0 = _bs;
 
-		while (bs0.hasItem(_view) )
+		while (bs0.hasItem(_view)
+		&&     numItems < kMaxItems)
 		{
-			uint16_t item = bs0.m_item;
+			const uint32_t item = numItems++;
 
 			const BlitItem& blit = bs0.advance();
 
 			TextureVK& src = m_textures[blit.m_src.idx];
 			TextureVK& dst = m_textures[blit.m_dst.idx];
 
-			srcLayouts[item] = VK_NULL_HANDLE != src.m_singleMsaaImage ? src.m_currentSingleMsaaImageLayout : src.m_currentImageLayout;
+			srcLayouts[item] = VK_NULL_HANDLE != src.m_singleMsaaImage
+				? src.m_currentSingleMsaaImageLayout
+				: src.m_currentImageLayout
+				;
 			dstLayouts[item] = dst.m_currentImageLayout;
 		}
 
 		bs0 = _bs;
 
-		while (bs0.hasItem(_view) )
+		for (uint32_t item = 0; item < numItems; ++item)
 		{
 			const BlitItem& blit = bs0.advance();
 
@@ -9523,10 +9556,8 @@ VK_DESTROY
 				);
 		}
 
-		while (_bs.hasItem(_view) )
+		for (uint32_t item = 0; item < numItems; ++item)
 		{
-			uint16_t item = _bs.m_item;
-
 			const BlitItem& blit = _bs.advance();
 
 			TextureVK& src = m_textures[blit.m_src.idx];
@@ -9534,6 +9565,16 @@ VK_DESTROY
 
 			src.setState(m_commandBuffer, srcLayouts[item], VK_NULL_HANDLE != src.m_singleMsaaImage);
 			dst.setState(m_commandBuffer, dstLayouts[item]);
+		}
+	}
+
+	void RendererContextVK::submitBlit(BlitState& _bs, uint16_t _view)
+	{
+		BGFX_PROFILER_SCOPE("RendererContextVK::submitBlit", kColorFrame);
+
+		while (_bs.hasItem(_view) )
+		{
+			submitBlitBatch(_bs, _view);
 		}
 	}
 
@@ -10247,7 +10288,9 @@ VK_DESTROY
 
 						const uint32_t fstencil = unpackStencil(0, draw.m_stencil);
 						const uint32_t ref = (fstencil&BGFX_STENCIL_FUNC_REF_MASK)>>BGFX_STENCIL_FUNC_REF_SHIFT;
+						const uint32_t rmask = (fstencil&BGFX_STENCIL_FUNC_RMASK_MASK)>>BGFX_STENCIL_FUNC_RMASK_SHIFT;
 						vkCmdSetStencilReference(m_commandBuffer, VK_STENCIL_FRONT_AND_BACK, ref);
+						vkCmdSetStencilCompareMask(m_commandBuffer, VK_STENCIL_FRONT_AND_BACK, rmask);
 						vkCmdSetStencilWriteMask(m_commandBuffer, VK_STENCIL_FRONT_AND_BACK, unpackStencilWriteMask(draw.m_stencil) );
 					}
 
