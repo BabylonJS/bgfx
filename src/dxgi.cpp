@@ -626,7 +626,15 @@ namespace bgfx
 
 		if (_scd.waitable)
 		{
-			(*_swapChain)->SetMaximumFrameLatency(bx::max<uint32_t>(1, _scd.maxFrameLatency) );
+			// SetMaximumFrameLatency lives on IDXGISwapChain2. On Win32 SwapChainI is
+			// IDXGISwapChain3 (which inherits it), but on WinRT it is IDXGISwapChain1.
+			IDXGISwapChain2* swapChain2;
+			HRESULT hrLatency = (*_swapChain)->QueryInterface(IID_IDXGISwapChain2, (void**)&swapChain2);
+			if (SUCCEEDED(hrLatency) )
+			{
+				swapChain2->SetMaximumFrameLatency(bx::max<uint32_t>(1, _scd.maxFrameLatency) );
+				DX_RELEASE(swapChain2, 0);
+			}
 		}
 
 		updateHdr10(*_swapChain, _scd);
