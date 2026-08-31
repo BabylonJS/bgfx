@@ -226,7 +226,7 @@ Buffer sizes
 
 ``BGFX_CONFIG_MAX_TRANSIENT_INDEX_BUFFER_SIZE`` - Maximum transient index buffer size. There is no growth; all transient indices must fit into this buffer. Default is 2 MB.
 
-``BGFX_CONFIG_MIN_RESOURCE_COMMAND_BUFFER_SIZE`` - Minimum initial size of the resource command buffer (pre/post render commands for resource creation and updates). Default is 64 KB. The buffer grows as needed.
+``BGFX_CONFIG_MIN_RESOURCE_COMMAND_BUFFER_SIZE`` - Minimum initial size of the resource command buffer (pre/post render commands for resource creation and updates). Default is 64 KB. The buffer grows as needed. After ``Init::Limits::numDrawCallPeakFrames`` (default 60) of observing the high-water mark it shrinks toward that peak, but not below this minimum. Set ``numDrawCallPeakFrames`` to 0 to keep the largest size for the lifetime of the context.
 
 ``BGFX_CONFIG_MIN_UNIFORM_BUFFER_SIZE`` - Minimum initial size in bytes of the per-encoder uniform buffer. Default is 128 KB. This buffer will resize on demand. Must be larger than ``BGFX_CONFIG_UNIFORM_BUFFER_RESIZE_THRESHOLD_SIZE``, otherwise the buffer resizes on first use.
 
@@ -265,7 +265,7 @@ Debugging and profiling
 
 ``BGFX_CONFIG_DEBUG_TEXT_MAX_SCALE`` - Debug text maximum scale factor for ``bgfx::dbgTextPrintf``. Default is 4.
 
-``BGFX_CONFIG_DEBUG_PERFHUD`` - Enable nVidia PerfHUD integration. Default is 0.
+``BGFX_CONFIG_DEBUG_PERFHUD`` - Enable NVIDIA PerfHUD integration. Default is 0.
 
 ``BGFX_CONFIG_DEBUG_ANNOTATION`` - Enable annotation for graphics debuggers (e.g. RenderDoc, PIX). Default matches ``BGFX_CONFIG_DEBUG``.
 
@@ -284,10 +284,8 @@ Debugging and profiling
 Miscellaneous
 ^^^^^^^^^^^^^
 
-``BGFX_CONFIG_USE_TINYSTL`` - Enable use of tinystl instead of std containers for internal data structures. Default is 1. Reduces binary size and avoids std library dependency.
-
 ``BGFX_CONFIG_MIP_LOD_BIAS`` - Global MIP level-of-detail bias applied to all texture sampling. Default is 0. Positive values select coarser MIP levels, negative values select finer MIP levels.
 
 ``BGFX_CONFIG_DRAW_INDIRECT_STRIDE`` - Stride in bytes of each draw indirect command. Fixed at 32 bytes. Not configurable.
 
-``BGFX_CONFIG_PREFER_DISCRETE_GPU`` - On laptops with integrated and discrete GPU, prefer selection of the discrete GPU (nVidia and AMD). Default is 1 on Windows, 0 elsewhere.
+``BGFX_CONFIG_PREFER_DISCRETE_GPU`` - On laptops with integrated and discrete GPU, prefer selection of the discrete GPU (NVIDIA and AMD). Default is 1 on Windows, 0 elsewhere.

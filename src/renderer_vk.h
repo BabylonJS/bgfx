@@ -535,8 +535,7 @@ VK_DESTROY_FUNC(DescriptorSet);
 	struct ShaderVK
 	{
 		ShaderVK()
-			: m_code(NULL)
-			, m_module(VK_NULL_HANDLE)
+			: m_module(VK_NULL_HANDLE)
 			, m_constantBuffer(NULL)
 			, m_hash(0)
 			, m_numUniforms(0)
@@ -550,7 +549,6 @@ VK_DESTROY_FUNC(DescriptorSet);
 		void create(const Memory* _mem);
 		void destroy();
 
-		const Memory* m_code;
 		VkShaderModule m_module;
 		UniformBuffer* m_constantBuffer;
 
@@ -682,8 +680,9 @@ VK_DESTROY_FUNC(DescriptorSet);
 		void create(VkImage _image, uint32_t _width, uint32_t _height, TextureFormat::Enum _format);
 		void destroy();
 		uint32_t pitch(uint8_t _mip = 0) const;
+		uint32_t stagingSize(VkImageAspectFlags _aspect, uint8_t _mip = 0) const;
 		void copyImageToBuffer(VkCommandBuffer _commandBuffer, VkBuffer _buffer, VkImageLayout _layout, VkImageAspectFlags _aspect, uint16_t _layer = 0, uint8_t _mip = 0) const;
-		void readback(VkDeviceMemory _memory, VkDeviceSize _offset, void* _data, uint8_t _mip = 0) const;
+		void readback(VkDeviceMemory _memory, VkDeviceSize _offset, void* _data, VkImageAspectFlags _aspect, uint8_t _mip = 0) const;
 
 		VkImage  m_image;
 		uint32_t m_width;
