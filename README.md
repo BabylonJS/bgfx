@@ -77,15 +77,14 @@ Languages:
  * [Beef API bindings](https://github.com/bkaradzic/bgfx/tree/master/bindings/bf)
  * [C# language API bindings](https://github.com/bkaradzic/bgfx/tree/master/bindings/cs)
  * [C3 language API bindings](https://github.com/bkaradzic/bgfx/tree/master/bindings/c3)
+ * [Python language API bindings](https://github.com/bkaradzic/bgfx/tree/master/bindings/py)
  * [D language API bindings](https://github.com/BindBC/bindbc-bgfx)
  * [Go language API bindings](https://github.com/james4k/go-bgfx)
  * [Haskell language API bindings](https://github.com/haskell-game/bgfx)
  * [Lightweight Java Game Library 3 bindings](https://github.com/LWJGL/lwjgl3)
  * [Lua language API bindings](https://github.com/cloudwu/lua-bgfx)
- * [Nim language API bindings](https://github.com/Halsys/nim-bgfx)
+ * [Nim language API bindings](https://github.com/puffball1567/bgfxim)
  * [Pascal language API bindings](https://github.com/Akira13641/PasBGFX)
- * [Python language API bindings #1](https://github.com/fbertola/bgfx-python#-----bgfx-python--)
- * [Python language API bindings #2](https://github.com/jnadro/pybgfx#pybgfx)
  * [Rust language API bindings (new)](https://github.com/emoon/bgfx-rs)
  * [Swift language API bindings](https://github.com/stuartcarnie/SwiftBGFX)
  * [Zig language API bindings](https://github.com/bkaradzic/bgfx/tree/master/bindings/zig)
@@ -99,7 +98,9 @@ https://www.carbongames.com/airmech-strike - AirMech is a free-to-play
 futuristic action real-time strategy video game developed and published by
 Carbon Games.
 
-![AirMech screenshot](https://www.mobygames.com/images/shots/l/830630-airmech-playstation-4-screenshot-blue-bar-on-your-mech-indicates.jpg)
+<a href="http://www.youtube.com/watch?feature=player_embedded&v=dMUSomUxrHk"
+target="_blank"><img src="http://img.youtube.com/vi/dMUSomUxrHk/0.jpg"
+alt="AirMech Wastelands Trailer 2" width="640" height="480" border="0" /></a>
 
 ## cmftStudio
 

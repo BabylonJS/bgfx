@@ -75,6 +75,8 @@ local function convert_type_0(arg)
 		return arg.ctype:gsub("float", "f32")
 	elseif arg.ctype == "const char*" then
 		return "[*c]const u8"
+	elseif arg.ctype == "const uint8_t*" then
+		return "[*c]const u8"
 	elseif hasPrefix(arg.ctype, "char") then
 		return arg.ctype:gsub("char", "u8")
 	elseif hasSuffix(arg.fulltype, "Handle") then
@@ -286,6 +288,9 @@ function converter.types(params)
 
 		yield("pub const " .. typ.name .. " = extern struct {")
 		yield("    idx: c_ushort,")
+		if typ.tagged then
+		yield("    type: c_ushort,")
+		end
 		yield("};")
 	elseif hasSuffix(typ.name, "::Enum") then
 		lastCombinedFlagBlock()

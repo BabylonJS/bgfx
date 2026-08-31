@@ -87,6 +87,10 @@ newaction {
 			local c3gen = require "bindings-c3"
 			c3gen.write(c3gen.gen(), "../bindings/c3/bgfx.c3")
 
+			local pygen = require "bindings-py"
+			pygen.write(pygen.gen(), "../bindings/py/bgfx.py")
+			pygen.write(pygen.gen_pyi(), "../bindings/py/bgfx.pyi")
+
 			local docsgen = require "docs-rst"
 			docsgen.write(docsgen.gen(), "../docs/bgfx.rst")
 		end
