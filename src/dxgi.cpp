@@ -466,7 +466,7 @@ namespace bgfx
 		DX_RELEASE_I(dxgiDevice);
 	}
 
-	HRESULT Dxgi::createSwapChain(IUnknown* _device, const SwapChainDesc& _scd, SwapChainI** _swapChain)
+	HRESULT Dxgi::createSwapChain(IUnknown* _device, const DxgiSwapChainDesc& _scd, SwapChainI** _swapChain)
 	{
 		HRESULT hr = S_OK;
 
@@ -584,9 +584,9 @@ namespace bgfx
 			}
 		}
 
-		if (FAILED(hr))
+		if (FAILED(hr) )
 		{
-			BX_TRACE("Failed to create swap chain.");
+			BX_TRACE("Failed to create swap chain, hr 0x%08x.", hr);
 			return hr;
 		}
 
@@ -627,14 +627,13 @@ namespace bgfx
 
 		if (_scd.waitable)
 		{
-			// SetMaximumFrameLatency lives on IDXGISwapChain2. On Win32 SwapChainI is
-			// IDXGISwapChain3 (which inherits it), but on WinRT it is IDXGISwapChain1.
 			IDXGISwapChain2* swapChain2;
-			HRESULT hrLatency = (*_swapChain)->QueryInterface(IID_IDXGISwapChain2, (void**)&swapChain2);
-			if (SUCCEEDED(hrLatency) )
+			hr = (*_swapChain)->QueryInterface(IID_IDXGISwapChain2, (void**)&swapChain2);
+
+			if (SUCCEEDED(hr) )
 			{
 				swapChain2->SetMaximumFrameLatency(bx::max<uint32_t>(1, _scd.maxFrameLatency) );
-				DX_RELEASE(swapChain2, 0);
+				DX_RELEASE(swapChain2, 1);
 			}
 		}
 
@@ -643,7 +642,7 @@ namespace bgfx
 		return S_OK;
 	}
 
-	HRESULT Dxgi::removeSwapChain(const SwapChainDesc& _scd)
+	HRESULT Dxgi::removeSwapChain(const DxgiSwapChainDesc& _scd)
 	{
 #if BX_PLATFORM_WINRT
 		IInspectable* nativeWindow = reinterpret_cast<IInspectable*>(_scd.nwh);
@@ -654,7 +653,7 @@ namespace bgfx
 #endif // BX_PLATFORM_WINRT
 	}
 
-	void Dxgi::updateHdr10(SwapChainI* _swapChain, const SwapChainDesc& _scd)
+	void Dxgi::updateHdr10(SwapChainI* _swapChain, const DxgiSwapChainDesc& _scd)
 	{
 #if BX_PLATFORM_WINDOWS
 		::IDXGISwapChain4* swapChain4;
@@ -728,7 +727,7 @@ namespace bgfx
 #endif // BX_PLATFORM_WINDOWS
 	}
 
-	HRESULT Dxgi::resizeBuffers(SwapChainI* _swapChain, const SwapChainDesc& _scd, const uint32_t* _nodeMask, IUnknown* const* _presentQueue)
+	HRESULT Dxgi::resizeBuffers(SwapChainI* _swapChain, const DxgiSwapChainDesc& _scd, const uint32_t* _nodeMask, IUnknown* const* _presentQueue)
 	{
 		HRESULT hr;
 
@@ -747,10 +746,10 @@ namespace bgfx
 			BX_TRACE("Allow tearing is %ssupported.", allowTearing ? "" : "not ");
 
 			scdFlags |= allowTearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
-			scdFlags |= false
-				|| _scd.swapEffect == DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL
-				|| _scd.swapEffect == DXGI_SWAP_EFFECT_FLIP_DISCARD
-				? 0 // DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT
+			scdFlags |= (_scd.waitable
+				&& (DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL == _scd.swapEffect
+				 || DXGI_SWAP_EFFECT_FLIP_DISCARD    == _scd.swapEffect) )
+				? DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT
 				: 0
 				;
 

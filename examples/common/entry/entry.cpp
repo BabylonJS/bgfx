@@ -29,6 +29,25 @@ namespace entry
 	static uint32_t s_height = ENTRY_DEFAULT_HEIGHT;
 	static bool s_exit = false;
 
+	static void resetMainWindow(uint32_t _width, uint32_t _height, uint32_t _reset)
+	{
+		constexpr uint32_t kSwapChainFlags = 0
+			| BGFX_SWAP_CHAIN_FULLSCREEN_MASK
+			| BGFX_SWAP_CHAIN_MSAA_MASK
+			| BGFX_SWAP_CHAIN_SRGB_BACKBUFFER
+			| BGFX_SWAP_CHAIN_HDR10
+			| BGFX_SWAP_CHAIN_HIDPI
+			| BGFX_SWAP_CHAIN_TRANSPARENT_BACKBUFFER
+			;
+
+		bgfx::SwapChain swapChain;
+		swapChain.width  = _width;
+		swapChain.height = _height;
+		swapChain.flags  = _reset &  kSwapChainFlags;
+
+		bgfx::reset(_reset & ~kSwapChainFlags, &swapChain);
+	}
+
 	static bx::FileReaderI* s_fileReader = NULL;
 	static bx::FileWriterI* s_fileWriter = NULL;
 
@@ -289,7 +308,6 @@ BX_PRAGMA_DIAGNOSTIC_POP();
 			||  setOrToggle(s_reset, "flush",       BGFX_RESET_FLUSH_AFTER_RENDER, 1, _argc, _argv)
 			||  setOrToggle(s_reset, "flip",        BGFX_RESET_FLIP_AFTER_RENDER,  1, _argc, _argv)
 			||  setOrToggle(s_reset, "hidpi",       BGFX_RESET_HIDPI,              1, _argc, _argv)
-			||  setOrToggle(s_reset, "depthclamp",  BGFX_RESET_DEPTH_CLAMP,        1, _argc, _argv)
 			   )
 			{
 				return bx::kExitSuccess;
@@ -843,7 +861,7 @@ restart:
 		{
 			_reset = s_reset;
 			BX_TRACE("bgfx::reset(%d, %d, 0x%x)", _width, _height, _reset);
-			bgfx::reset(_width, _height, _reset);
+			resetMainWindow(_width, _height, _reset);
 			inputSetMouseResolution(uint16_t(_width), uint16_t(_height) );
 		}
 
@@ -1023,7 +1041,7 @@ restart:
 		{
 			_reset = s_reset;
 			BX_TRACE("bgfx::reset(%d, %d, 0x%x)", s_window[0].m_width, s_window[0].m_height, _reset);
-			bgfx::reset(s_window[0].m_width, s_window[0].m_height, _reset);
+			resetMainWindow(s_window[0].m_width, s_window[0].m_height, _reset);
 			inputSetMouseResolution(uint16_t(s_window[0].m_width), uint16_t(s_window[0].m_height) );
 		}
 

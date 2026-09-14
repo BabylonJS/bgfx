@@ -78,12 +78,12 @@ public:
 		bgfx::Init init;
 		init.type     = args.m_type;
 		init.vendorId = args.m_pciId;
-		init.platformData.nwh  = entry::getNativeWindowHandle(entry::kDefaultWindowHandle);
-		init.platformData.ndt  = entry::getNativeDisplayHandle();
+		init.swapChain.nwh     = entry::getNativeWindowHandle(entry::kDefaultWindowHandle);
+		init.swapChain.ndt     = entry::getNativeDisplayHandle();
 		init.platformData.type = entry::getNativeWindowHandleType();
-		init.resolution.width  = m_width;
-		init.resolution.height = m_height;
-		init.resolution.reset  = m_reset;
+		init.swapChain.width  = m_width;
+		init.swapChain.height = m_height;
+		init.reset  = m_reset;
 		bgfx::init(init);
 
 		// Enable debug text.
@@ -131,9 +131,7 @@ public:
 		// Render targets.
 		m_shadowMapSize = 512;
 
-		// Shadow samplers are supported at least partially supported if texture
-		// compare less equal feature is supported.
-		m_shadowSamplerSupported = 0 != (caps->supported & BGFX_CAPS_TEXTURE_COMPARE_LEQUAL);
+		m_shadowSamplerSupported = true;
 		m_useShadowSampler = m_shadowSamplerSupported;
 
 		m_shadowMapFB = BGFX_INVALID_HANDLE;

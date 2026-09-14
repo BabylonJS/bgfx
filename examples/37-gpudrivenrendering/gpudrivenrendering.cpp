@@ -328,12 +328,12 @@ public:
 		bgfx::Init init;
 		init.type     = args.m_type;
 		init.vendorId = args.m_pciId;
-		init.platformData.nwh  = entry::getNativeWindowHandle(entry::kDefaultWindowHandle);
-		init.platformData.ndt  = entry::getNativeDisplayHandle();
+		init.swapChain.nwh     = entry::getNativeWindowHandle(entry::kDefaultWindowHandle);
+		init.swapChain.ndt     = entry::getNativeDisplayHandle();
 		init.platformData.type = entry::getNativeWindowHandleType();
-		init.resolution.width  = m_width;
-		init.resolution.height = m_height;
-		init.resolution.reset  = m_reset;
+		init.swapChain.width  = m_width;
+		init.swapChain.height = m_height;
+		init.reset  = m_reset;
 		bgfx::init(init);
 
 		// Enable debug text.
@@ -517,7 +517,7 @@ public:
 
 			bgfx::TextureHandle buffer = bgfx::createTexture2D(uint16_t(m_hiZwidth), uint16_t(m_hiZheight), true, 1, bgfx::TextureFormat::R32F, BGFX_TEXTURE_COMPUTE_WRITE | tsFlags);
 			bgfx::Attachment at;
-			at.init(buffer, bgfx::Access::Write, 0, 1, 0, BGFX_RESOLVE_NONE);
+			at.init(buffer, bgfx::Access::Write, 0, 1, 0, BGFX_ATTACHMENT_NONE);
 			m_hiZBuffer = bgfx::createFrameBuffer(1, &at, true);
 
 			//how many mip will the Hi Z buffer have?
@@ -1046,7 +1046,6 @@ public:
 
 			// Check if instancing, compute and draw indirect are supported.
 			const uint64_t requiredCaps = 0
-				| BGFX_CAPS_INSTANCING
 				| BGFX_CAPS_COMPUTE
 				| BGFX_CAPS_DRAW_INDIRECT
 				;

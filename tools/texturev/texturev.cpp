@@ -324,6 +324,8 @@ struct View
 		, m_outputFormat(Output::sRGB)
 		, m_action(Action::None)
 		, m_fileIndex(0)
+		, m_fileRows(1)
+		, m_fileScroll(0)
 		, m_scaleFn(0)
 		, m_mip(0)
 		, m_layer(0)
@@ -641,13 +643,27 @@ struct View
 			}
 			else if (0 == bx::strCmp(_argv[1], "file-up") )
 			{
-				m_fileIndex = bx::satSub<uint32_t>(m_fileIndex, 1u);
+				m_fileIndex  = bx::satSub<uint32_t>(m_fileIndex, 1u);
+				m_fileScroll = -1;
 			}
 			else if (0 == bx::strCmp(_argv[1], "file-down") )
 			{
 				uint32_t numFiles = bx::satSub<uint32_t>(uint32_t(m_fileList.size()), 1u);
 				++m_fileIndex;
-				m_fileIndex = bx::min(m_fileIndex, numFiles);
+				m_fileIndex  = bx::min(m_fileIndex, numFiles);
+				m_fileScroll = 1;
+			}
+			else if (0 == bx::strCmp(_argv[1], "file-pgup") )
+			{
+				m_fileIndex  = bx::satSub<uint32_t>(m_fileIndex, m_fileRows);
+				m_fileScroll = -1;
+			}
+			else if (0 == bx::strCmp(_argv[1], "file-pgdown") )
+			{
+				uint32_t numFiles = bx::satSub<uint32_t>(uint32_t(m_fileList.size()), 1u);
+				m_fileIndex += m_fileRows;
+				m_fileIndex  = bx::min(m_fileIndex, numFiles);
+				m_fileScroll = 1;
 			}
 			else if (0 == bx::strCmp(_argv[1], "rgb") )
 			{
@@ -736,10 +752,16 @@ struct View
 					else if (Output::HDR10 == m_outputFormat)
 					{
 						format = bgfx::TextureFormat::RGB10A2;
-						formatFlag = BGFX_RESET_HDR10;
+						formatFlag = BGFX_SWAP_CHAIN_HDR10;
 					}
 
-					bgfx::reset(m_width, m_height, BGFX_RESET_VSYNC | formatFlag, format);
+					bgfx::SwapChain swapChain;
+					swapChain.width       = m_width;
+					swapChain.height      = m_height;
+					swapChain.flags       = formatFlag;
+					swapChain.formatColor = format;
+
+					bgfx::reset(BGFX_RESET_VSYNC, &swapChain);
 				}
 			}
 			else if (0 == bx::strCmp(_argv[1], "help") )
@@ -785,6 +807,7 @@ struct View
 			else if (0 == bx::strCmp(_argv[1], "files") )
 			{
 				m_files ^= true;
+				m_fileScroll = -1;
 			}
 		}
 
@@ -943,6 +966,8 @@ struct View
 	Output::Enum m_outputFormat;
 	Action::Enum m_action;
 	uint32_t m_fileIndex;
+	uint32_t m_fileRows;
+	int32_t  m_fileScroll;
 	uint32_t m_scaleFn;
 	uint32_t m_mip;
 	uint32_t m_layer;
@@ -1511,11 +1536,11 @@ int _main_(int _argc, char** _argv)
 		: view.m_rendererType
 		;
 	init.vendorId          = args.m_pciId;
-	init.platformData.nwh  = entry::getNativeWindowHandle(entry::kDefaultWindowHandle);
-	init.platformData.ndt  = entry::getNativeDisplayHandle();
-	init.resolution.width  = view.m_width;
-	init.resolution.height = view.m_height;
-	init.resolution.reset  = BGFX_RESET_VSYNC;
+	init.swapChain.nwh     = entry::getNativeWindowHandle(entry::kDefaultWindowHandle);
+	init.swapChain.ndt     = entry::getNativeDisplayHandle();
+	init.swapChain.width  = view.m_width;
+	init.swapChain.height = view.m_height;
+	init.reset  = BGFX_RESET_VSYNC;
 	init.videoDecode       = true;
 
 	bgfx::init(init);
@@ -1529,6 +1554,8 @@ int _main_(int _argc, char** _argv)
 		);
 
 	imguiCreate();
+
+	ImGui::GetIO().ConfigFlags &= ~ImGuiConfigFlags_NavEnableKeyboard;
 
 	PosUvwColorVertex::init();
 
@@ -1662,7 +1689,7 @@ int _main_(int _argc, char** _argv)
 
 		entry::WindowState windowState;
 		entry::MouseState mouseStatePrev;
-		while (!entry::processWindowEvents(windowState, debug, init.resolution.reset) )
+		while (!entry::processWindowEvents(windowState, debug, init.reset) )
 		{
 			const entry::MouseState& mouseState = windowState.m_mouse;
 			view.m_width  = windowState.m_width;
@@ -2161,41 +2188,53 @@ int _main_(int _argc, char** _argv)
 						if (ImGui::BeginListBox("##empty", ImVec2(0.0f, listHeight) ) )
 						{
 							const int32_t itemCount = int32_t(view.m_fileList.size() );
+							const int32_t index     = int32_t(view.m_fileIndex);
+							const int32_t scroll    = view.m_fileScroll;
+
+							view.m_fileRows = bx::max<uint32_t>(1
+								, uint32_t(ImGui::GetWindowHeight()/itemHeight)
+								);
+							view.m_fileScroll = 0;
 
 							ImGuiListClipper clipper;
 							clipper.Begin(itemCount, itemHeight);
 
-							const  int32_t index = int32_t(view.m_fileIndex);
-							static int32_t oldIndex  = index;
-							const  int32_t direction = bx::clamp(index - oldIndex, -1, 1);
-							oldIndex = index;
-
-							bool currentVisible = false;
+							if (0 != scroll
+							&&  index < itemCount)
+							{
+								clipper.IncludeItemByIndex(index);
+							}
 
 							while (clipper.Step() )
 							{
-								currentVisible |= index > clipper.DisplayStart && index < clipper.DisplayEnd;
-
 								for (int32_t pos = clipper.DisplayStart; pos < clipper.DisplayEnd; ++pos)
 								{
 									ImGui::PushID(pos);
 
-									bool isSelected = pos == index;
+									const bool isSelected = pos == index;
 
-									if (ImGui::Selectable(view.m_fileList[pos].c_str(), &isSelected) )
+									if (ImGui::Selectable(view.m_fileList[pos].c_str(), isSelected) )
 									{
 										view.m_fileIndex = pos;
 									}
 
+									if (isSelected
+									&&  0 != scroll)
+									{
+										const float itemTop = ImGui::GetItemRectMin().y;
+										const float itemBot = ImGui::GetItemRectMax().y;
+										const float viewTop = ImGui::GetWindowPos().y;
+										const float viewBot = viewTop + ImGui::GetWindowHeight();
+
+										if (itemTop < viewTop
+										||  itemBot > viewBot)
+										{
+											ImGui::SetScrollHereY(0 < scroll ? 1.0f : 0.0f);
+										}
+									}
+
 									ImGui::PopID();
 								}
-							}
-
-							if (0 != direction && !currentVisible)
-							{
-								const int32_t num  = int32_t(listHeight / itemHeight);
-								const int32_t posY = index + (1 == direction ? 1-num : 0);
-								ImGui::SetScrollY(posY*itemHeight);
 							}
 
 							clipper.End();
