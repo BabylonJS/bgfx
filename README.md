@@ -173,14 +173,12 @@ https://github.com/mamedev/mame - MAME - Multiple Arcade Machine Emulator.
 
 ## Blackshift
 
-https://blackshift.itch.io/blackshift - Blackshift is a grid-based, space-themed
-action puzzle game which isn't afraid of complexity - think Chip's Challenge on
-crack.
+https://store.steampowered.com/app/741110/Blackshift/ - Blackshift is a
+grid-based action puzzle game game full of guns, blocks, robots, bombs, 
+lasers, conveyor belts, mirrors, machines, landmines, keys, doors, 
+teleports, crystals, force fields, secrets and mysteries.
 
-<a href="http://www.youtube.com/watch?feature=player_embedded&v=PUl8612Y-ds"
-target="_blank"><img src="http://img.youtube.com/vi/PUl8612Y-ds/0.jpg"
-alt="Blackshift Trailer, May 2016"
-width="640" height="480" border="0" /></a>
+![Blackshift screenshot](https://foon.uk/bsshots/3.jpg)
 
 ## Real-Time Polygonal-Light Shading with Linearly Transformed Cosines
 
@@ -725,6 +723,12 @@ visual identity of the original Harbi2 while bringing the game to desktop and
 mobile platforms.
 
 ![Harbi2 screenshot](https://h2mb.b-cdn.net/image.webp)
+
+## METAL GEAR SOLID 4: Guns of the Patriots
+
+https://store.steampowered.com/app/2492670/METAL_GEAR_SOLID_4_Guns_of_the_Patriots__Master_Collection_Version/ 2026 remaster of the 2008 action-adventure stealth video game.
+
+<img width="1800" height="1013" alt="mgs4_cover" src="https://github.com/user-attachments/assets/cea9ec8a-f71b-4bf9-b826-0be898ca8658" />
 
 [License (BSD 2-clause)](https://bkaradzic.github.io/bgfx/license.html)
 -----------------------------------------------------------------------

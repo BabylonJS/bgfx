@@ -73,11 +73,11 @@ BGFX_C_API void bgfx_buffer_region_init_buffer(bgfx_buffer_region_t* _this, bgfx
 	This->init(handle.cpp, _offset, _size);
 }
 
-BGFX_C_API void bgfx_attachment_init(bgfx_attachment_t* _this, bgfx_texture_handle_t _handle, bgfx_access_t _access, uint16_t _layer, uint16_t _numLayers, uint16_t _mip, uint8_t _resolve)
+BGFX_C_API void bgfx_attachment_init(bgfx_attachment_t* _this, bgfx_texture_handle_t _handle, bgfx_access_t _access, uint16_t _layer, uint16_t _numLayers, uint16_t _mip, uint8_t _flags)
 {
 	bgfx::Attachment* This = (bgfx::Attachment*)_this;
 	union { bgfx_texture_handle_t c; bgfx::TextureHandle cpp; } handle = { _handle };
-	This->init(handle.cpp, (bgfx::Access::Enum)_access, _layer, _numLayers, _mip, _resolve);
+	This->init(handle.cpp, (bgfx::Access::Enum)_access, _layer, _numLayers, _mip, _flags);
 }
 
 BGFX_C_API bgfx_vertex_layout_t* bgfx_vertex_layout_begin(bgfx_vertex_layout_t* _this, bgfx_renderer_type_t _rendererType)
@@ -184,9 +184,9 @@ BGFX_C_API void bgfx_shutdown(void)
 	bgfx::shutdown();
 }
 
-BGFX_C_API void bgfx_reset(uint32_t _width, uint32_t _height, uint32_t _flags, bgfx_texture_format_t _format)
+BGFX_C_API void bgfx_reset(uint32_t _flags, const bgfx_swap_chain_t* _swapChain)
 {
-	bgfx::reset(_width, _height, _flags, (bgfx::TextureFormat::Enum)_format);
+	bgfx::reset(_flags, (const bgfx::SwapChain*)_swapChain);
 }
 
 BGFX_C_API uint32_t bgfx_frame(uint8_t _flags)
@@ -229,9 +229,10 @@ BGFX_C_API const bgfx_memory_t* bgfx_make_ref_release(const void* _data, uint32_
 	return (const bgfx_memory_t*)bgfx::makeRef(_data, _size, (bgfx::ReleaseFn)_releaseFn, _userData);
 }
 
-BGFX_C_API void bgfx_set_debug(uint32_t _debug)
+BGFX_C_API void bgfx_set_debug(uint32_t _debug, bgfx_frame_buffer_handle_t _handle, uint8_t _scale)
 {
-	bgfx::setDebug(_debug);
+	union { bgfx_frame_buffer_handle_t c; bgfx::FrameBufferHandle cpp; } handle = { _handle };
+	bgfx::setDebug(_debug, handle.cpp, _scale);
 }
 
 BGFX_C_API void bgfx_dbg_text_clear(uint8_t _attr, bool _small)
@@ -601,11 +602,19 @@ BGFX_C_API bgfx_frame_buffer_handle_t bgfx_create_frame_buffer_from_attachment(u
 	return handle_ret.c;
 }
 
-BGFX_C_API bgfx_frame_buffer_handle_t bgfx_create_frame_buffer_from_nwh(void* _nwh, uint16_t _width, uint16_t _height, bgfx_texture_format_t _format, bgfx_texture_format_t _depthFormat)
+BGFX_C_API bgfx_frame_buffer_handle_t bgfx_create_frame_buffer_from_swap_chain(const bgfx_swap_chain_t* _desc)
 {
+	const bgfx::SwapChain& desc = *(const bgfx::SwapChain*)_desc;
 	union { bgfx_frame_buffer_handle_t c; bgfx::FrameBufferHandle cpp; } handle_ret;
-	handle_ret.cpp = bgfx::createFrameBuffer(_nwh, _width, _height, (bgfx::TextureFormat::Enum)_format, (bgfx::TextureFormat::Enum)_depthFormat);
+	handle_ret.cpp = bgfx::createFrameBuffer(desc);
 	return handle_ret.c;
+}
+
+BGFX_C_API void bgfx_update_swap_chain(bgfx_frame_buffer_handle_t _handle, const bgfx_swap_chain_t* _desc)
+{
+	union { bgfx_frame_buffer_handle_t c; bgfx::FrameBufferHandle cpp; } handle = { _handle };
+	const bgfx::SwapChain& desc = *(const bgfx::SwapChain*)_desc;
+	bgfx::updateSwapChain(handle.cpp, desc);
 }
 
 BGFX_C_API void bgfx_set_frame_buffer_name(bgfx_frame_buffer_handle_t _handle, const char* _name, int32_t _len)
@@ -694,9 +703,9 @@ BGFX_C_API void bgfx_set_view_name(bgfx_view_id_t _id, const char* _name, int32_
 	bgfx::setViewName((bgfx::ViewId)_id, _name, _len);
 }
 
-BGFX_C_API void bgfx_set_view_rect(bgfx_view_id_t _id, int16_t _x, int16_t _y, uint16_t _width, uint16_t _height)
+BGFX_C_API void bgfx_set_view_rect(bgfx_view_id_t _id, int16_t _x, int16_t _y, uint16_t _width, uint16_t _height, float _minDepth, float _maxDepth)
 {
-	bgfx::setViewRect((bgfx::ViewId)_id, _x, _y, _width, _height);
+	bgfx::setViewRect((bgfx::ViewId)_id, _x, _y, _width, _height, _minDepth, _maxDepth);
 }
 
 BGFX_C_API void bgfx_set_view_rect_ratio(bgfx_view_id_t _id, int16_t _x, int16_t _y, bgfx_backbuffer_ratio_t _ratio)
@@ -707,6 +716,16 @@ BGFX_C_API void bgfx_set_view_rect_ratio(bgfx_view_id_t _id, int16_t _x, int16_t
 BGFX_C_API void bgfx_set_view_scissor(bgfx_view_id_t _id, uint16_t _x, uint16_t _y, uint16_t _width, uint16_t _height)
 {
 	bgfx::setViewScissor((bgfx::ViewId)_id, _x, _y, _width, _height);
+}
+
+BGFX_C_API void bgfx_set_view_depth_bias(bgfx_view_id_t _id, int32_t _constant, float _slopeScale, float _clamp)
+{
+	bgfx::setViewDepthBias((bgfx::ViewId)_id, _constant, _slopeScale, _clamp);
+}
+
+BGFX_C_API void bgfx_set_view_sample_mask(bgfx_view_id_t _id, uint32_t _mask)
+{
+	bgfx::setViewSampleMask((bgfx::ViewId)_id, _mask);
 }
 
 BGFX_C_API void bgfx_set_view_clear(bgfx_view_id_t _id, uint16_t _flags, uint32_t _rgba, float _depth, uint8_t _stencil)
@@ -785,6 +804,12 @@ BGFX_C_API void bgfx_encoder_set_stencil(bgfx_encoder_t* _this, uint32_t _fstenc
 	This->setStencil(_fstencil, _bstencil);
 }
 
+BGFX_C_API void bgfx_encoder_set_sample_mask(bgfx_encoder_t* _this, uint32_t _mask)
+{
+	bgfx::Encoder* This = (bgfx::Encoder*)_this;
+	This->setSampleMask(_mask);
+}
+
 BGFX_C_API uint16_t bgfx_encoder_set_scissor(bgfx_encoder_t* _this, uint16_t _x, uint16_t _y, uint16_t _width, uint16_t _height)
 {
 	bgfx::Encoder* This = (bgfx::Encoder*)_this;
@@ -795,6 +820,18 @@ BGFX_C_API void bgfx_encoder_set_scissor_cached(bgfx_encoder_t* _this, uint16_t 
 {
 	bgfx::Encoder* This = (bgfx::Encoder*)_this;
 	This->setScissor(_cache);
+}
+
+BGFX_C_API uint16_t bgfx_encoder_set_depth_control(bgfx_encoder_t* _this, int32_t _constant, float _slopeScale, float _clamp, bool _depthClamp)
+{
+	bgfx::Encoder* This = (bgfx::Encoder*)_this;
+	return This->setDepthControl(_constant, _slopeScale, _clamp, _depthClamp);
+}
+
+BGFX_C_API void bgfx_encoder_set_depth_control_cached(bgfx_encoder_t* _this, uint16_t _cache)
+{
+	bgfx::Encoder* This = (bgfx::Encoder*)_this;
+	This->setDepthControl(_cache);
 }
 
 BGFX_C_API uint32_t bgfx_encoder_set_transform(bgfx_encoder_t* _this, const void* _mtx, uint16_t _num)
@@ -820,6 +857,13 @@ BGFX_C_API void bgfx_encoder_set_uniform(bgfx_encoder_t* _this, bgfx_uniform_han
 	bgfx::Encoder* This = (bgfx::Encoder*)_this;
 	union { bgfx_uniform_handle_t c; bgfx::UniformHandle cpp; } handle = { _handle };
 	This->setUniform(handle.cpp, _value, _num);
+}
+
+BGFX_C_API void bgfx_encoder_set_uniform_ref(bgfx_encoder_t* _this, bgfx_uniform_handle_t _handle, const void* _value, uint16_t _num)
+{
+	bgfx::Encoder* This = (bgfx::Encoder*)_this;
+	union { bgfx_uniform_handle_t c; bgfx::UniformHandle cpp; } handle = { _handle };
+	This->setUniformRef(handle.cpp, _value, _num);
 }
 
 BGFX_C_API void bgfx_set_view_uniform(bgfx_view_id_t _id, bgfx_uniform_handle_t _handle, const void* _value, uint16_t _num)
@@ -983,32 +1027,32 @@ BGFX_C_API void bgfx_encoder_submit_indirect_count(bgfx_encoder_t* _this, bgfx_v
 	This->submit((bgfx::ViewId)_id, program.cpp, indirectHandle.cpp, _start, numHandle.cpp, _numIndex, _numMax, _depth, _flags);
 }
 
-BGFX_C_API void bgfx_encoder_set_compute_index_buffer(bgfx_encoder_t* _this, uint8_t _stage, bgfx_index_buffer_handle_t _handle, bgfx_access_t _access)
+BGFX_C_API void bgfx_encoder_set_compute_index_buffer(bgfx_encoder_t* _this, uint8_t _stage, bgfx_index_buffer_handle_t _handle, bgfx_access_t _access, uint32_t _offset, uint32_t _size)
 {
 	bgfx::Encoder* This = (bgfx::Encoder*)_this;
 	union { bgfx_index_buffer_handle_t c; bgfx::IndexBufferHandle cpp; } handle = { _handle };
-	This->setBuffer(_stage, handle.cpp, (bgfx::Access::Enum)_access);
+	This->setBuffer(_stage, handle.cpp, (bgfx::Access::Enum)_access, _offset, _size);
 }
 
-BGFX_C_API void bgfx_encoder_set_compute_vertex_buffer(bgfx_encoder_t* _this, uint8_t _stage, bgfx_vertex_buffer_handle_t _handle, bgfx_access_t _access)
+BGFX_C_API void bgfx_encoder_set_compute_vertex_buffer(bgfx_encoder_t* _this, uint8_t _stage, bgfx_vertex_buffer_handle_t _handle, bgfx_access_t _access, uint32_t _offset, uint32_t _size)
 {
 	bgfx::Encoder* This = (bgfx::Encoder*)_this;
 	union { bgfx_vertex_buffer_handle_t c; bgfx::VertexBufferHandle cpp; } handle = { _handle };
-	This->setBuffer(_stage, handle.cpp, (bgfx::Access::Enum)_access);
+	This->setBuffer(_stage, handle.cpp, (bgfx::Access::Enum)_access, _offset, _size);
 }
 
-BGFX_C_API void bgfx_encoder_set_compute_dynamic_index_buffer(bgfx_encoder_t* _this, uint8_t _stage, bgfx_dynamic_index_buffer_handle_t _handle, bgfx_access_t _access)
+BGFX_C_API void bgfx_encoder_set_compute_dynamic_index_buffer(bgfx_encoder_t* _this, uint8_t _stage, bgfx_dynamic_index_buffer_handle_t _handle, bgfx_access_t _access, uint32_t _offset, uint32_t _size)
 {
 	bgfx::Encoder* This = (bgfx::Encoder*)_this;
 	union { bgfx_dynamic_index_buffer_handle_t c; bgfx::DynamicIndexBufferHandle cpp; } handle = { _handle };
-	This->setBuffer(_stage, handle.cpp, (bgfx::Access::Enum)_access);
+	This->setBuffer(_stage, handle.cpp, (bgfx::Access::Enum)_access, _offset, _size);
 }
 
-BGFX_C_API void bgfx_encoder_set_compute_dynamic_vertex_buffer(bgfx_encoder_t* _this, uint8_t _stage, bgfx_dynamic_vertex_buffer_handle_t _handle, bgfx_access_t _access)
+BGFX_C_API void bgfx_encoder_set_compute_dynamic_vertex_buffer(bgfx_encoder_t* _this, uint8_t _stage, bgfx_dynamic_vertex_buffer_handle_t _handle, bgfx_access_t _access, uint32_t _offset, uint32_t _size)
 {
 	bgfx::Encoder* This = (bgfx::Encoder*)_this;
 	union { bgfx_dynamic_vertex_buffer_handle_t c; bgfx::DynamicVertexBufferHandle cpp; } handle = { _handle };
-	This->setBuffer(_stage, handle.cpp, (bgfx::Access::Enum)_access);
+	This->setBuffer(_stage, handle.cpp, (bgfx::Access::Enum)_access, _offset, _size);
 }
 
 BGFX_C_API void bgfx_encoder_set_compute_indirect_buffer(bgfx_encoder_t* _this, uint8_t _stage, bgfx_indirect_buffer_handle_t _handle, bgfx_access_t _access)
@@ -1096,27 +1140,9 @@ BGFX_C_API bgfx_render_frame_t bgfx_render_frame(int32_t _msecs)
 	return (bgfx_render_frame_t)bgfx::renderFrame(_msecs);
 }
 
-BGFX_C_API void bgfx_set_platform_data(const bgfx_platform_data_t * _data)
-{
-	const bgfx::PlatformData & data = *(const bgfx::PlatformData *)_data;
-	bgfx::setPlatformData(data);
-}
-
 BGFX_C_API const bgfx_internal_data_t* bgfx_get_internal_data(void)
 {
 	return (const bgfx_internal_data_t*)bgfx::getInternalData();
-}
-
-BGFX_C_API uintptr_t bgfx_override_internal_texture_ptr(bgfx_texture_handle_t _handle, uintptr_t _ptr, uint16_t _layerIndex)
-{
-	union { bgfx_texture_handle_t c; bgfx::TextureHandle cpp; } handle = { _handle };
-	return bgfx::overrideInternal(handle.cpp, _ptr, _layerIndex);
-}
-
-BGFX_C_API uintptr_t bgfx_override_internal_texture(bgfx_texture_handle_t _handle, uint16_t _width, uint16_t _height, uint8_t _numMips, bgfx_texture_format_t _format, uint64_t _flags)
-{
-	union { bgfx_texture_handle_t c; bgfx::TextureHandle cpp; } handle = { _handle };
-	return bgfx::overrideInternal(handle.cpp, _width, _height, _numMips, (bgfx::TextureFormat::Enum)_format, _flags);
 }
 
 BGFX_C_API void bgfx_set_marker(const char* _name, int32_t _len)
@@ -1140,6 +1166,11 @@ BGFX_C_API void bgfx_set_stencil(uint32_t _fstencil, uint32_t _bstencil)
 	bgfx::setStencil(_fstencil, _bstencil);
 }
 
+BGFX_C_API void bgfx_set_sample_mask(uint32_t _mask)
+{
+	bgfx::setSampleMask(_mask);
+}
+
 BGFX_C_API uint16_t bgfx_set_scissor(uint16_t _x, uint16_t _y, uint16_t _width, uint16_t _height)
 {
 	return bgfx::setScissor(_x, _y, _width, _height);
@@ -1148,6 +1179,16 @@ BGFX_C_API uint16_t bgfx_set_scissor(uint16_t _x, uint16_t _y, uint16_t _width, 
 BGFX_C_API void bgfx_set_scissor_cached(uint16_t _cache)
 {
 	bgfx::setScissor(_cache);
+}
+
+BGFX_C_API uint16_t bgfx_set_depth_control(int32_t _constant, float _slopeScale, float _clamp, bool _depthClamp)
+{
+	return bgfx::setDepthControl(_constant, _slopeScale, _clamp, _depthClamp);
+}
+
+BGFX_C_API void bgfx_set_depth_control_cached(uint16_t _cache)
+{
+	bgfx::setDepthControl(_cache);
 }
 
 BGFX_C_API uint32_t bgfx_set_transform(const void* _mtx, uint16_t _num)
@@ -1169,6 +1210,12 @@ BGFX_C_API void bgfx_set_uniform(bgfx_uniform_handle_t _handle, const void* _val
 {
 	union { bgfx_uniform_handle_t c; bgfx::UniformHandle cpp; } handle = { _handle };
 	bgfx::setUniform(handle.cpp, _value, _num);
+}
+
+BGFX_C_API void bgfx_set_uniform_ref(bgfx_uniform_handle_t _handle, const void* _value, uint16_t _num)
+{
+	union { bgfx_uniform_handle_t c; bgfx::UniformHandle cpp; } handle = { _handle };
+	bgfx::setUniformRef(handle.cpp, _value, _num);
 }
 
 BGFX_C_API void bgfx_set_index_buffer(bgfx_index_buffer_handle_t _handle, uint32_t _firstIndex, uint32_t _numIndices)
@@ -1299,28 +1346,28 @@ BGFX_C_API void bgfx_submit_indirect_count(bgfx_view_id_t _id, bgfx_program_hand
 	bgfx::submit((bgfx::ViewId)_id, program.cpp, indirectHandle.cpp, _start, numHandle.cpp, _numIndex, _numMax, _depth, _flags);
 }
 
-BGFX_C_API void bgfx_set_compute_index_buffer(uint8_t _stage, bgfx_index_buffer_handle_t _handle, bgfx_access_t _access)
+BGFX_C_API void bgfx_set_compute_index_buffer(uint8_t _stage, bgfx_index_buffer_handle_t _handle, bgfx_access_t _access, uint32_t _offset, uint32_t _size)
 {
 	union { bgfx_index_buffer_handle_t c; bgfx::IndexBufferHandle cpp; } handle = { _handle };
-	bgfx::setBuffer(_stage, handle.cpp, (bgfx::Access::Enum)_access);
+	bgfx::setBuffer(_stage, handle.cpp, (bgfx::Access::Enum)_access, _offset, _size);
 }
 
-BGFX_C_API void bgfx_set_compute_vertex_buffer(uint8_t _stage, bgfx_vertex_buffer_handle_t _handle, bgfx_access_t _access)
+BGFX_C_API void bgfx_set_compute_vertex_buffer(uint8_t _stage, bgfx_vertex_buffer_handle_t _handle, bgfx_access_t _access, uint32_t _offset, uint32_t _size)
 {
 	union { bgfx_vertex_buffer_handle_t c; bgfx::VertexBufferHandle cpp; } handle = { _handle };
-	bgfx::setBuffer(_stage, handle.cpp, (bgfx::Access::Enum)_access);
+	bgfx::setBuffer(_stage, handle.cpp, (bgfx::Access::Enum)_access, _offset, _size);
 }
 
-BGFX_C_API void bgfx_set_compute_dynamic_index_buffer(uint8_t _stage, bgfx_dynamic_index_buffer_handle_t _handle, bgfx_access_t _access)
+BGFX_C_API void bgfx_set_compute_dynamic_index_buffer(uint8_t _stage, bgfx_dynamic_index_buffer_handle_t _handle, bgfx_access_t _access, uint32_t _offset, uint32_t _size)
 {
 	union { bgfx_dynamic_index_buffer_handle_t c; bgfx::DynamicIndexBufferHandle cpp; } handle = { _handle };
-	bgfx::setBuffer(_stage, handle.cpp, (bgfx::Access::Enum)_access);
+	bgfx::setBuffer(_stage, handle.cpp, (bgfx::Access::Enum)_access, _offset, _size);
 }
 
-BGFX_C_API void bgfx_set_compute_dynamic_vertex_buffer(uint8_t _stage, bgfx_dynamic_vertex_buffer_handle_t _handle, bgfx_access_t _access)
+BGFX_C_API void bgfx_set_compute_dynamic_vertex_buffer(uint8_t _stage, bgfx_dynamic_vertex_buffer_handle_t _handle, bgfx_access_t _access, uint32_t _offset, uint32_t _size)
 {
 	union { bgfx_dynamic_vertex_buffer_handle_t c; bgfx::DynamicVertexBufferHandle cpp; } handle = { _handle };
-	bgfx::setBuffer(_stage, handle.cpp, (bgfx::Access::Enum)_access);
+	bgfx::setBuffer(_stage, handle.cpp, (bgfx::Access::Enum)_access, _offset, _size);
 }
 
 BGFX_C_API void bgfx_set_compute_indirect_buffer(uint8_t _stage, bgfx_indirect_buffer_handle_t _handle, bgfx_access_t _access)
@@ -1518,7 +1565,8 @@ BGFX_C_API bgfx_interface_vtbl_t* bgfx_get_interface(uint32_t _version)
 			bgfx_create_frame_buffer_scaled,
 			bgfx_create_frame_buffer_from_handles,
 			bgfx_create_frame_buffer_from_attachment,
-			bgfx_create_frame_buffer_from_nwh,
+			bgfx_create_frame_buffer_from_swap_chain,
+			bgfx_update_swap_chain,
 			bgfx_set_frame_buffer_name,
 			bgfx_get_texture,
 			bgfx_destroy_frame_buffer,
@@ -1536,6 +1584,8 @@ BGFX_C_API bgfx_interface_vtbl_t* bgfx_get_interface(uint32_t _version)
 			bgfx_set_view_rect,
 			bgfx_set_view_rect_ratio,
 			bgfx_set_view_scissor,
+			bgfx_set_view_depth_bias,
+			bgfx_set_view_sample_mask,
 			bgfx_set_view_clear,
 			bgfx_set_view_clear_mrt,
 			bgfx_set_view_mode,
@@ -1550,12 +1600,16 @@ BGFX_C_API bgfx_interface_vtbl_t* bgfx_get_interface(uint32_t _version)
 			bgfx_encoder_set_state,
 			bgfx_encoder_set_condition,
 			bgfx_encoder_set_stencil,
+			bgfx_encoder_set_sample_mask,
 			bgfx_encoder_set_scissor,
 			bgfx_encoder_set_scissor_cached,
+			bgfx_encoder_set_depth_control,
+			bgfx_encoder_set_depth_control_cached,
 			bgfx_encoder_set_transform,
 			bgfx_encoder_set_transform_cached,
 			bgfx_encoder_alloc_transform,
 			bgfx_encoder_set_uniform,
+			bgfx_encoder_set_uniform_ref,
 			bgfx_set_view_uniform,
 			bgfx_set_frame_uniform,
 			bgfx_encoder_set_index_buffer,
@@ -1595,20 +1649,21 @@ BGFX_C_API bgfx_interface_vtbl_t* bgfx_get_interface(uint32_t _version)
 			bgfx_encoder_blit_from_buffer,
 			bgfx_request_screen_shot,
 			bgfx_render_frame,
-			bgfx_set_platform_data,
 			bgfx_get_internal_data,
-			bgfx_override_internal_texture_ptr,
-			bgfx_override_internal_texture,
 			bgfx_set_marker,
 			bgfx_set_state,
 			bgfx_set_condition,
 			bgfx_set_stencil,
+			bgfx_set_sample_mask,
 			bgfx_set_scissor,
 			bgfx_set_scissor_cached,
+			bgfx_set_depth_control,
+			bgfx_set_depth_control_cached,
 			bgfx_set_transform,
 			bgfx_set_transform_cached,
 			bgfx_alloc_transform,
 			bgfx_set_uniform,
+			bgfx_set_uniform_ref,
 			bgfx_set_index_buffer,
 			bgfx_set_dynamic_index_buffer,
 			bgfx_set_transient_index_buffer,

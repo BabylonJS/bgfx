@@ -414,6 +414,7 @@ class TextureFlags(enum.IntFlag):
 	BlitDst = 0x400000000000
 	ReadBack = 0x800000000000
 	ExternalShared = 0x1000000000000
+	SrgbMutable = 0x40000000000000
 	ReservedShift = 0x3c
 	ReservedMask = 0xf000000000000000
 	RtMsaaX2 = 0x2000000000
@@ -469,6 +470,7 @@ class SamplerFlags(enum.IntFlag):
 	ReservedMask = 0xf0000000
 	None_ = 0x0
 	SampleStencil = 0x100000
+	Srgb = 0x200000
 	Point = 0x540
 	UvwMirror = 0x15
 	UvwClamp = 0x2a
@@ -492,7 +494,6 @@ class ResetFlags(enum.IntFlag):
 	SrgbBackbuffer = 0x8000
 	Hdr10 = 0x10000
 	Hidpi = 0x20000
-	DepthClamp = 0x40000
 	Suspend = 0x80000
 	TransparentBackbuffer = 0x100000
 	FullscreenShift = 0x0
@@ -536,43 +537,49 @@ class DebugFlags(enum.IntFlag):
 	Text = 0x8
 	Profiler = 0x10
 
+class SwapChainMsaaFlags(enum.IntFlag):
+	X2 = 0x10
+	X4 = 0x20
+	X8 = 0x30
+	X16 = 0x40
+	Shift = 0x4
+	Mask = 0x70
+
+class SwapChainFlags(enum.IntFlag):
+	None_ = 0x0
+	Fullscreen = 0x1
+	SrgbBackbuffer = 0x8000
+	Hdr10 = 0x10000
+	Hidpi = 0x20000
+	TransparentBackbuffer = 0x100000
+
+class SwapChainFullscreenFlags(enum.IntFlag):
+	Shift = 0x0
+	Mask = 0x1
+
 class CapsFlags(enum.IntFlag):
-	AlphaToCoverage = 0x1
-	BlendIndependent = 0x2
-	Compute = 0x4
-	ConservativeRaster = 0x8
-	DrawIndirect = 0x10
-	DrawIndirectCount = 0x20
-	FragmentDepth = 0x40
-	FragmentOrdering = 0x80
-	GraphicsDebugger = 0x100
-	Hdr10 = 0x200
-	Hidpi = 0x400
-	ImageRw = 0x800
-	Index32 = 0x1000
-	Instancing = 0x2000
-	OcclusionQuery = 0x4000
-	PrimitiveId = 0x8000
-	RendererMultithreaded = 0x10000
-	SwapChain = 0x20000
-	TextureBlit = 0x40000
-	TextureCompareLequal = 0x80000
-	TextureCompareReserved = 0x100000
-	TextureCubeArray = 0x200000
-	TextureDirectAccess = 0x400000
-	TextureExternal = 0x800000
-	TextureExternalShared = 0x1000000
-	TextureReadBack = 0x2000000
-	Texture_2dArray = 0x4000000
-	Texture_3d = 0x8000000
-	TransparentBackbuffer = 0x10000000
-	VariableRateShading = 0x20000000
-	VertexAttribHalf = 0x40000000
-	VertexAttribUint10 = 0x80000000
-	VertexId = 0x100000000
-	VideoDecode = 0x200000000
-	ViewportLayerArray = 0x400000000
-	TextureCompareAll = 0x180000
+	BlendIndependent = 0x1
+	Compute = 0x2
+	ConservativeRaster = 0x4
+	DrawIndirect = 0x8
+	DrawIndirectCount = 0x10
+	FragmentOrdering = 0x20
+	GraphicsDebugger = 0x40
+	Hdr10 = 0x80
+	ImageRw = 0x100
+	Index32 = 0x200
+	PrimitiveId = 0x400
+	RendererMultithreaded = 0x800
+	SwapChain = 0x1000
+	TextureCubeArray = 0x2000
+	TextureDirectAccess = 0x4000
+	TextureExternal = 0x8000
+	TextureExternalShared = 0x10000
+	TransparentBackbuffer = 0x20000
+	VariableRateShading = 0x40000
+	VertexAttribUint10 = 0x80000
+	VideoDecode = 0x100000
+	ViewportLayerArray = 0x200000
 
 class CapsFormatFlags(enum.IntFlag):
 	TextureNone = 0x0
@@ -615,9 +622,12 @@ class VideoDecodeFrameFlags(enum.IntFlag):
 	Final = 0x4
 	Loop = 0x8
 
-class ResolveFlags(enum.IntFlag):
+class AttachmentFlags(enum.IntFlag):
 	None_ = 0x0
 	AutoGenMips = 0x1
+	ReadOnlyDepth = 0x2
+	ReadOnlyStencil = 0x4
+	Srgb = 0x8
 
 class PciIdFlags(enum.IntFlag):
 	None_ = 0x0
@@ -658,7 +668,7 @@ class InternalData(ctypes.Structure):
 class PlatformData(ctypes.Structure):
 	pass
 
-class Resolution(ctypes.Structure):
+class SwapChain(ctypes.Structure):
 	pass
 
 class InitLimits(ctypes.Structure):
@@ -871,24 +881,22 @@ InternalData._fields_ = [
 ]
 
 PlatformData._fields_ = [
-	("ndt", ctypes.c_void_p),
-	("nwh", ctypes.c_void_p),
 	("context", ctypes.c_void_p),
 	("queue", ctypes.c_void_p),
-	("backBuffer", ctypes.c_void_p),
-	("backBufferDS", ctypes.c_void_p),
 	("type", ctypes.c_int),
 ]
 
-Resolution._fields_ = [
-	("formatColor", ctypes.c_int),
-	("formatDepthStencil", ctypes.c_int),
+SwapChain._fields_ = [
+	("nwh", ctypes.c_void_p),
+	("ndt", ctypes.c_void_p),
 	("width", ctypes.c_uint32),
 	("height", ctypes.c_uint32),
-	("reset", ctypes.c_uint32),
+	("flags", ctypes.c_uint32),
+	("formatColor", ctypes.c_int),
+	("formatDepthStencil", ctypes.c_int),
+	("depth", TextureHandle),
 	("numBackBuffers", ctypes.c_uint8),
 	("maxFrameLatency", ctypes.c_uint8),
-	("debugTextScale", ctypes.c_uint8),
 ]
 
 InitLimits._fields_ = [
@@ -911,7 +919,8 @@ Init._fields_ = [
 	("fallback", ctypes.c_bool),
 	("videoDecode", ctypes.c_bool),
 	("platformData", PlatformData),
-	("resolution", Resolution),
+	("swapChain", SwapChain),
+	("reset", ctypes.c_uint32),
 	("limits", InitLimits),
 	("callback", ctypes.c_void_p),
 	("allocator", ctypes.c_void_p),
@@ -1014,7 +1023,7 @@ Attachment._fields_ = [
 	("mip", ctypes.c_uint16),
 	("layer", ctypes.c_uint16),
 	("numLayers", ctypes.c_uint16),
-	("resolve", ctypes.c_uint8),
+	("flags", ctypes.c_uint8),
 ]
 
 Transform._fields_ = [
@@ -1176,7 +1185,7 @@ def _bind(lib):
 	bgfx_shutdown.restype = None
 	global bgfx_reset
 	bgfx_reset = lib.bgfx_reset
-	bgfx_reset.argtypes = [ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_int]
+	bgfx_reset.argtypes = [ctypes.c_uint32, ctypes.POINTER(SwapChain)]
 	bgfx_reset.restype = None
 	global bgfx_frame
 	bgfx_frame = lib.bgfx_frame
@@ -1212,7 +1221,7 @@ def _bind(lib):
 	bgfx_make_ref_release.restype = ctypes.POINTER(Memory)
 	global bgfx_set_debug
 	bgfx_set_debug = lib.bgfx_set_debug
-	bgfx_set_debug.argtypes = [ctypes.c_uint32]
+	bgfx_set_debug.argtypes = [ctypes.c_uint32, FrameBufferHandle, ctypes.c_uint8]
 	bgfx_set_debug.restype = None
 	global bgfx_dbg_text_clear
 	bgfx_dbg_text_clear = lib.bgfx_dbg_text_clear
@@ -1442,10 +1451,14 @@ def _bind(lib):
 	bgfx_create_frame_buffer_from_attachment = lib.bgfx_create_frame_buffer_from_attachment
 	bgfx_create_frame_buffer_from_attachment.argtypes = [ctypes.c_uint8, ctypes.POINTER(Attachment), ctypes.c_bool]
 	bgfx_create_frame_buffer_from_attachment.restype = FrameBufferHandle
-	global bgfx_create_frame_buffer_from_nwh
-	bgfx_create_frame_buffer_from_nwh = lib.bgfx_create_frame_buffer_from_nwh
-	bgfx_create_frame_buffer_from_nwh.argtypes = [ctypes.c_void_p, ctypes.c_uint16, ctypes.c_uint16, ctypes.c_int, ctypes.c_int]
-	bgfx_create_frame_buffer_from_nwh.restype = FrameBufferHandle
+	global bgfx_create_frame_buffer_from_swap_chain
+	bgfx_create_frame_buffer_from_swap_chain = lib.bgfx_create_frame_buffer_from_swap_chain
+	bgfx_create_frame_buffer_from_swap_chain.argtypes = [ctypes.POINTER(SwapChain)]
+	bgfx_create_frame_buffer_from_swap_chain.restype = FrameBufferHandle
+	global bgfx_update_swap_chain
+	bgfx_update_swap_chain = lib.bgfx_update_swap_chain
+	bgfx_update_swap_chain.argtypes = [FrameBufferHandle, ctypes.POINTER(SwapChain)]
+	bgfx_update_swap_chain.restype = None
 	global bgfx_set_frame_buffer_name
 	bgfx_set_frame_buffer_name = lib.bgfx_set_frame_buffer_name
 	bgfx_set_frame_buffer_name.argtypes = [FrameBufferHandle, ctypes.c_char_p, ctypes.c_int32]
@@ -1504,7 +1517,7 @@ def _bind(lib):
 	bgfx_set_view_name.restype = None
 	global bgfx_set_view_rect
 	bgfx_set_view_rect = lib.bgfx_set_view_rect
-	bgfx_set_view_rect.argtypes = [ctypes.c_uint16, ctypes.c_int16, ctypes.c_int16, ctypes.c_uint16, ctypes.c_uint16]
+	bgfx_set_view_rect.argtypes = [ctypes.c_uint16, ctypes.c_int16, ctypes.c_int16, ctypes.c_uint16, ctypes.c_uint16, ctypes.c_float, ctypes.c_float]
 	bgfx_set_view_rect.restype = None
 	global bgfx_set_view_rect_ratio
 	bgfx_set_view_rect_ratio = lib.bgfx_set_view_rect_ratio
@@ -1514,6 +1527,14 @@ def _bind(lib):
 	bgfx_set_view_scissor = lib.bgfx_set_view_scissor
 	bgfx_set_view_scissor.argtypes = [ctypes.c_uint16, ctypes.c_uint16, ctypes.c_uint16, ctypes.c_uint16, ctypes.c_uint16]
 	bgfx_set_view_scissor.restype = None
+	global bgfx_set_view_depth_bias
+	bgfx_set_view_depth_bias = lib.bgfx_set_view_depth_bias
+	bgfx_set_view_depth_bias.argtypes = [ctypes.c_uint16, ctypes.c_int32, ctypes.c_float, ctypes.c_float]
+	bgfx_set_view_depth_bias.restype = None
+	global bgfx_set_view_sample_mask
+	bgfx_set_view_sample_mask = lib.bgfx_set_view_sample_mask
+	bgfx_set_view_sample_mask.argtypes = [ctypes.c_uint16, ctypes.c_uint32]
+	bgfx_set_view_sample_mask.restype = None
 	global bgfx_set_view_clear
 	bgfx_set_view_clear = lib.bgfx_set_view_clear
 	bgfx_set_view_clear.argtypes = [ctypes.c_uint16, ctypes.c_uint16, ctypes.c_uint32, ctypes.c_float, ctypes.c_uint8]
@@ -1570,6 +1591,10 @@ def _bind(lib):
 	bgfx_encoder_set_stencil = lib.bgfx_encoder_set_stencil
 	bgfx_encoder_set_stencil.argtypes = [ctypes.POINTER(Encoder), ctypes.c_uint32, ctypes.c_uint32]
 	bgfx_encoder_set_stencil.restype = None
+	global bgfx_encoder_set_sample_mask
+	bgfx_encoder_set_sample_mask = lib.bgfx_encoder_set_sample_mask
+	bgfx_encoder_set_sample_mask.argtypes = [ctypes.POINTER(Encoder), ctypes.c_uint32]
+	bgfx_encoder_set_sample_mask.restype = None
 	global bgfx_encoder_set_scissor
 	bgfx_encoder_set_scissor = lib.bgfx_encoder_set_scissor
 	bgfx_encoder_set_scissor.argtypes = [ctypes.POINTER(Encoder), ctypes.c_uint16, ctypes.c_uint16, ctypes.c_uint16, ctypes.c_uint16]
@@ -1578,6 +1603,14 @@ def _bind(lib):
 	bgfx_encoder_set_scissor_cached = lib.bgfx_encoder_set_scissor_cached
 	bgfx_encoder_set_scissor_cached.argtypes = [ctypes.POINTER(Encoder), ctypes.c_uint16]
 	bgfx_encoder_set_scissor_cached.restype = None
+	global bgfx_encoder_set_depth_control
+	bgfx_encoder_set_depth_control = lib.bgfx_encoder_set_depth_control
+	bgfx_encoder_set_depth_control.argtypes = [ctypes.POINTER(Encoder), ctypes.c_int32, ctypes.c_float, ctypes.c_float, ctypes.c_bool]
+	bgfx_encoder_set_depth_control.restype = ctypes.c_uint16
+	global bgfx_encoder_set_depth_control_cached
+	bgfx_encoder_set_depth_control_cached = lib.bgfx_encoder_set_depth_control_cached
+	bgfx_encoder_set_depth_control_cached.argtypes = [ctypes.POINTER(Encoder), ctypes.c_uint16]
+	bgfx_encoder_set_depth_control_cached.restype = None
 	global bgfx_encoder_set_transform
 	bgfx_encoder_set_transform = lib.bgfx_encoder_set_transform
 	bgfx_encoder_set_transform.argtypes = [ctypes.POINTER(Encoder), ctypes.c_void_p, ctypes.c_uint16]
@@ -1594,6 +1627,10 @@ def _bind(lib):
 	bgfx_encoder_set_uniform = lib.bgfx_encoder_set_uniform
 	bgfx_encoder_set_uniform.argtypes = [ctypes.POINTER(Encoder), UniformHandle, ctypes.c_void_p, ctypes.c_uint16]
 	bgfx_encoder_set_uniform.restype = None
+	global bgfx_encoder_set_uniform_ref
+	bgfx_encoder_set_uniform_ref = lib.bgfx_encoder_set_uniform_ref
+	bgfx_encoder_set_uniform_ref.argtypes = [ctypes.POINTER(Encoder), UniformHandle, ctypes.c_void_p, ctypes.c_uint16]
+	bgfx_encoder_set_uniform_ref.restype = None
 	global bgfx_set_view_uniform
 	bgfx_set_view_uniform = lib.bgfx_set_view_uniform
 	bgfx_set_view_uniform.argtypes = [ctypes.c_uint16, UniformHandle, ctypes.c_void_p, ctypes.c_uint16]
@@ -1688,19 +1725,19 @@ def _bind(lib):
 	bgfx_encoder_submit_indirect_count.restype = None
 	global bgfx_encoder_set_compute_index_buffer
 	bgfx_encoder_set_compute_index_buffer = lib.bgfx_encoder_set_compute_index_buffer
-	bgfx_encoder_set_compute_index_buffer.argtypes = [ctypes.POINTER(Encoder), ctypes.c_uint8, IndexBufferHandle, ctypes.c_int]
+	bgfx_encoder_set_compute_index_buffer.argtypes = [ctypes.POINTER(Encoder), ctypes.c_uint8, IndexBufferHandle, ctypes.c_int, ctypes.c_uint32, ctypes.c_uint32]
 	bgfx_encoder_set_compute_index_buffer.restype = None
 	global bgfx_encoder_set_compute_vertex_buffer
 	bgfx_encoder_set_compute_vertex_buffer = lib.bgfx_encoder_set_compute_vertex_buffer
-	bgfx_encoder_set_compute_vertex_buffer.argtypes = [ctypes.POINTER(Encoder), ctypes.c_uint8, VertexBufferHandle, ctypes.c_int]
+	bgfx_encoder_set_compute_vertex_buffer.argtypes = [ctypes.POINTER(Encoder), ctypes.c_uint8, VertexBufferHandle, ctypes.c_int, ctypes.c_uint32, ctypes.c_uint32]
 	bgfx_encoder_set_compute_vertex_buffer.restype = None
 	global bgfx_encoder_set_compute_dynamic_index_buffer
 	bgfx_encoder_set_compute_dynamic_index_buffer = lib.bgfx_encoder_set_compute_dynamic_index_buffer
-	bgfx_encoder_set_compute_dynamic_index_buffer.argtypes = [ctypes.POINTER(Encoder), ctypes.c_uint8, DynamicIndexBufferHandle, ctypes.c_int]
+	bgfx_encoder_set_compute_dynamic_index_buffer.argtypes = [ctypes.POINTER(Encoder), ctypes.c_uint8, DynamicIndexBufferHandle, ctypes.c_int, ctypes.c_uint32, ctypes.c_uint32]
 	bgfx_encoder_set_compute_dynamic_index_buffer.restype = None
 	global bgfx_encoder_set_compute_dynamic_vertex_buffer
 	bgfx_encoder_set_compute_dynamic_vertex_buffer = lib.bgfx_encoder_set_compute_dynamic_vertex_buffer
-	bgfx_encoder_set_compute_dynamic_vertex_buffer.argtypes = [ctypes.POINTER(Encoder), ctypes.c_uint8, DynamicVertexBufferHandle, ctypes.c_int]
+	bgfx_encoder_set_compute_dynamic_vertex_buffer.argtypes = [ctypes.POINTER(Encoder), ctypes.c_uint8, DynamicVertexBufferHandle, ctypes.c_int, ctypes.c_uint32, ctypes.c_uint32]
 	bgfx_encoder_set_compute_dynamic_vertex_buffer.restype = None
 	global bgfx_encoder_set_compute_indirect_buffer
 	bgfx_encoder_set_compute_indirect_buffer = lib.bgfx_encoder_set_compute_indirect_buffer
@@ -1750,22 +1787,10 @@ def _bind(lib):
 	bgfx_render_frame = lib.bgfx_render_frame
 	bgfx_render_frame.argtypes = [ctypes.c_int32]
 	bgfx_render_frame.restype = ctypes.c_int
-	global bgfx_set_platform_data
-	bgfx_set_platform_data = lib.bgfx_set_platform_data
-	bgfx_set_platform_data.argtypes = [ctypes.POINTER(PlatformData)]
-	bgfx_set_platform_data.restype = None
 	global bgfx_get_internal_data
 	bgfx_get_internal_data = lib.bgfx_get_internal_data
 	bgfx_get_internal_data.argtypes = []
 	bgfx_get_internal_data.restype = ctypes.POINTER(InternalData)
-	global bgfx_override_internal_texture_ptr
-	bgfx_override_internal_texture_ptr = lib.bgfx_override_internal_texture_ptr
-	bgfx_override_internal_texture_ptr.argtypes = [TextureHandle, ctypes.c_size_t, ctypes.c_uint16]
-	bgfx_override_internal_texture_ptr.restype = ctypes.c_size_t
-	global bgfx_override_internal_texture
-	bgfx_override_internal_texture = lib.bgfx_override_internal_texture
-	bgfx_override_internal_texture.argtypes = [TextureHandle, ctypes.c_uint16, ctypes.c_uint16, ctypes.c_uint8, ctypes.c_int, ctypes.c_uint64]
-	bgfx_override_internal_texture.restype = ctypes.c_size_t
 	global bgfx_set_marker
 	bgfx_set_marker = lib.bgfx_set_marker
 	bgfx_set_marker.argtypes = [ctypes.c_char_p, ctypes.c_int32]
@@ -1782,6 +1807,10 @@ def _bind(lib):
 	bgfx_set_stencil = lib.bgfx_set_stencil
 	bgfx_set_stencil.argtypes = [ctypes.c_uint32, ctypes.c_uint32]
 	bgfx_set_stencil.restype = None
+	global bgfx_set_sample_mask
+	bgfx_set_sample_mask = lib.bgfx_set_sample_mask
+	bgfx_set_sample_mask.argtypes = [ctypes.c_uint32]
+	bgfx_set_sample_mask.restype = None
 	global bgfx_set_scissor
 	bgfx_set_scissor = lib.bgfx_set_scissor
 	bgfx_set_scissor.argtypes = [ctypes.c_uint16, ctypes.c_uint16, ctypes.c_uint16, ctypes.c_uint16]
@@ -1790,6 +1819,14 @@ def _bind(lib):
 	bgfx_set_scissor_cached = lib.bgfx_set_scissor_cached
 	bgfx_set_scissor_cached.argtypes = [ctypes.c_uint16]
 	bgfx_set_scissor_cached.restype = None
+	global bgfx_set_depth_control
+	bgfx_set_depth_control = lib.bgfx_set_depth_control
+	bgfx_set_depth_control.argtypes = [ctypes.c_int32, ctypes.c_float, ctypes.c_float, ctypes.c_bool]
+	bgfx_set_depth_control.restype = ctypes.c_uint16
+	global bgfx_set_depth_control_cached
+	bgfx_set_depth_control_cached = lib.bgfx_set_depth_control_cached
+	bgfx_set_depth_control_cached.argtypes = [ctypes.c_uint16]
+	bgfx_set_depth_control_cached.restype = None
 	global bgfx_set_transform
 	bgfx_set_transform = lib.bgfx_set_transform
 	bgfx_set_transform.argtypes = [ctypes.c_void_p, ctypes.c_uint16]
@@ -1806,6 +1843,10 @@ def _bind(lib):
 	bgfx_set_uniform = lib.bgfx_set_uniform
 	bgfx_set_uniform.argtypes = [UniformHandle, ctypes.c_void_p, ctypes.c_uint16]
 	bgfx_set_uniform.restype = None
+	global bgfx_set_uniform_ref
+	bgfx_set_uniform_ref = lib.bgfx_set_uniform_ref
+	bgfx_set_uniform_ref.argtypes = [UniformHandle, ctypes.c_void_p, ctypes.c_uint16]
+	bgfx_set_uniform_ref.restype = None
 	global bgfx_set_index_buffer
 	bgfx_set_index_buffer = lib.bgfx_set_index_buffer
 	bgfx_set_index_buffer.argtypes = [IndexBufferHandle, ctypes.c_uint32, ctypes.c_uint32]
@@ -1892,19 +1933,19 @@ def _bind(lib):
 	bgfx_submit_indirect_count.restype = None
 	global bgfx_set_compute_index_buffer
 	bgfx_set_compute_index_buffer = lib.bgfx_set_compute_index_buffer
-	bgfx_set_compute_index_buffer.argtypes = [ctypes.c_uint8, IndexBufferHandle, ctypes.c_int]
+	bgfx_set_compute_index_buffer.argtypes = [ctypes.c_uint8, IndexBufferHandle, ctypes.c_int, ctypes.c_uint32, ctypes.c_uint32]
 	bgfx_set_compute_index_buffer.restype = None
 	global bgfx_set_compute_vertex_buffer
 	bgfx_set_compute_vertex_buffer = lib.bgfx_set_compute_vertex_buffer
-	bgfx_set_compute_vertex_buffer.argtypes = [ctypes.c_uint8, VertexBufferHandle, ctypes.c_int]
+	bgfx_set_compute_vertex_buffer.argtypes = [ctypes.c_uint8, VertexBufferHandle, ctypes.c_int, ctypes.c_uint32, ctypes.c_uint32]
 	bgfx_set_compute_vertex_buffer.restype = None
 	global bgfx_set_compute_dynamic_index_buffer
 	bgfx_set_compute_dynamic_index_buffer = lib.bgfx_set_compute_dynamic_index_buffer
-	bgfx_set_compute_dynamic_index_buffer.argtypes = [ctypes.c_uint8, DynamicIndexBufferHandle, ctypes.c_int]
+	bgfx_set_compute_dynamic_index_buffer.argtypes = [ctypes.c_uint8, DynamicIndexBufferHandle, ctypes.c_int, ctypes.c_uint32, ctypes.c_uint32]
 	bgfx_set_compute_dynamic_index_buffer.restype = None
 	global bgfx_set_compute_dynamic_vertex_buffer
 	bgfx_set_compute_dynamic_vertex_buffer = lib.bgfx_set_compute_dynamic_vertex_buffer
-	bgfx_set_compute_dynamic_vertex_buffer.argtypes = [ctypes.c_uint8, DynamicVertexBufferHandle, ctypes.c_int]
+	bgfx_set_compute_dynamic_vertex_buffer.argtypes = [ctypes.c_uint8, DynamicVertexBufferHandle, ctypes.c_int, ctypes.c_uint32, ctypes.c_uint32]
 	bgfx_set_compute_dynamic_vertex_buffer.restype = None
 	global bgfx_set_compute_indirect_buffer
 	bgfx_set_compute_indirect_buffer = lib.bgfx_set_compute_indirect_buffer

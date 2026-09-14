@@ -148,6 +148,10 @@ namespace bgfx
 						float frect[4];
 						frect[0] = 1.0f/float(m_rect.m_width);
 						frect[1] = 1.0f/float(m_rect.m_height);
+						// .zw = the view's viewport depth range [minDepth, maxDepth], for
+						// shaders that clamp a written depth (WebGPU @builtin(frag_depth)).
+						frect[2] = _frame->m_view[_view].m_minDepth;
+						frect[3] = _frame->m_view[_view].m_maxDepth;
 
 						_renderer->setShaderUniform4f(flags
 							, predefined.m_loc
@@ -243,7 +247,7 @@ namespace bgfx
 
 				case PredefinedUniform::Model:
 					{
-						const Matrix4& model = frameCache.m_matrixCache.m_cache[_draw.m_startMatrix];
+						const Matrix4& model = frameCache.m_matrixCache.at(_draw.m_startMatrix);
 						_renderer->setShaderUniform4x4f(flags
 							, predefined.m_loc
 							, model.un.val
@@ -255,7 +259,7 @@ namespace bgfx
 				case PredefinedUniform::ModelView:
 					{
 						Matrix4 modelView;
-						const Matrix4& model = frameCache.m_matrixCache.m_cache[_draw.m_startMatrix];
+						const Matrix4& model = frameCache.m_matrixCache.at(_draw.m_startMatrix);
 						bx::model4x4_mul(&modelView.un.f4x4
 							, &model.un.f4x4
 							, &m_view[_view].un.f4x4
@@ -272,7 +276,7 @@ namespace bgfx
 					{
 						Matrix4 modelView;
 						Matrix4 invModelView;
-						const Matrix4& model = frameCache.m_matrixCache.m_cache[_draw.m_startMatrix];
+						const Matrix4& model = frameCache.m_matrixCache.at(_draw.m_startMatrix);
 						bx::model4x4_mul(&modelView.un.f4x4
 							, &model.un.f4x4
 							, &m_view[_view].un.f4x4
@@ -291,7 +295,7 @@ namespace bgfx
 				case PredefinedUniform::ModelViewProj:
 					{
 						Matrix4 modelViewProj;
-						const Matrix4& model = frameCache.m_matrixCache.m_cache[_draw.m_startMatrix];
+						const Matrix4& model = frameCache.m_matrixCache.at(_draw.m_startMatrix);
 						bx::model4x4_mul_viewproj4x4(&modelViewProj.un.f4x4
 							, &model.un.f4x4
 							, &m_viewProj[_view].un.f4x4
@@ -646,9 +650,11 @@ namespace bgfx
 			ChunkTy sbc;
 			static_cast<Derived*>(this)->createChunk(sbc);
 
-			const uint32_t lastChunk = bx::max(uint32_t(m_chunks.size()-1), 1);
-			const uint32_t at = UINT32_MAX == _at ? lastChunk : _at;
-			const uint32_t chunkIndex = at % bx::max(m_chunks.size(), 1);
+			const uint32_t numChunks  = uint32_t(m_chunks.size() );
+			const uint32_t chunkIndex = UINT32_MAX == _at
+				? numChunks
+				: bx::min(_at, numChunks)
+				;
 
 			m_chunkControl.resize(m_chunkSize);
 

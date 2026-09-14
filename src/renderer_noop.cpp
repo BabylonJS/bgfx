@@ -13,35 +13,22 @@ namespace bgfx { namespace noop
 		{
 			// Pretend all features are available.
 			g_caps.supported = 0
-				| BGFX_CAPS_ALPHA_TO_COVERAGE
 				| BGFX_CAPS_BLEND_INDEPENDENT
 				| BGFX_CAPS_COMPUTE
 				| BGFX_CAPS_CONSERVATIVE_RASTER
 				| BGFX_CAPS_DRAW_INDIRECT
 				| BGFX_CAPS_DRAW_INDIRECT_COUNT
-				| BGFX_CAPS_FRAGMENT_DEPTH
 				| BGFX_CAPS_FRAGMENT_ORDERING
 				| BGFX_CAPS_GRAPHICS_DEBUGGER
 				| BGFX_CAPS_HDR10
-				| BGFX_CAPS_HIDPI
 				| BGFX_CAPS_IMAGE_RW
 				| BGFX_CAPS_INDEX32
-				| BGFX_CAPS_INSTANCING
-				| BGFX_CAPS_OCCLUSION_QUERY
 				| BGFX_CAPS_PRIMITIVE_ID
 				| BGFX_CAPS_RENDERER_MULTITHREADED
 				| BGFX_CAPS_SWAP_CHAIN
-				| BGFX_CAPS_TEXTURE_2D_ARRAY
-				| BGFX_CAPS_TEXTURE_3D
-				| BGFX_CAPS_TEXTURE_BLIT
-				| BGFX_CAPS_TEXTURE_COMPARE_ALL
-				| BGFX_CAPS_TEXTURE_COMPARE_LEQUAL
 				| BGFX_CAPS_TEXTURE_CUBE_ARRAY
-				| BGFX_CAPS_TEXTURE_READ_BACK
 				| BGFX_CAPS_TRANSPARENT_BACKBUFFER
-				| BGFX_CAPS_VERTEX_ATTRIB_HALF
 				| BGFX_CAPS_VERTEX_ATTRIB_UINT10
-				| BGFX_CAPS_VERTEX_ID
 				| BGFX_CAPS_VIEWPORT_LAYER_ARRAY
 				;
 
@@ -190,10 +177,6 @@ namespace bgfx { namespace noop
 		{
 		}
 
-		void overrideInternal(TextureHandle /*_handle*/, uintptr_t /*_ptr*/, uint16_t /*_layerIndex*/) override
-		{
-		}
-
 		uintptr_t getInternal(TextureHandle /*_handle*/) override
 		{
 			return 0;
@@ -207,19 +190,11 @@ namespace bgfx { namespace noop
 		{
 		}
 
-		void createFrameBuffer(FrameBufferHandle /*_handle*/, void* /*_nwh*/, uint32_t /*_width*/, uint32_t /*_height*/, TextureFormat::Enum /*_format*/, TextureFormat::Enum /*_depthFormat*/) override
+		void createFrameBuffer(FrameBufferHandle /*_handle*/, const SwapChain& /*_desc*/) override
 		{
 		}
 
 		void destroyFrameBuffer(FrameBufferHandle /*_handle*/) override
-		{
-		}
-
-		void createUniform(UniformHandle /*_handle*/, UniformType::Enum /*_type*/, uint16_t /*_num*/, const char* /*_name*/) override
-		{
-		}
-
-		void destroyUniform(UniformHandle /*_handle*/) override
 		{
 		}
 
@@ -228,10 +203,6 @@ namespace bgfx { namespace noop
 		}
 
 		void updateViewName(ViewId /*_id*/, const char* /*_name*/) override
-		{
-		}
-
-		void updateUniform(uint16_t /*_loc*/, const void* /*_data*/, uint32_t /*_size*/) override
 		{
 		}
 
@@ -268,7 +239,7 @@ namespace bgfx { namespace noop
 			perfStats.gpuMemoryUsed = -INT64_MAX;
 		}
 
-		void dbgTextRenderBegin(TextVideoMemBlitter& /*_blitter*/) override
+		void dbgTextRenderBegin(TextVideoMemBlitter& /*_blitter*/, FrameBufferHandle /*_handle*/) override
 		{
 		}
 

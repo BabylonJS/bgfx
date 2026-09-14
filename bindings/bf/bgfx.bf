@@ -687,6 +687,16 @@ public static class bgfx
 		/// Texture is shared with other device or other process.
 		/// </summary>
 		ExternalShared         = 0x0001000000000000,
+	
+		/// <summary>
+		/// Texture may be sampled and rendered with either sRGB-ness,
+		/// not just the one implied by its format. Every bind and
+		/// attachment must then state the encoding it wants (see
+		/// `BGFX_SAMPLER_SRGB`, `BGFX_ATTACHMENT_SRGB`). Costs nothing
+		/// until used, but may disable texture compression on some
+		/// hardware.
+		/// </summary>
+		SrgbMutable            = 0x0040000000000000,
 		ReservedShift          = 60,
 		ReservedMask           = 0xf000000000000000,
 	
@@ -856,6 +866,14 @@ public static class bgfx
 		/// Sample stencil instead of depth.
 		/// </summary>
 		SampleStencil          = 0x00100000,
+	
+		/// <summary>
+		/// Sample with sRGB conversion; absence of this flag samples
+		/// without it. Only affects textures created
+		/// `BGFX_TEXTURE_SRGB_MUTABLE`, which must state the encoding
+		/// explicitly on every bind; ignored for any other texture.
+		/// </summary>
+		Srgb                   = 0x00200000,
 		Point                  = 0x00000540,
 		UvwMirror              = 0x00000015,
 		UvwClamp               = 0x0000002a,
@@ -940,11 +958,6 @@ public static class bgfx
 		Hidpi                  = 0x00020000,
 	
 		/// <summary>
-		/// Enable depth clamp.
-		/// </summary>
-		DepthClamp             = 0x00040000,
-	
-		/// <summary>
 		/// Suspend rendering.
 		/// </summary>
 		Suspend                = 0x00080000,
@@ -960,183 +973,175 @@ public static class bgfx
 	}
 	
 	[AllowDuplicates]
+	public enum SwapChainFlags : uint32
+	{
+		/// <summary>
+		/// Enable 2x MSAA.
+		/// </summary>
+		MsaaX2                 = 0x00000010,
+	
+		/// <summary>
+		/// Enable 4x MSAA.
+		/// </summary>
+		MsaaX4                 = 0x00000020,
+	
+		/// <summary>
+		/// Enable 8x MSAA.
+		/// </summary>
+		MsaaX8                 = 0x00000030,
+	
+		/// <summary>
+		/// Enable 16x MSAA.
+		/// </summary>
+		MsaaX16                = 0x00000040,
+		MsaaShift              = 4,
+		MsaaMask               = 0x00000070,
+	
+		/// <summary>
+		/// No swap chain flags.
+		/// </summary>
+		None                   = 0x00000000,
+	
+		/// <summary>
+		/// Not supported yet.
+		/// </summary>
+		Fullscreen             = 0x00000001,
+	
+		/// <summary>
+		/// Enable sRGB backbuffer.
+		/// </summary>
+		SrgbBackbuffer         = 0x00008000,
+	
+		/// <summary>
+		/// Enable HDR10 rendering.
+		/// </summary>
+		Hdr10                  = 0x00010000,
+	
+		/// <summary>
+		/// Enable HiDPI rendering.
+		/// </summary>
+		Hidpi                  = 0x00020000,
+	
+		/// <summary>
+		/// Transparent backbuffer. Availability depends on: `BGFX_CAPS_TRANSPARENT_BACKBUFFER`.
+		/// </summary>
+		TransparentBackbuffer  = 0x00100000,
+		FullscreenShift        = 0,
+		FullscreenMask         = 0x00000001,
+	}
+	
+	[AllowDuplicates]
 	public enum CapsFlags : uint64
 	{
 		/// <summary>
-		/// Alpha to coverage is supported.
-		/// </summary>
-		AlphaToCoverage        = 0x0000000000000001,
-	
-		/// <summary>
 		/// Blend independent is supported.
 		/// </summary>
-		BlendIndependent       = 0x0000000000000002,
+		BlendIndependent       = 0x0000000000000001,
 	
 		/// <summary>
 		/// Compute shaders are supported.
 		/// </summary>
-		Compute                = 0x0000000000000004,
+		Compute                = 0x0000000000000002,
 	
 		/// <summary>
 		/// Conservative rasterization is supported.
 		/// </summary>
-		ConservativeRaster     = 0x0000000000000008,
+		ConservativeRaster     = 0x0000000000000004,
 	
 		/// <summary>
 		/// Draw indirect is supported.
 		/// </summary>
-		DrawIndirect           = 0x0000000000000010,
+		DrawIndirect           = 0x0000000000000008,
 	
 		/// <summary>
 		/// Draw indirect with indirect count is supported.
 		/// </summary>
-		DrawIndirectCount      = 0x0000000000000020,
-	
-		/// <summary>
-		/// Fragment depth is available in fragment shader.
-		/// </summary>
-		FragmentDepth          = 0x0000000000000040,
+		DrawIndirectCount      = 0x0000000000000010,
 	
 		/// <summary>
 		/// Fragment ordering is available in fragment shader.
 		/// </summary>
-		FragmentOrdering       = 0x0000000000000080,
+		FragmentOrdering       = 0x0000000000000020,
 	
 		/// <summary>
 		/// Graphics debugger is present.
 		/// </summary>
-		GraphicsDebugger       = 0x0000000000000100,
+		GraphicsDebugger       = 0x0000000000000040,
 	
 		/// <summary>
 		/// HDR10 rendering is supported.
 		/// </summary>
-		Hdr10                  = 0x0000000000000200,
-	
-		/// <summary>
-		/// HiDPI rendering is supported.
-		/// </summary>
-		Hidpi                  = 0x0000000000000400,
+		Hdr10                  = 0x0000000000000080,
 	
 		/// <summary>
 		/// Image Read/Write is supported.
 		/// </summary>
-		ImageRw                = 0x0000000000000800,
+		ImageRw                = 0x0000000000000100,
 	
 		/// <summary>
 		/// 32-bit indices are supported.
 		/// </summary>
-		Index32                = 0x0000000000001000,
-	
-		/// <summary>
-		/// Instancing is supported.
-		/// </summary>
-		Instancing             = 0x0000000000002000,
-	
-		/// <summary>
-		/// Occlusion query is supported.
-		/// </summary>
-		OcclusionQuery         = 0x0000000000004000,
+		Index32                = 0x0000000000000200,
 	
 		/// <summary>
 		/// PrimitiveID is available in fragment shader.
 		/// </summary>
-		PrimitiveId            = 0x0000000000008000,
+		PrimitiveId            = 0x0000000000000400,
 	
 		/// <summary>
 		/// Renderer is on separate thread.
 		/// </summary>
-		RendererMultithreaded  = 0x0000000000010000,
+		RendererMultithreaded  = 0x0000000000000800,
 	
 		/// <summary>
 		/// Multiple windows are supported.
 		/// </summary>
-		SwapChain              = 0x0000000000020000,
-	
-		/// <summary>
-		/// Texture blit is supported.
-		/// </summary>
-		TextureBlit            = 0x0000000000040000,
-	
-		/// <summary>
-		/// Texture compare less equal mode is supported.
-		/// </summary>
-		TextureCompareLequal   = 0x0000000000080000,
-		TextureCompareReserved = 0x0000000000100000,
+		SwapChain              = 0x0000000000001000,
 	
 		/// <summary>
 		/// Cubemap texture array is supported.
 		/// </summary>
-		TextureCubeArray       = 0x0000000000200000,
+		TextureCubeArray       = 0x0000000000002000,
 	
 		/// <summary>
 		/// CPU direct access to GPU texture memory.
 		/// </summary>
-		TextureDirectAccess    = 0x0000000000400000,
+		TextureDirectAccess    = 0x0000000000004000,
 	
 		/// <summary>
 		/// External texture is supported.
 		/// </summary>
-		TextureExternal        = 0x0000000000800000,
+		TextureExternal        = 0x0000000000008000,
 	
 		/// <summary>
 		/// External shared texture is supported.
 		/// </summary>
-		TextureExternalShared  = 0x0000000001000000,
-	
-		/// <summary>
-		/// Read-back texture is supported.
-		/// </summary>
-		TextureReadBack        = 0x0000000002000000,
-	
-		/// <summary>
-		/// 2D texture array is supported.
-		/// </summary>
-		Texture2dArray         = 0x0000000004000000,
-	
-		/// <summary>
-		/// 3D textures are supported.
-		/// </summary>
-		Texture3d              = 0x0000000008000000,
+		TextureExternalShared  = 0x0000000000010000,
 	
 		/// <summary>
 		/// Transparent back buffer supported.
 		/// </summary>
-		TransparentBackbuffer  = 0x0000000010000000,
+		TransparentBackbuffer  = 0x0000000000020000,
 	
 		/// <summary>
 		/// Variable Rate Shading
 		/// </summary>
-		VariableRateShading    = 0x0000000020000000,
-	
-		/// <summary>
-		/// Vertex attribute half-float is supported.
-		/// </summary>
-		VertexAttribHalf       = 0x0000000040000000,
+		VariableRateShading    = 0x0000000000040000,
 	
 		/// <summary>
 		/// Vertex attribute 10_10_10_2 is supported.
 		/// </summary>
-		VertexAttribUint10     = 0x0000000080000000,
-	
-		/// <summary>
-		/// Rendering with VertexID only is supported.
-		/// </summary>
-		VertexId               = 0x0000000100000000,
+		VertexAttribUint10     = 0x0000000000080000,
 	
 		/// <summary>
 		/// Hardware video decode is supported.
 		/// </summary>
-		VideoDecode            = 0x0000000200000000,
+		VideoDecode            = 0x0000000000100000,
 	
 		/// <summary>
 		/// Viewport layer is available in vertex shader.
 		/// </summary>
-		ViewportLayerArray     = 0x0000000400000000,
-	
-		/// <summary>
-		/// All texture compare modes are supported.
-		/// </summary>
-		TextureCompareAll      = 0x0000000000180000,
+		ViewportLayerArray     = 0x0000000000200000,
 	}
 	
 	[AllowDuplicates]
@@ -1332,10 +1337,10 @@ public static class bgfx
 	}
 	
 	[AllowDuplicates]
-	public enum ResolveFlags : uint32
+	public enum AttachmentFlags : uint32
 	{
 		/// <summary>
-		/// No resolve flags.
+		/// No attachment flags.
 		/// </summary>
 		None                   = 0x00000000,
 	
@@ -1343,6 +1348,25 @@ public static class bgfx
 		/// Auto-generate mip maps on resolve.
 		/// </summary>
 		AutoGenMips            = 0x00000001,
+	
+		/// <summary>
+		/// Bind the depth aspect read-only (read-only depth-stencil view) so the
+		/// attachment can be sampled as a texture in the same pass.
+		/// </summary>
+		ReadOnlyDepth          = 0x00000002,
+	
+		/// <summary>
+		/// Bind the stencil aspect read-only.
+		/// </summary>
+		ReadOnlyStencil        = 0x00000004,
+	
+		/// <summary>
+		/// Render with sRGB conversion; absence of this flag renders without
+		/// it. Only affects textures created `BGFX_TEXTURE_SRGB_MUTABLE`,
+		/// which must state the encoding explicitly on every attachment;
+		/// ignored for any other texture.
+		/// </summary>
+		Srgb                   = 0x00000008,
 	}
 	
 	[AllowDuplicates]
@@ -1374,7 +1398,7 @@ public static class bgfx
 		Intel                  = 0x8086,
 	
 		/// <summary>
-		/// nVidia adapter.
+		/// NVIDIA adapter.
 		/// </summary>
 		Nvidia                 = 0x10de,
 	
@@ -1706,7 +1730,7 @@ public static class bgfx
 		Uint16,
 	
 		/// <summary>
-		/// Half, availability depends on: `BGFX_CAPS_VERTEX_ATTRIB_HALF`.
+		/// Half.
 		/// </summary>
 		Half,
 	
@@ -2315,32 +2339,32 @@ public static class bgfx
 	public enum BackbufferRatio : uint32
 	{
 		/// <summary>
-		/// Equal to backbuffer.
+		/// Equal to the main window's backbuffer.
 		/// </summary>
 		Equal,
 	
 		/// <summary>
-		/// One half size of backbuffer.
+		/// One half size of the main window's backbuffer.
 		/// </summary>
 		Half,
 	
 		/// <summary>
-		/// One quarter size of backbuffer.
+		/// One quarter size of the main window's backbuffer.
 		/// </summary>
 		Quarter,
 	
 		/// <summary>
-		/// One eighth size of backbuffer.
+		/// One eighth size of the main window's backbuffer.
 		/// </summary>
 		Eighth,
 	
 		/// <summary>
-		/// One sixteenth size of backbuffer.
+		/// One sixteenth size of the main window's backbuffer.
 		/// </summary>
 		Sixteenth,
 	
 		/// <summary>
-		/// Double size of backbuffer.
+		/// Double size of the main window's backbuffer.
 		/// </summary>
 		Double,
 	
@@ -2646,26 +2670,24 @@ public static class bgfx
 	[CRepr]
 	public struct PlatformData
 	{
-		public void* ndt;
-		public void* nwh;
 		public void* context;
 		public void* queue;
-		public void* backBuffer;
-		public void* backBufferDS;
 		public NativeWindowHandleType type;
 	}
 	
 	[CRepr]
-	public struct Resolution
+	public struct SwapChain
 	{
-		public TextureFormat formatColor;
-		public TextureFormat formatDepthStencil;
+		public void* nwh;
+		public void* ndt;
 		public uint32 width;
 		public uint32 height;
-		public uint32 reset;
+		public uint32 flags;
+		public TextureFormat formatColor;
+		public TextureFormat formatDepthStencil;
+		public TextureHandle depth;
 		public uint8 numBackBuffers;
 		public uint8 maxFrameLatency;
-		public uint8 debugTextScale;
 	}
 	
 	[CRepr]
@@ -2692,7 +2714,8 @@ public static class bgfx
 		public uint8 fallback;
 		public uint8 videoDecode;
 		public PlatformData platformData;
-		public Resolution resolution;
+		public SwapChain swapChain;
+		public uint32 reset;
 		public Limits limits;
 		public void* callback;
 		public void* allocator;
@@ -2819,7 +2842,7 @@ public static class bgfx
 		public uint16 mip;
 		public uint16 layer;
 		public uint16 numLayers;
-		public uint8 resolve;
+		public uint8 flags;
 	}
 	
 	[CRepr]
@@ -3037,10 +3060,10 @@ public static class bgfx
 	/// <param name="_layer">Cubemap side or depth layer/slice to use.</param>
 	/// <param name="_numLayers">Number of texture layer/slice(s) in array to use.</param>
 	/// <param name="_mip">Mip level.</param>
-	/// <param name="_resolve">Resolve flags. See: `BGFX_RESOLVE_*`</param>
+	/// <param name="_flags">Attachment flags. See: `BGFX_ATTACHMENT_*`</param>
 	///
 	[LinkName("bgfx_attachment_init")]
-	public static extern void attachment_init(Attachment* _this, TextureHandle _handle, Access _access, uint16 _layer, uint16 _numLayers, uint16 _mip, uint8 _resolve);
+	public static extern void attachment_init(Attachment* _this, TextureHandle _handle, Access _access, uint16 _layer, uint16 _numLayers, uint16 _mip, uint8 _flags);
 	
 	/// <summary>
 	/// Start VertexLayout.
@@ -3220,13 +3243,11 @@ public static class bgfx
 	/// 
 	/// </summary>
 	///
-	/// <param name="_width">Back-buffer width.</param>
-	/// <param name="_height">Back-buffer height.</param>
-	/// <param name="_flags">See: `BGFX_RESET_*` for more info.   - `BGFX_RESET_NONE` - No reset flags.   - `BGFX_RESET_FULLSCREEN` - Not supported yet.   - `BGFX_RESET_MSAA_X[2/4/8/16]` - Enable 2, 4, 8 or 16 x MSAA.   - `BGFX_RESET_VSYNC` - Enable V-Sync.   - `BGFX_RESET_MAXANISOTROPY` - Turn on/off max anisotropy.   - `BGFX_RESET_CAPTURE` - Begin screen capture.   - `BGFX_RESET_FLUSH_AFTER_RENDER` - Flush rendering after submitting to GPU.   - `BGFX_RESET_FLIP_AFTER_RENDER` - This flag  specifies where flip     occurs. Default behaviour is that flip occurs before rendering new     frame. This flag only has effect when `BGFX_CONFIG_MULTITHREADED=0`.   - `BGFX_RESET_SRGB_BACKBUFFER` - Enable sRGB back-buffer.</param>
-	/// <param name="_format">Texture format. See: `TextureFormat::Enum`.</param>
+	/// <param name="_flags">See: `BGFX_RESET_*` for more info.   - `BGFX_RESET_NONE` - No reset flags.   - `BGFX_RESET_VSYNC` - Enable V-Sync.   - `BGFX_RESET_MAXANISOTROPY` - Turn on/off max anisotropy.   - `BGFX_RESET_CAPTURE` - Begin screen capture.   - `BGFX_RESET_FLUSH_AFTER_RENDER` - Flush rendering after submitting to GPU.   - `BGFX_RESET_FLIP_AFTER_RENDER` - This flag  specifies where flip     occurs. Default behaviour is that flip occurs before rendering new     frame. This flag only has effect when `BGFX_CONFIG_MULTITHREADED=0`. Per-surface settings are not here. `BGFX_SWAP_CHAIN_*` flags belong on `SwapChain::flags`, and are ignored if passed here.</param>
+	/// <param name="_swapChain">Main window swap chain. When `NULL` the main window is left untouched and only the device and frame globals above are applied, which is what an application driving its own swap chains wants. Otherwise the main window takes on this description: resize it, change its format, or change its per-surface flags. Fields left neutral keep their current value, and `nwh`/`ndt` are ignored -- main's are bgfx's own. Must be `NULL` when `bgfx::init` created no main window.</param>
 	///
 	[LinkName("bgfx_reset")]
-	public static extern void reset(uint32 _width, uint32 _height, uint32 _flags, TextureFormat _format);
+	public static extern void reset(uint32 _flags, SwapChain* _swapChain);
 	
 	/// <summary>
 	/// Advance to next frame. This is the main frame-advancement call on the
@@ -3354,9 +3375,11 @@ public static class bgfx
 	/// </summary>
 	///
 	/// <param name="_debug">Available flags:   - `BGFX_DEBUG_IFH` - Infinitely fast hardware. When this flag is set     all rendering calls will be skipped. This is useful when profiling     to quickly assess potential bottlenecks between CPU and GPU.   - `BGFX_DEBUG_PROFILER` - Enable profiler.   - `BGFX_DEBUG_STATS` - Display internal statistics.   - `BGFX_DEBUG_TEXT` - Display debug text.   - `BGFX_DEBUG_WIREFRAME` - Wireframe rendering. All rendering     primitives will be rendered as lines.</param>
+	/// <param name="_handle">Frame buffer the debug text and statistics are drawn on. Invalid handle selects the window bgfx was initialized with.</param>
+	/// <param name="_scale">Debug text scale factor. 0 is the same as 1.</param>
 	///
 	[LinkName("bgfx_set_debug")]
-	public static extern void set_debug(uint32 _debug);
+	public static extern void set_debug(uint32 _debug, FrameBufferHandle _handle, uint8 _scale);
 	
 	/// <summary>
 	/// Clear internal debug text buffer.
@@ -3848,7 +3871,7 @@ public static class bgfx
 	/// <param name="_width">Width.</param>
 	/// <param name="_height">Height.</param>
 	/// <param name="_hasMips">Indicates that texture contains full mip-map chain.</param>
-	/// <param name="_numLayers">Number of layers in texture array. Must be 1 if caps `BGFX_CAPS_TEXTURE_2D_ARRAY` flag is not set.</param>
+	/// <param name="_numLayers">Number of layers in texture array.</param>
 	/// <param name="_format">Texture format. See: `TextureFormat::Enum`.</param>
 	/// <param name="_flags">Texture creation (see `BGFX_TEXTURE_*`.), and sampler (see `BGFX_SAMPLER_*`) flags. Default texture sampling mode is linear, and wrap mode is repeat. - `BGFX_SAMPLER_[U/V/W]_[MIRROR/CLAMP]` - Mirror or clamp to edge wrap   mode. - `BGFX_SAMPLER_[MIN/MAG/MIP]_[POINT/ANISOTROPIC]` - Point or anisotropic   sampling.</param>
 	/// <param name="_mem">Texture data. If `_mem` is non-NULL, created texture will be immutable. If `_mem` is NULL content of the texture is uninitialized. When `_numLayers` is more than 1, expected memory layout is texture and all mips together for each array element.</param>
@@ -3864,7 +3887,7 @@ public static class bgfx
 	///
 	/// <param name="_ratio">Texture size in respect to back-buffer size. See: `BackbufferRatio::Enum`.</param>
 	/// <param name="_hasMips">Indicates that texture contains full mip-map chain.</param>
-	/// <param name="_numLayers">Number of layers in texture array. Must be 1 if caps `BGFX_CAPS_TEXTURE_2D_ARRAY` flag is not set.</param>
+	/// <param name="_numLayers">Number of layers in texture array.</param>
 	/// <param name="_format">Texture format. See: `TextureFormat::Enum`.</param>
 	/// <param name="_flags">Texture creation (see `BGFX_TEXTURE_*`.), and sampler (see `BGFX_SAMPLER_*`) flags. Default texture sampling mode is linear, and wrap mode is repeat. - `BGFX_SAMPLER_[U/V/W]_[MIRROR/CLAMP]` - Mirror or clamp to edge wrap   mode. - `BGFX_SAMPLER_[MIN/MAG/MIP]_[POINT/ANISOTROPIC]` - Point or anisotropic   sampling.</param>
 	///
@@ -3893,7 +3916,7 @@ public static class bgfx
 	///
 	/// <param name="_size">Cube side size.</param>
 	/// <param name="_hasMips">Indicates that texture contains full mip-map chain.</param>
-	/// <param name="_numLayers">Number of layers in texture array. Must be 1 if caps `BGFX_CAPS_TEXTURE_2D_ARRAY` flag is not set.</param>
+	/// <param name="_numLayers">Number of layers in texture array.</param>
 	/// <param name="_format">Texture format. See: `TextureFormat::Enum`.</param>
 	/// <param name="_flags">Texture creation (see `BGFX_TEXTURE_*`.), and sampler (see `BGFX_SAMPLER_*`) flags. Default texture sampling mode is linear, and wrap mode is repeat. - `BGFX_SAMPLER_[U/V/W]_[MIRROR/CLAMP]` - Mirror or clamp to edge wrap   mode. - `BGFX_SAMPLER_[MIN/MAG/MIP]_[POINT/ANISOTROPIC]` - Point or anisotropic   sampling.</param>
 	/// <param name="_mem">Texture data. If `_mem` is non-NULL, created texture will be immutable. If `_mem` is NULL content of the texture is uninitialized. When `_numLayers` is more than</param>
@@ -3991,7 +4014,6 @@ public static class bgfx
 	/// @attention Texture must be created with `BGFX_TEXTURE_READ_BACK` flag.
 	///            It's a texture for CPU readback, and can't be a GPU resource
 	///            at the same time. See `examples/30-picking`.
-	/// @attention Availability depends on: `BGFX_CAPS_TEXTURE_READ_BACK`.
 	/// 
 	/// </summary>
 	///
@@ -4082,7 +4104,7 @@ public static class bgfx
 	public static extern FrameBufferHandle create_frame_buffer_from_attachment(uint8 _num, Attachment* _attachment, bool _destroyTexture);
 	
 	/// <summary>
-	/// Create frame buffer for multiple window rendering.
+	/// Create a frame buffer for a window, from a full swap chain description.
 	/// 
 	/// @remarks
 	///   Frame buffer cannot be used for sampling.
@@ -4091,14 +4113,27 @@ public static class bgfx
 	/// 
 	/// </summary>
 	///
-	/// <param name="_nwh">OS' target native window handle.</param>
-	/// <param name="_width">Window back buffer width.</param>
-	/// <param name="_height">Window back buffer height.</param>
-	/// <param name="_format">Window back buffer color format.</param>
-	/// <param name="_depthFormat">Window back buffer depth format.</param>
+	/// <param name="_desc">Swap chain description. See: `bgfx::SwapChain`.</param>
 	///
-	[LinkName("bgfx_create_frame_buffer_from_nwh")]
-	public static extern FrameBufferHandle create_frame_buffer_from_nwh(void* _nwh, uint16 _width, uint16 _height, TextureFormat _format, TextureFormat _depthFormat);
+	[LinkName("bgfx_create_frame_buffer_from_swap_chain")]
+	public static extern FrameBufferHandle create_frame_buffer_from_swap_chain(SwapChain* _desc);
+	
+	/// <summary>
+	/// Change a swap chain's size, format or per-surface flags, in place.
+	/// 
+	/// The frame buffer handle stays valid, so nothing that refers to it has to be
+	/// rebuilt. Pass `BGFX_INVALID_HANDLE` to address the window bgfx was
+	/// initialized with.
+	/// 
+	/// @attention Availability depends on: `BGFX_CAPS_SWAP_CHAIN`.
+	/// 
+	/// </summary>
+	///
+	/// <param name="_handle">Window frame buffer handle. The window bgfx was initialized with is not addressed here; it is `bgfx::reset`'s swap chain.</param>
+	/// <param name="_desc">Swap chain description. See: `bgfx::SwapChain`.</param>
+	///
+	[LinkName("bgfx_update_swap_chain")]
+	public static extern void update_swap_chain(FrameBufferHandle _handle, SwapChain* _desc);
 	
 	/// <summary>
 	/// Set frame buffer debug name.
@@ -4314,9 +4349,11 @@ public static class bgfx
 	/// <param name="_y">Position y from the top corner of the window. Can be negative to place view origin outside of the window.</param>
 	/// <param name="_width">Width of view port region.</param>
 	/// <param name="_height">Height of view port region.</param>
+	/// <param name="_minDepth">Viewport minimum depth (maps clip-space z=0).</param>
+	/// <param name="_maxDepth">Viewport maximum depth (maps clip-space z=1).</param>
 	///
 	[LinkName("bgfx_set_view_rect")]
-	public static extern void set_view_rect(ViewId _id, int16 _x, int16 _y, uint16 _width, uint16 _height);
+	public static extern void set_view_rect(ViewId _id, int16 _x, int16 _y, uint16 _width, uint16 _height, float _minDepth, float _maxDepth);
 	
 	/// <summary>
 	/// Set view rectangle. Draw primitive outside view will be clipped.
@@ -4343,6 +4380,30 @@ public static class bgfx
 	///
 	[LinkName("bgfx_set_view_scissor")]
 	public static extern void set_view_scissor(ViewId _id, uint16 _x, uint16 _y, uint16 _width, uint16 _height);
+	
+	/// <summary>
+	/// Set view depth bias. Applies to all draws in the view unless overridden per-draw
+	/// with `bgfx::setDepthControl`.
+	/// </summary>
+	///
+	/// <param name="_id">View id.</param>
+	/// <param name="_constant">Constant depth bias.</param>
+	/// <param name="_slopeScale">Slope-scaled depth bias.</param>
+	/// <param name="_clamp">Depth bias clamp.</param>
+	///
+	[LinkName("bgfx_set_view_depth_bias")]
+	public static extern void set_view_depth_bias(ViewId _id, int32 _constant, float _slopeScale, float _clamp);
+	
+	/// <summary>
+	/// Set view multisample coverage mask. Combined with the per-draw mask set by
+	/// `bgfx::setSampleMask`, so a draw can narrow the view's mask but not widen it.
+	/// </summary>
+	///
+	/// <param name="_id">View id.</param>
+	/// <param name="_mask">Sample coverage mask.</param>
+	///
+	[LinkName("bgfx_set_view_sample_mask")]
+	public static extern void set_view_sample_mask(ViewId _id, uint32 _mask);
 	
 	/// <summary>
 	/// Set view clear flags.
@@ -4561,6 +4622,17 @@ public static class bgfx
 	public static extern void encoder_set_stencil(Encoder* _this, uint32 _fstencil, uint32 _bstencil);
 	
 	/// <summary>
+	/// Set multisample coverage mask for draw primitive. Samples whose bit is clear
+	/// in the mask are never written, regardless of the coverage the rasterizer
+	/// computes. Only has an effect when rendering to a multisampled target.
+	/// </summary>
+	///
+	/// <param name="_mask">Sample coverage mask.</param>
+	///
+	[LinkName("bgfx_encoder_set_sample_mask")]
+	public static extern void encoder_set_sample_mask(Encoder* _this, uint32 _mask);
+	
+	/// <summary>
 	/// Set scissor for draw primitive.
 	/// 
 	/// @remark
@@ -4588,6 +4660,28 @@ public static class bgfx
 	///
 	[LinkName("bgfx_encoder_set_scissor_cached")]
 	public static extern void encoder_set_scissor_cached(Encoder* _this, uint16 _cache);
+	
+	/// <summary>
+	/// Set depth control (depth bias and depth clip) for draw primitive. Overrides the
+	/// view depth bias for this draw.
+	/// </summary>
+	///
+	/// <param name="_constant">Constant depth bias.</param>
+	/// <param name="_slopeScale">Slope-scaled depth bias.</param>
+	/// <param name="_clamp">Depth bias clamp.</param>
+	/// <param name="_depthClamp">Disable depth clipping and clamp NDC depth to the [0,1] range instead.</param>
+	///
+	[LinkName("bgfx_encoder_set_depth_control")]
+	public static extern uint16 encoder_set_depth_control(Encoder* _this, int32 _constant, float _slopeScale, float _clamp, bool _depthClamp);
+	
+	/// <summary>
+	/// Set depth control from depth-control cache for draw primitive.
+	/// </summary>
+	///
+	/// <param name="_cache">Index in depth control cache.</param>
+	///
+	[LinkName("bgfx_encoder_set_depth_control_cached")]
+	public static extern void encoder_set_depth_control_cached(Encoder* _this, uint16 _cache);
 	
 	/// <summary>
 	/// Set model matrix for draw primitive. If it is not called,
@@ -4633,6 +4727,20 @@ public static class bgfx
 	///
 	[LinkName("bgfx_encoder_set_uniform")]
 	public static extern void encoder_set_uniform(Encoder* _this, UniformHandle _handle, void* _value, uint16 _num);
+	
+	/// <summary>
+	/// Set shader uniform parameter by reference. Unlike `Encoder::setUniform`, the data
+	/// is not copied immediately; the renderer reads it from `_value` at frame render
+	/// time. The pointer must remain valid and unchanged until the frame is rendered
+	/// (up to two `bgfx::frame` calls with multithreaded submission).
+	/// </summary>
+	///
+	/// <param name="_handle">Uniform.</param>
+	/// <param name="_value">Pointer to uniform data. Must stay valid until the frame is rendered.</param>
+	/// <param name="_num">Number of elements. Passing `UINT16_MAX` will use the _num passed on uniform creation.</param>
+	///
+	[LinkName("bgfx_encoder_set_uniform_ref")]
+	public static extern void encoder_set_uniform_ref(Encoder* _this, UniformHandle _handle, void* _value, uint16 _num);
 	
 	/// <summary>
 	/// Set shader uniform parameter for view.
@@ -4775,7 +4883,6 @@ public static class bgfx
 	/// Set number of vertices for auto generated vertices use in conjunction
 	/// with gl_VertexID.
 	/// 
-	/// @attention Availability depends on: `BGFX_CAPS_VERTEX_ID`.
 	/// 
 	/// </summary>
 	///
@@ -4821,7 +4928,6 @@ public static class bgfx
 	/// Set number of instances for auto generated instances use in conjunction
 	/// with gl_InstanceID.
 	/// 
-	/// @attention Availability depends on: `BGFX_CAPS_VERTEX_ID`.
 	/// 
 	/// </summary>
 	///
@@ -4947,9 +5053,11 @@ public static class bgfx
 	/// <param name="_stage">Compute stage.</param>
 	/// <param name="_handle">Index buffer handle.</param>
 	/// <param name="_access">Buffer access. See `Access::Enum`.</param>
+	/// <param name="_offset">Byte offset the shader's view of the buffer starts at. Must be a multiple of 256 bytes.</param>
+	/// <param name="_size">Bytes bound from the offset, `UINT32_MAX` for the rest of the buffer.</param>
 	///
 	[LinkName("bgfx_encoder_set_compute_index_buffer")]
-	public static extern void encoder_set_compute_index_buffer(Encoder* _this, uint8 _stage, IndexBufferHandle _handle, Access _access);
+	public static extern void encoder_set_compute_index_buffer(Encoder* _this, uint8 _stage, IndexBufferHandle _handle, Access _access, uint32 _offset, uint32 _size);
 	
 	/// <summary>
 	/// Set compute vertex buffer.
@@ -4958,9 +5066,11 @@ public static class bgfx
 	/// <param name="_stage">Compute stage.</param>
 	/// <param name="_handle">Vertex buffer handle.</param>
 	/// <param name="_access">Buffer access. See `Access::Enum`.</param>
+	/// <param name="_offset">Byte offset the shader's view of the buffer starts at. Must be a multiple of 256 bytes.</param>
+	/// <param name="_size">Bytes bound from the offset, `UINT32_MAX` for the rest of the buffer.</param>
 	///
 	[LinkName("bgfx_encoder_set_compute_vertex_buffer")]
-	public static extern void encoder_set_compute_vertex_buffer(Encoder* _this, uint8 _stage, VertexBufferHandle _handle, Access _access);
+	public static extern void encoder_set_compute_vertex_buffer(Encoder* _this, uint8 _stage, VertexBufferHandle _handle, Access _access, uint32 _offset, uint32 _size);
 	
 	/// <summary>
 	/// Set compute dynamic index buffer.
@@ -4969,9 +5079,11 @@ public static class bgfx
 	/// <param name="_stage">Compute stage.</param>
 	/// <param name="_handle">Dynamic index buffer handle.</param>
 	/// <param name="_access">Buffer access. See `Access::Enum`.</param>
+	/// <param name="_offset">Byte offset the shader's view of the buffer starts at. Must be a multiple of 256 bytes.</param>
+	/// <param name="_size">Bytes bound from the offset, `UINT32_MAX` for the rest of the buffer.</param>
 	///
 	[LinkName("bgfx_encoder_set_compute_dynamic_index_buffer")]
-	public static extern void encoder_set_compute_dynamic_index_buffer(Encoder* _this, uint8 _stage, DynamicIndexBufferHandle _handle, Access _access);
+	public static extern void encoder_set_compute_dynamic_index_buffer(Encoder* _this, uint8 _stage, DynamicIndexBufferHandle _handle, Access _access, uint32 _offset, uint32 _size);
 	
 	/// <summary>
 	/// Set compute dynamic vertex buffer.
@@ -4980,9 +5092,11 @@ public static class bgfx
 	/// <param name="_stage">Compute stage.</param>
 	/// <param name="_handle">Dynamic vertex buffer handle.</param>
 	/// <param name="_access">Buffer access. See `Access::Enum`.</param>
+	/// <param name="_offset">Byte offset the shader's view of the buffer starts at. Must be a multiple of 256 bytes.</param>
+	/// <param name="_size">Bytes bound from the offset, `UINT32_MAX` for the rest of the buffer.</param>
 	///
 	[LinkName("bgfx_encoder_set_compute_dynamic_vertex_buffer")]
-	public static extern void encoder_set_compute_dynamic_vertex_buffer(Encoder* _this, uint8 _stage, DynamicVertexBufferHandle _handle, Access _access);
+	public static extern void encoder_set_compute_dynamic_vertex_buffer(Encoder* _this, uint8 _stage, DynamicVertexBufferHandle _handle, Access _access, uint32 _offset, uint32 _size);
 	
 	/// <summary>
 	/// Set compute indirect buffer.
@@ -5073,7 +5187,6 @@ public static class bgfx
 	///   draw commands are executed after blit and compute commands.
 	/// 
 	/// @attention Destination texture must be created with `BGFX_TEXTURE_BLIT_DST` flag.
-	/// @attention Availability depends on: `BGFX_CAPS_TEXTURE_BLIT`.
 	/// 
 	/// </summary>
 	///
@@ -5125,7 +5238,6 @@ public static class bgfx
 	/// 
 	/// @attention Destination buffer must be created with `BGFX_BUFFER_COMPUTE_WRITE`, or
 	///   `BGFX_BUFFER_DRAW_INDIRECT` flag.
-	/// @attention Availability depends on: `BGFX_CAPS_TEXTURE_BLIT`.
 	/// 
 	/// </summary>
 	///
@@ -5151,7 +5263,6 @@ public static class bgfx
 	/// @attention Source buffer must be created with one of `BGFX_BUFFER_COMPUTE_*`, or
 	///   `BGFX_BUFFER_DRAW_INDIRECT` flags.
 	/// @attention Destination texture must be created with `BGFX_TEXTURE_BLIT_DST` flag.
-	/// @attention Availability depends on: `BGFX_CAPS_TEXTURE_BLIT`.
 	/// 
 	/// </summary>
 	///
@@ -5224,18 +5335,6 @@ public static class bgfx
 	public static extern RenderFrame render_frame(int32 _msecs);
 	
 	/// <summary>
-	/// Set platform data.
-	/// 
-	/// @warning Must be called before `bgfx::init`.
-	/// 
-	/// </summary>
-	///
-	/// <param name="_data">Platform data.</param>
-	///
-	[LinkName("bgfx_set_platform_data")]
-	public static extern void set_platform_data(PlatformData* _data);
-	
-	/// <summary>
 	/// Get internal data for interop.
 	/// 
 	/// @attention It's expected you understand some bgfx internals before you
@@ -5247,48 +5346,6 @@ public static class bgfx
 	///
 	[LinkName("bgfx_get_internal_data")]
 	public static extern InternalData* get_internal_data();
-	
-	/// <summary>
-	/// Override internal texture with externally created texture. Previously
-	/// created internal texture will released.
-	/// 
-	/// @attention It's expected you understand some bgfx internals before you
-	///   use this call.
-	/// 
-	/// @warning Must be called only on render thread.
-	/// 
-	/// </summary>
-	///
-	/// <param name="_handle">Texture handle.</param>
-	/// <param name="_ptr">Native API pointer to texture.</param>
-	/// <param name="_layerIndex">Layer index for texture arrays (only implemented for D3D11).</param>
-	///
-	[LinkName("bgfx_override_internal_texture_ptr")]
-	public static extern void* override_internal_texture_ptr(TextureHandle _handle, void* _ptr, uint16 _layerIndex);
-	
-	/// <summary>
-	/// Override internal texture by creating new texture. Previously created
-	/// internal texture will released.
-	/// 
-	/// @attention It's expected you understand some bgfx internals before you
-	///   use this call.
-	/// 
-	/// @returns Native API pointer to texture. If result is 0, texture is not created yet from the
-	///   main thread.
-	/// 
-	/// @warning Must be called only on render thread.
-	/// 
-	/// </summary>
-	///
-	/// <param name="_handle">Texture handle.</param>
-	/// <param name="_width">Width.</param>
-	/// <param name="_height">Height.</param>
-	/// <param name="_numMips">Number of mip-maps.</param>
-	/// <param name="_format">Texture format. See: `TextureFormat::Enum`.</param>
-	/// <param name="_flags">Texture creation (see `BGFX_TEXTURE_*`.), and sampler (see `BGFX_SAMPLER_*`) flags. Default texture sampling mode is linear, and wrap mode is repeat. - `BGFX_SAMPLER_[U/V/W]_[MIRROR/CLAMP]` - Mirror or clamp to edge wrap   mode. - `BGFX_SAMPLER_[MIN/MAG/MIP]_[POINT/ANISOTROPIC]` - Point or anisotropic   sampling.</param>
-	///
-	[LinkName("bgfx_override_internal_texture")]
-	public static extern void* override_internal_texture(TextureHandle _handle, uint16 _width, uint16 _height, uint8 _numMips, TextureFormat _format, uint64 _flags);
 	
 	/// <summary>
 	/// Sets a debug marker. This allows you to group graphics calls together for easy browsing in
@@ -5344,6 +5401,17 @@ public static class bgfx
 	public static extern void set_stencil(uint32 _fstencil, uint32 _bstencil);
 	
 	/// <summary>
+	/// Set multisample coverage mask for draw primitive. Samples whose bit is clear
+	/// in the mask are never written, regardless of the coverage the rasterizer
+	/// computes. Only has an effect when rendering to a multisampled target.
+	/// </summary>
+	///
+	/// <param name="_mask">Sample coverage mask.</param>
+	///
+	[LinkName("bgfx_set_sample_mask")]
+	public static extern void set_sample_mask(uint32 _mask);
+	
+	/// <summary>
 	/// Set scissor for draw primitive.
 	/// 
 	/// @remark
@@ -5371,6 +5439,28 @@ public static class bgfx
 	///
 	[LinkName("bgfx_set_scissor_cached")]
 	public static extern void set_scissor_cached(uint16 _cache);
+	
+	/// <summary>
+	/// Set depth control (depth bias and depth clip) for draw primitive. Overrides the
+	/// view depth bias for this draw.
+	/// </summary>
+	///
+	/// <param name="_constant">Constant depth bias.</param>
+	/// <param name="_slopeScale">Slope-scaled depth bias.</param>
+	/// <param name="_clamp">Depth bias clamp.</param>
+	/// <param name="_depthClamp">Disable depth clipping and clamp NDC depth to the [0,1] range instead.</param>
+	///
+	[LinkName("bgfx_set_depth_control")]
+	public static extern uint16 set_depth_control(int32 _constant, float _slopeScale, float _clamp, bool _depthClamp);
+	
+	/// <summary>
+	/// Set depth control from depth-control cache for draw primitive.
+	/// </summary>
+	///
+	/// <param name="_cache">Index in depth control cache.</param>
+	///
+	[LinkName("bgfx_set_depth_control_cached")]
+	public static extern void set_depth_control_cached(uint16 _cache);
 	
 	/// <summary>
 	/// Set model matrix for draw primitive. If it is not called,
@@ -5416,6 +5506,20 @@ public static class bgfx
 	///
 	[LinkName("bgfx_set_uniform")]
 	public static extern void set_uniform(UniformHandle _handle, void* _value, uint16 _num);
+	
+	/// <summary>
+	/// Set shader uniform parameter by reference. Unlike `bgfx::setUniform`, the data
+	/// is not copied immediately; the renderer reads it from `_value` at frame render
+	/// time. The pointer must remain valid and unchanged until the frame is rendered
+	/// (up to two `bgfx::frame` calls with multithreaded submission).
+	/// </summary>
+	///
+	/// <param name="_handle">Uniform.</param>
+	/// <param name="_value">Pointer to uniform data. Must stay valid until the frame is rendered.</param>
+	/// <param name="_num">Number of elements. Passing `UINT16_MAX` will use the _num passed on uniform creation.</param>
+	///
+	[LinkName("bgfx_set_uniform_ref")]
+	public static extern void set_uniform_ref(UniformHandle _handle, void* _value, uint16 _num);
 	
 	/// <summary>
 	/// Set index buffer for draw primitive.
@@ -5529,7 +5633,6 @@ public static class bgfx
 	/// Set number of vertices for auto generated vertices use in conjunction
 	/// with gl_VertexID.
 	/// 
-	/// @attention Availability depends on: `BGFX_CAPS_VERTEX_ID`.
 	/// 
 	/// </summary>
 	///
@@ -5575,7 +5678,6 @@ public static class bgfx
 	/// Set number of instances for auto generated instances use in conjunction
 	/// with gl_InstanceID.
 	/// 
-	/// @attention Availability depends on: `BGFX_CAPS_VERTEX_ID`.
 	/// 
 	/// </summary>
 	///
@@ -5699,9 +5801,11 @@ public static class bgfx
 	/// <param name="_stage">Compute stage.</param>
 	/// <param name="_handle">Index buffer handle.</param>
 	/// <param name="_access">Buffer access. See `Access::Enum`.</param>
+	/// <param name="_offset">Byte offset the shader's view of the buffer starts at. Must be a multiple of 256 bytes.</param>
+	/// <param name="_size">Bytes bound from the offset, `UINT32_MAX` for the rest of the buffer.</param>
 	///
 	[LinkName("bgfx_set_compute_index_buffer")]
-	public static extern void set_compute_index_buffer(uint8 _stage, IndexBufferHandle _handle, Access _access);
+	public static extern void set_compute_index_buffer(uint8 _stage, IndexBufferHandle _handle, Access _access, uint32 _offset, uint32 _size);
 	
 	/// <summary>
 	/// Set compute vertex buffer.
@@ -5710,9 +5814,11 @@ public static class bgfx
 	/// <param name="_stage">Compute stage.</param>
 	/// <param name="_handle">Vertex buffer handle.</param>
 	/// <param name="_access">Buffer access. See `Access::Enum`.</param>
+	/// <param name="_offset">Byte offset the shader's view of the buffer starts at. Must be a multiple of 256 bytes.</param>
+	/// <param name="_size">Bytes bound from the offset, `UINT32_MAX` for the rest of the buffer.</param>
 	///
 	[LinkName("bgfx_set_compute_vertex_buffer")]
-	public static extern void set_compute_vertex_buffer(uint8 _stage, VertexBufferHandle _handle, Access _access);
+	public static extern void set_compute_vertex_buffer(uint8 _stage, VertexBufferHandle _handle, Access _access, uint32 _offset, uint32 _size);
 	
 	/// <summary>
 	/// Set compute dynamic index buffer.
@@ -5721,9 +5827,11 @@ public static class bgfx
 	/// <param name="_stage">Compute stage.</param>
 	/// <param name="_handle">Dynamic index buffer handle.</param>
 	/// <param name="_access">Buffer access. See `Access::Enum`.</param>
+	/// <param name="_offset">Byte offset the shader's view of the buffer starts at. Must be a multiple of 256 bytes.</param>
+	/// <param name="_size">Bytes bound from the offset, `UINT32_MAX` for the rest of the buffer.</param>
 	///
 	[LinkName("bgfx_set_compute_dynamic_index_buffer")]
-	public static extern void set_compute_dynamic_index_buffer(uint8 _stage, DynamicIndexBufferHandle _handle, Access _access);
+	public static extern void set_compute_dynamic_index_buffer(uint8 _stage, DynamicIndexBufferHandle _handle, Access _access, uint32 _offset, uint32 _size);
 	
 	/// <summary>
 	/// Set compute dynamic vertex buffer.
@@ -5732,9 +5840,11 @@ public static class bgfx
 	/// <param name="_stage">Compute stage.</param>
 	/// <param name="_handle">Dynamic vertex buffer handle.</param>
 	/// <param name="_access">Buffer access. See `Access::Enum`.</param>
+	/// <param name="_offset">Byte offset the shader's view of the buffer starts at. Must be a multiple of 256 bytes.</param>
+	/// <param name="_size">Bytes bound from the offset, `UINT32_MAX` for the rest of the buffer.</param>
 	///
 	[LinkName("bgfx_set_compute_dynamic_vertex_buffer")]
-	public static extern void set_compute_dynamic_vertex_buffer(uint8 _stage, DynamicVertexBufferHandle _handle, Access _access);
+	public static extern void set_compute_dynamic_vertex_buffer(uint8 _stage, DynamicVertexBufferHandle _handle, Access _access, uint32 _offset, uint32 _size);
 	
 	/// <summary>
 	/// Set compute indirect buffer.
@@ -5825,7 +5935,6 @@ public static class bgfx
 	///   draw commands are executed after blit and compute commands.
 	/// 
 	/// @attention Destination texture must be created with `BGFX_TEXTURE_BLIT_DST` flag.
-	/// @attention Availability depends on: `BGFX_CAPS_TEXTURE_BLIT`.
 	/// 
 	/// </summary>
 	///
@@ -5877,7 +5986,6 @@ public static class bgfx
 	/// 
 	/// @attention Destination buffer must be created with `BGFX_BUFFER_COMPUTE_WRITE`, or
 	///   `BGFX_BUFFER_DRAW_INDIRECT` flag.
-	/// @attention Availability depends on: `BGFX_CAPS_TEXTURE_BLIT`.
 	/// 
 	/// </summary>
 	///
@@ -5903,7 +6011,6 @@ public static class bgfx
 	/// @attention Source buffer must be created with one of `BGFX_BUFFER_COMPUTE_*`, or
 	///   `BGFX_BUFFER_DRAW_INDIRECT` flags.
 	/// @attention Destination texture must be created with `BGFX_TEXTURE_BLIT_DST` flag.
-	/// @attention Availability depends on: `BGFX_CAPS_TEXTURE_BLIT`.
 	/// 
 	/// </summary>
 	///

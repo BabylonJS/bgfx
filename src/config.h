@@ -359,6 +359,10 @@
 #	endif // BGFX_CONFIG_DYNAMIC_FRAME_STORAGE
 #endif //  BGFX_CONFIG_MAX_RECT_CACHE
 
+#ifndef BGFX_CONFIG_MAX_DEPTH_BIAS_CACHE
+#	define BGFX_CONFIG_MAX_DEPTH_BIAS_CACHE (4<<10)
+#endif //  BGFX_CONFIG_MAX_DEPTH_BIAS_CACHE
+
 /// Number of bits used for depth in the sort key. Default is 32.
 /// Reducing this allows more bits for other sort key fields.
 #ifndef BGFX_CONFIG_SORT_KEY_NUM_BITS_DEPTH
@@ -602,14 +606,14 @@ static_assert(BGFX_CONFIG_MAX_VERTEX_STREAMS < 32, "Must be less than 32!");
 #endif // BGFX_CONFIG_DEFAULT_MAX_ENCODERS
 
 /// Maximum number of back buffers for swap chain. Default is 4.
-/// The actual number used is specified via bgfx::Resolution::numBackBuffers.
+/// The actual number used is specified via bgfx::SwapChain::numBackBuffers.
 #ifndef BGFX_CONFIG_MAX_BACK_BUFFERS
 #	define BGFX_CONFIG_MAX_BACK_BUFFERS 4
 #endif // BGFX_CONFIG_MAX_BACK_BUFFERS
 
 /// Maximum frame latency (number of frames that can be queued ahead).
 /// Default is 3. The actual value is specified via
-/// bgfx::Resolution::maxFrameLatency.
+/// bgfx::SwapChain::maxFrameLatency.
 #ifndef BGFX_CONFIG_MAX_FRAME_LATENCY
 #	define BGFX_CONFIG_MAX_FRAME_LATENCY 3
 #endif // BGFX_CONFIG_MAX_FRAME_LATENCY

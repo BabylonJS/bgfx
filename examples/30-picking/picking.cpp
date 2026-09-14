@@ -38,12 +38,12 @@ public:
 		bgfx::Init init;
 		init.type     = args.m_type;
 		init.vendorId = args.m_pciId;
-		init.platformData.nwh  = entry::getNativeWindowHandle(entry::kDefaultWindowHandle);
-		init.platformData.ndt  = entry::getNativeDisplayHandle();
+		init.swapChain.nwh     = entry::getNativeWindowHandle(entry::kDefaultWindowHandle);
+		init.swapChain.ndt     = entry::getNativeDisplayHandle();
 		init.platformData.type = entry::getNativeWindowHandleType();
-		init.resolution.width  = m_width;
-		init.resolution.height = m_height;
-		init.resolution.reset  = m_reset;
+		init.swapChain.width  = m_width;
+		init.swapChain.height = m_height;
+		init.reset  = m_reset;
 		bgfx::init(init);
 
 		// Enable debug text.
@@ -207,16 +207,10 @@ public:
 				, uint16_t(m_height)
 				);
 
+			showExampleDialog(this);
+
 			const bgfx::Caps* caps = bgfx::getCaps();
-			bool blitSupport = 0 != (caps->supported & BGFX_CAPS_TEXTURE_BLIT);
 
-			showExampleDialog(this
-				, !blitSupport
-				? "BGFX_CAPS_TEXTURE_BLIT is not supported."
-				: NULL
-				);
-
-			if (blitSupport)
 			{
 				ImGui::SetNextWindowPos(
 					  ImVec2(m_width - m_width / 5.0f - 10.0f, 10.0f)
