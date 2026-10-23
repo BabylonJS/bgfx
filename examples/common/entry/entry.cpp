@@ -30,6 +30,8 @@ namespace entry
 	static uint32_t s_height = ENTRY_DEFAULT_HEIGHT;
 	static bool s_exit = false;
 
+	WindowState s_window[ENTRY_CONFIG_MAX_WINDOWS];
+
 	static void resetMainWindow(uint32_t _width, uint32_t _height, uint32_t _reset)
 	{
 		constexpr uint32_t kSwapChainFlags = 0
@@ -45,6 +47,7 @@ namespace entry
 		swapChain.width  = _width;
 		swapChain.height = _height;
 		swapChain.flags  = _reset &  kSwapChainFlags;
+		swapChain.nwh    = s_window[0].m_nwh;
 
 		bgfx::reset(_reset & ~kSwapChainFlags, &swapChain);
 	}
@@ -803,8 +806,6 @@ restart:
 		return result;
 	}
 
-	WindowState s_window[ENTRY_CONFIG_MAX_WINDOWS];
-
 	bool processEvents(uint32_t& _width, uint32_t& _height, uint32_t& _debug, uint32_t& _reset, MouseState* _mouse)
 	{
 		bool needReset = s_reset != _reset;
@@ -902,9 +903,34 @@ restart:
 					break;
 
 				case Event::Window:
+					{
+						const WindowEvent* window = static_cast<const WindowEvent*>(ev);
+						if (0 == window->m_handle.idx)
+						{
+							WindowState& win = s_window[0];
+
+							if (NULL != window->m_nwh
+							&&  win.m_nwh != window->m_nwh)
+							{
+								handle    = window->m_handle;
+								needReset = true;
+							}
+
+							win.m_handle = window->m_handle;
+							win.m_nwh    = window->m_nwh;
+						}
+					}
 					break;
 
 				case Event::Suspend:
+					{
+						const SuspendEvent* suspend = static_cast<const SuspendEvent*>(ev);
+
+						if (Suspend::DidSuspend == suspend->m_state)
+						{
+							inputReleaseKeys();
+						}
+					}
 					break;
 
 				case Event::DropFile:
@@ -1069,6 +1095,14 @@ restart:
 					break;
 
 				case Event::Suspend:
+					{
+						const SuspendEvent* suspend = static_cast<const SuspendEvent*>(ev);
+
+						if (Suspend::DidSuspend == suspend->m_state)
+						{
+							inputReleaseKeys();
+						}
+					}
 					break;
 
 				case Event::DropFile:

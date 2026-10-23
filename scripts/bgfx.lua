@@ -71,6 +71,9 @@ function bgfxProjectBase(_kind, _defines)
 
 		configuration { "android*" }
 			targetextension ".so"
+			linkoptions {
+				"-shared",
+			}
 
 		configuration { "android*" ,"Debug"}
 			linkoptions {
@@ -135,6 +138,9 @@ function bgfxProjectBase(_kind, _defines)
 			"-Wno-microsoft-enum-value", -- enumerator value is not representable in the underlying type 'int'
 			"-Wno-microsoft-const-init", -- default initialization of an object of const type '' without a user-provided default constructor is a Microsoft extension
 		}
+
+	configuration { "ios* or tvos* or xros*" }
+		buildoptions { "-x objective-c++" }
 
 	configuration { "osx*" }
 		buildoptions { "-x objective-c++" }  -- additional build option for osx

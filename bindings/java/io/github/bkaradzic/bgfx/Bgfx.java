@@ -646,7 +646,7 @@ public final class Bgfx {
 	 * <strong>Attention:</strong> This call doesn’t change the window size, it just resizes
 	 *   the back-buffer. Your windowing code controls the window size.
 	 * @param _flags See: {@code BGFX_RESET_*} for more info.   - {@code BGFX_RESET_NONE} - No reset flags.   - {@code BGFX_RESET_VSYNC} - Enable V-Sync.   - {@code BGFX_RESET_MAXANISOTROPY} - Turn on/off max anisotropy.   - {@code BGFX_RESET_CAPTURE} - Begin screen capture.   - {@code BGFX_RESET_FLUSH_AFTER_RENDER} - Flush rendering after submitting to GPU.   - {@code BGFX_RESET_FLIP_AFTER_RENDER} - This flag  specifies where flip     occurs. Default behaviour is that flip occurs before rendering new     frame. This flag only has effect when {@code BGFX_CONFIG_MULTITHREADED=0}.   - {@code BGFX_RESET_LOW_LATENCY_ON} - Enable low latency mode (NVIDIA Reflex).     Availability depends on: {@code BGFX_CAPS_LOW_LATENCY}.   - {@code BGFX_RESET_LOW_LATENCY_BOOST} - Enable low latency mode, and keep GPU     clocks high even when GPU is mostly idle. Availability depends on:     {@code BGFX_CAPS_LOW_LATENCY}. Set either {@code BGFX_RESET_LOW_LATENCY_ON} or     {@code BGFX_RESET_LOW_LATENCY_BOOST}, not both. Per-surface settings are not here. {@code BGFX_SWAP_CHAIN_*} flags belong on {@code SwapChain.flags}, and are ignored if passed here.
-	 * @param _swapChain Main window swap chain. When {@code NULL} the main window is left untouched and only the device and frame globals above are applied, which is what an application driving its own swap chains wants. Otherwise the main window takes on this description: resize it, change its format, or change its per-surface flags. Fields left neutral keep their current value, and {@code nwh}/{@code ndt} are ignored -- main's are bgfx's own. Must be {@code NULL} when {@code init} created no main window.
+	 * @param _swapChain Main window swap chain. When {@code NULL} the main window is left untouched and only the device and frame globals above are applied, which is what an application driving its own swap chains wants. Otherwise the main window takes on this description: resize it, change its format, or change its per-surface flags. Fields left neutral keep their current value. A new {@code nwh} moves the main window to another native window: the renderer recreates the main swap chain for it and keeps the device, context and every GPU resource. {@code ndt} must stay what {@code init} received. Must be {@code NULL} when {@code init} created no main window.
 	 */
 	public static void reset(@Unsigned int _flags, @Nullable SwapChain _swapChain) {
 		try {
@@ -2435,7 +2435,7 @@ public final class Bgfx {
 	/**
 	 * Set shader uniform parameter for frame.
 	 * <p>
-	 * <strong>Attention:</strong> Uniform must be created with {@code UniformFreq.VIEW} argument.
+	 * <strong>Attention:</strong> Uniform must be created with {@code UniformFreq.FRAME} argument.
 	 * @param _handle Uniform.
 	 * @param _value Pointer to uniform data.
 	 * @param _num Number of elements. Passing {@code UINT16_MAX} will use the _num passed on uniform creation.
@@ -5040,29 +5040,49 @@ public final class Bgfx {
 		public static final int TextureFramebuffer = 0x00001000;
 
 		/**
-		 * Texture format can be used as MSAA frame buffer.
-		 */
-		public static final int TextureFramebufferMsaa = 0x00002000;
-
-		/**
 		 * Texture can be sampled as MSAA.
 		 */
-		public static final int TextureMsaa = 0x00004000;
+		public static final int TextureMsaa = 0x00002000;
 
 		/**
 		 * Texture format supports auto-generated mips.
 		 */
-		public static final int TextureMipAutogen = 0x00008000;
+		public static final int TextureMipAutogen = 0x00004000;
 
 		/**
 		 * Texture format can be used as back buffer format.
 		 */
-		public static final int TextureBackbuffer = 0x00010000;
+		public static final int TextureBackbuffer = 0x00008000;
 
 		/**
 		 * Texture format can be used as video decode destination.
 		 */
-		public static final int TextureVideoDecodeDst = 0x00020000;
+		public static final int TextureVideoDecodeDst = 0x00010000;
+
+		/**
+		 * Texture format can be used as MSAA frame buffer with 2 samples.
+		 */
+		public static final int TextureFramebufferMsaaX2 = 0x00020000;
+
+		/**
+		 * Texture format can be used as MSAA frame buffer with 4 samples.
+		 */
+		public static final int TextureFramebufferMsaaX4 = 0x00040000;
+
+		/**
+		 * Texture format can be used as MSAA frame buffer with 8 samples.
+		 */
+		public static final int TextureFramebufferMsaaX8 = 0x00080000;
+
+		/**
+		 * Texture format can be used as MSAA frame buffer with 16 samples.
+		 */
+		public static final int TextureFramebufferMsaaX16 = 0x00100000;
+
+		/**
+		 * Texture format can be used as MSAA frame buffer with any sample count.
+		 */
+		public static final int TextureFramebufferMsaa = 0x001e0000;
 	}
 
 	/**
@@ -6999,8 +7019,10 @@ public final class Bgfx {
 		 *     and written to.
 		 *   - {@code BGFX_CAPS_FORMAT_TEXTURE_FRAMEBUFFER} - Texture format can be used as frame
 		 *     buffer.
-		 *   - {@code BGFX_CAPS_FORMAT_TEXTURE_FRAMEBUFFER_MSAA} - Texture format can be used as MSAA
-		 *     frame buffer.
+		 *   - {@code BGFX_CAPS_FORMAT_TEXTURE_FRAMEBUFFER_MSAA_X2}, {@code _X4}, {@code _X8}, {@code _X16} - Texture
+		 *     format can be used as MSAA frame buffer with that many samples. A
+		 *     {@code BGFX_TEXTURE_RT_MSAA_X*} request is clamped to the highest one set.
+		 *     {@code BGFX_CAPS_FORMAT_TEXTURE_FRAMEBUFFER_MSAA} is the mask of all of them.
 		 *   - {@code BGFX_CAPS_FORMAT_TEXTURE_MSAA} - Texture can be sampled as MSAA.
 		 *   - {@code BGFX_CAPS_FORMAT_TEXTURE_MIP_AUTOGEN} - Texture format supports auto-generated
 		 *     mips.

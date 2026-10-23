@@ -788,20 +788,32 @@ constdef CapsFormatFlags : inline uint
 	// Texture format can be used as frame buffer.
 	TEXTUREFRAMEBUFFER     = 0x00001000,
 
-	// Texture format can be used as MSAA frame buffer.
-	TEXTUREFRAMEBUFFERMSAA = 0x00002000,
-
 	// Texture can be sampled as MSAA.
-	TEXTUREMSAA            = 0x00004000,
+	TEXTUREMSAA            = 0x00002000,
 
 	// Texture format supports auto-generated mips.
-	TEXTUREMIPAUTOGEN      = 0x00008000,
+	TEXTUREMIPAUTOGEN      = 0x00004000,
 
 	// Texture format can be used as back buffer format.
-	TEXTUREBACKBUFFER      = 0x00010000,
+	TEXTUREBACKBUFFER      = 0x00008000,
 
 	// Texture format can be used as video decode destination.
-	TEXTUREVIDEODECODEDST  = 0x00020000,
+	TEXTUREVIDEODECODEDST  = 0x00010000,
+
+	// Texture format can be used as MSAA frame buffer with 2 samples.
+	TEXTUREFRAMEBUFFERMSAAX2 = 0x00020000,
+
+	// Texture format can be used as MSAA frame buffer with 4 samples.
+	TEXTUREFRAMEBUFFERMSAAX4 = 0x00040000,
+
+	// Texture format can be used as MSAA frame buffer with 8 samples.
+	TEXTUREFRAMEBUFFERMSAAX8 = 0x00080000,
+
+	// Texture format can be used as MSAA frame buffer with 16 samples.
+	TEXTUREFRAMEBUFFERMSAAX16 = 0x00100000,
+
+	// Texture format can be used as MSAA frame buffer with any sample count.
+	TEXTUREFRAMEBUFFERMSAA = 0x001e0000,
 }
 
 constdef CapsVideoCodecFlags : inline uint
@@ -1779,8 +1791,10 @@ struct Caps
 	//     and written to.
 	//   - `BGFX_CAPS_FORMAT_TEXTURE_FRAMEBUFFER` - Texture format can be used as frame
 	//     buffer.
-	//   - `BGFX_CAPS_FORMAT_TEXTURE_FRAMEBUFFER_MSAA` - Texture format can be used as MSAA
-	//     frame buffer.
+	//   - `BGFX_CAPS_FORMAT_TEXTURE_FRAMEBUFFER_MSAA_X2`, `_X4`, `_X8`, `_X16` - Texture
+	//     format can be used as MSAA frame buffer with that many samples. A
+	//     `BGFX_TEXTURE_RT_MSAA_X*` request is clamped to the highest one set.
+	//     `BGFX_CAPS_FORMAT_TEXTURE_FRAMEBUFFER_MSAA` is the mask of all of them.
 	//   - `BGFX_CAPS_FORMAT_TEXTURE_MSAA` - Texture can be sampled as MSAA.
 	//   - `BGFX_CAPS_FORMAT_TEXTURE_MIP_AUTOGEN` - Texture format supports auto-generated
 	//     mips.
@@ -2539,7 +2553,7 @@ extern fn void shutdown() @cname("bgfx_shutdown");
 //   the back-buffer. Your windowing code controls the window size.
 // 
 // _flags : `See: `BGFX_RESET_*` for more info.   - `BGFX_RESET_NONE` - No reset flags.   - `BGFX_RESET_VSYNC` - Enable V-Sync.   - `BGFX_RESET_MAXANISOTROPY` - Turn on/off max anisotropy.   - `BGFX_RESET_CAPTURE` - Begin screen capture.   - `BGFX_RESET_FLUSH_AFTER_RENDER` - Flush rendering after submitting to GPU.   - `BGFX_RESET_FLIP_AFTER_RENDER` - This flag  specifies where flip     occurs. Default behaviour is that flip occurs before rendering new     frame. This flag only has effect when `BGFX_CONFIG_MULTITHREADED=0`.   - `BGFX_RESET_LOW_LATENCY_ON` - Enable low latency mode (NVIDIA Reflex).     Availability depends on: `BGFX_CAPS_LOW_LATENCY`.   - `BGFX_RESET_LOW_LATENCY_BOOST` - Enable low latency mode, and keep GPU     clocks high even when GPU is mostly idle. Availability depends on:     `BGFX_CAPS_LOW_LATENCY`. Set either `BGFX_RESET_LOW_LATENCY_ON` or     `BGFX_RESET_LOW_LATENCY_BOOST`, not both. Per-surface settings are not here. `BGFX_SWAP_CHAIN_*` flags belong on `SwapChain::flags`, and are ignored if passed here.`
-// _swapChain : `Main window swap chain. When `NULL` the main window is left untouched and only the device and frame globals above are applied, which is what an application driving its own swap chains wants. Otherwise the main window takes on this description: resize it, change its format, or change its per-surface flags. Fields left neutral keep their current value, and `nwh`/`ndt` are ignored -- main's are bgfx's own. Must be `NULL` when `bgfx::init` created no main window.`
+// _swapChain : `Main window swap chain. When `NULL` the main window is left untouched and only the device and frame globals above are applied, which is what an application driving its own swap chains wants. Otherwise the main window takes on this description: resize it, change its format, or change its per-surface flags. Fields left neutral keep their current value. A new `nwh` moves the main window to another native window: the renderer recreates the main swap chain for it and keeps the device, context and every GPU resource. `ndt` must stay what `bgfx::init` received. Must be `NULL` when `bgfx::init` created no main window.`
 extern fn void reset(uint _flags, SwapChain* _swapChain) @cname("bgfx_reset");
 
 // Advance to next frame. This is the main frame-advancement call on the
@@ -3494,7 +3508,7 @@ extern fn void set_view_uniform(ushort _id, UniformHandle _handle, void* _value,
 
 // Set shader uniform parameter for frame.
 // 
-// @attention Uniform must be created with `bgfx::UniformFreq::View` argument.
+// @attention Uniform must be created with `bgfx::UniformFreq::Frame` argument.
 // 
 // _handle : `Uniform.`
 // _value : `Pointer to uniform data.`

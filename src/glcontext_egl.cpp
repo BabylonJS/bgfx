@@ -978,8 +978,6 @@ WL_EGL_IMPORT
 
 	void GlContext::resize(const SwapChain& _swapChain, uint32_t _reset)
 	{
-		BX_UNUSED(_swapChain);
-
 		if (!m_ownsContext
 		&&  m_context == eglGetCurrentContext() )
 		{
@@ -987,14 +985,48 @@ WL_EGL_IMPORT
 			m_readSurface = eglGetCurrentSurface(EGL_READ);
 		}
 
+		const bool hasWindow = true
+			&& m_ownsContext
+			&& NULL != m_display
+			&& NULL != m_nwh
+			&& NULL != _swapChain.nwh
+			;
+
+		bool recreateSurface = hasWindow
+			&& m_nwh != _swapChain.nwh
+			;
+
 #	if BX_PLATFORM_ANDROID
-		if (m_ownsContext
-		&&  NULL != m_display
-		&&  NULL != m_nwh)
+		recreateSurface |= hasWindow;
+#	endif // BX_PLATFORM_ANDROID
+
+		if (recreateSurface)
 		{
-			EGLNativeWindowType nwh = (EGLNativeWindowType )m_nwh;
+			BX_TRACE("EGL window changed: %p -> %p", m_nwh, _swapChain.nwh);
+			m_nwh = _swapChain.nwh;
+
 			eglMakeCurrent(m_display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
 			eglDestroySurface(m_display, m_surface);
+
+			EGLNativeWindowType nwh = (EGLNativeWindowType)m_nwh;
+
+#	if BX_PLATFORM_LINUX
+			if (NULL != m_eglWindow)
+			{
+				wl_egl_window_destroy(m_eglWindow);
+				m_eglWindow = NULL;
+			}
+
+			if (g_platformData.type == NativeWindowHandleType::Wayland)
+			{
+				m_eglWindow = wl_egl_window_create(
+					  (wl_surface*)nwh
+					, _swapChain.width
+					, _swapChain.height
+					);
+				nwh = (EGLNativeWindowType)m_eglWindow;
+			}
+#	endif // BX_PLATFORM_LINUX
 
 			m_surface = eglCreateWindowSurface(m_display, m_config, nwh, NULL);
 			BGFX_FATAL(m_surface != EGL_NO_SURFACE, Fatal::UnableToInitialize, "Failed to create surface.");
@@ -1002,7 +1034,11 @@ WL_EGL_IMPORT
 
 			EGLBoolean success = eglMakeCurrent(m_display, m_surface, m_surface, m_context);
 			BGFX_FATAL(success, Fatal::UnableToInitialize, "Failed to set context.");
+		}
 
+#	if BX_PLATFORM_ANDROID
+		if (hasWindow)
+		{
 			EGLint format;
 			eglGetConfigAttrib(m_display, m_config, EGL_NATIVE_VISUAL_ID, &format);
 			ANativeWindow_setBuffersGeometry(
@@ -1038,7 +1074,7 @@ WL_EGL_IMPORT
 		if (NULL != m_display
 		&&  EGL_NO_SURFACE != m_surface)
 		{
-			EGL_CHECK(eglSwapInterval(m_display, m_swapInterval) );
+			eglSwapInterval(m_display, m_swapInterval);
 		}
 	}
 
@@ -1080,9 +1116,21 @@ WL_EGL_IMPORT
 		bx::deleteObject(g_allocator, _swapChain);
 	}
 
-	void GlContext::swap(SwapChainGL* _swapChain)
+	void GlContext::swap(SwapChainGL* _swapChain, bool _vsync)
 	{
 		makeCurrent(_swapChain);
+
+		const bool noWait = true
+			&& !_vsync
+			&& 0 != m_swapInterval
+			&& NULL != m_display
+			&& (NULL != _swapChain || EGL_NO_SURFACE != m_surface)
+			;
+
+		if (noWait)
+		{
+			eglSwapInterval(m_display, 0);
+		}
 
 		if (NULL == _swapChain)
 		{
@@ -1095,6 +1143,11 @@ WL_EGL_IMPORT
 		else
 		{
 			_swapChain->swapBuffers();
+		}
+
+		if (noWait)
+		{
+			eglSwapInterval(m_display, m_swapInterval);
 		}
 	}
 
@@ -1123,7 +1176,7 @@ WL_EGL_IMPORT
 			if (NULL != m_display
 			&&  (NULL != _swapChain || EGL_NO_SURFACE != m_surface) )
 			{
-				EGL_CHECK(eglSwapInterval(m_display, m_swapInterval) );
+				eglSwapInterval(m_display, m_swapInterval);
 			}
 		}
 	}
