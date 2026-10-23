@@ -1465,6 +1465,7 @@ namespace bgfx { namespace d3d12
 				m_scd.nwh             = _init.swapChain.nwh;
 				m_scd.ndt             = _init.swapChain.ndt;
 				m_scd.windowed        = true;
+				m_scd.hdr10           = 0 != (_init.swapChain.flags & BGFX_SWAP_CHAIN_HDR10);
 
 				m_backBufferColorIdx = m_scd.bufferCount-1;
 
@@ -1930,6 +1931,29 @@ namespace bgfx { namespace d3d12
 								else
 								{
 									BX_TRACE("CheckFeatureSupport depth srv failed with %x for format %s.", hr, getName(TextureFormat::Enum(ii)));
+								}
+							}
+						}
+
+						if (0 != (support & BGFX_CAPS_FORMAT_TEXTURE_FRAMEBUFFER_MSAA) )
+						{
+							support &= ~BGFX_CAPS_FORMAT_TEXTURE_FRAMEBUFFER_MSAA;
+
+							for (uint32_t jj = 1; jj < BX_COUNTOF(s_checkMsaa); ++jj)
+							{
+								D3D12_FEATURE_DATA_MULTISAMPLE_QUALITY_LEVELS msaaData =
+								{
+									.Format           = fmt,
+									.SampleCount      = s_checkMsaa[jj],
+									.Flags            = D3D12_MULTISAMPLE_QUALITY_LEVELS_FLAG_NONE,
+									.NumQualityLevels = 0,
+								};
+								hr = m_device->CheckFeatureSupport(D3D12_FEATURE_MULTISAMPLE_QUALITY_LEVELS, &msaaData, sizeof(msaaData) );
+
+								if (SUCCEEDED(hr)
+								&&  0 < msaaData.NumQualityLevels)
+								{
+									support |= BGFX_CAPS_FORMAT_TEXTURE_FRAMEBUFFER_MSAA_X2 << (jj - 1);
 								}
 							}
 						}
@@ -3246,7 +3270,6 @@ namespace bgfx { namespace d3d12
 				&&  0 < data.NumQualityLevels)
 				{
 					s_msaa[ii].Count   = data.SampleCount;
-					s_msaa[ii].Quality = data.NumQualityLevels-1;
 					last = ii;
 				}
 				else
@@ -3308,8 +3331,15 @@ namespace bgfx { namespace d3d12
 			|| (m_reset&maskFlags)   != (_reset&maskFlags) )
 			{
 				uint32_t flags = _reset & (~BGFX_RESET_INTERNAL_FORCE);
+
+				const bool newWindow = false
+					|| m_mainSwapChain.nwh != _swapChain.nwh
+					|| m_mainSwapChain.ndt != _swapChain.ndt
+					;
+
 				bool resize = true
 					&& BX_ENABLED(BX_PLATFORM_WINDOWS || BX_PLATFORM_WINRT)
+					&& !newWindow
 					&& (m_mainSwapChain.flags&BGFX_SWAP_CHAIN_MSAA_MASK) == (_swapChain.flags&BGFX_SWAP_CHAIN_MSAA_MASK)
 					;
 
@@ -3322,6 +3352,7 @@ namespace bgfx { namespace d3d12
 				m_scd.width  = _swapChain.width;
 				m_scd.height = _swapChain.height;
 				m_scd.format = s_textureFormat[_swapChain.formatColor].m_fmt;
+				m_scd.hdr10  = 0 != (_swapChain.flags & BGFX_SWAP_CHAIN_HDR10);
 
 				preReset();
 
@@ -3347,6 +3378,12 @@ namespace bgfx { namespace d3d12
 
 						DX_RELEASE(mainFrameBuffer().m_swapChain, 0);
 
+						if (newWindow)
+						{
+							m_scd.nwh = _swapChain.nwh;
+							m_scd.ndt = _swapChain.ndt;
+						}
+
 						HRESULT hr;
 #if BX_PLATFORM_LINUX
 						hr = E_FAIL;
@@ -3358,6 +3395,18 @@ namespace bgfx { namespace d3d12
 							);
 #endif // BX_PLATFORM_LINUX
 						BGFX_FATAL(SUCCEEDED(hr), bgfx::Fatal::UnableToInitialize, "Failed to create swap chain.");
+
+						mainFrameBuffer().m_nwh = m_scd.nwh;
+
+#if BX_PLATFORM_WINDOWS
+						if (newWindow)
+						{
+							DX_CHECK(m_dxgi.m_factory->MakeWindowAssociation( (HWND)m_scd.nwh, 0
+								| DXGI_MWA_NO_WINDOW_CHANGES
+								| DXGI_MWA_NO_ALT_ENTER
+								) );
+						}
+#endif // BX_PLATFORM_WINDOWS
 					}
 
 					mainFrameBuffer().m_swapChainFormat = m_scd.format;
@@ -4207,10 +4256,7 @@ namespace bgfx { namespace d3d12
 						? frameBuffer.m_texture[0]
 						: frameBuffer.m_depth
 						;
-					const uint64_t flags = m_textures[th.idx].m_flags;
-					const uint32_t msaaQuality = bx::satSub<uint32_t>(uint32_t( (flags & BGFX_TEXTURE_RT_MSAA_MASK) >> BGFX_TEXTURE_RT_MSAA_SHIFT), 1u);
-
-					desc.SampleDesc = s_msaa[msaaQuality];
+					desc.SampleDesc = m_textures[th.idx].m_sampleDesc;
 				}
 			}
 
@@ -5952,12 +5998,12 @@ namespace bgfx { namespace d3d12
 
 		if (UINT32_MAX != _draw.m_streamMask)
 		{
-			for (BitMaskToIndexIteratorT it(_draw.m_streamMask)
+			for (bx::BitMaskToIndexIteratorT it(_draw.m_streamMask)
 				; !it.isDone()
 				; it.next(), numStreams++
 				)
 			{
-				const uint8_t idx = it.idx;
+				const uint8_t idx = it.getIndex();
 				const Stream& stream = _draw.m_stream[idx];
 
 				uint16_t handle = stream.m_handle.idx;
@@ -6909,10 +6955,11 @@ namespace bgfx { namespace d3d12
 			const bool blit           = 0 != (m_flags & BGFX_TEXTURE_BLIT_DST);
 			const bool externalShared = 0 != (m_flags & BGFX_TEXTURE_EXTERNAL_SHARED);
 
-			const uint32_t msaaQuality = bx::satSub<uint32_t>(uint32_t( (m_flags & BGFX_TEXTURE_RT_MSAA_MASK) >> BGFX_TEXTURE_RT_MSAA_SHIFT ), 1u);
-			const DXGI_SAMPLE_DESC& msaa = s_msaa[msaaQuality];
-
 			const bool depth = bimg::isDepth(bimg::TextureFormat::Enum(m_textureFormat) );
+
+			m_sampleDesc = { getTextureMsaaSamples(TextureFormat::Enum(m_textureFormat), m_flags), 0 };
+
+			const DXGI_SAMPLE_DESC& msaa = m_sampleDesc;
 
 			const bool needResolve = true
 				&& 1 < msaa.Count
@@ -6947,13 +6994,14 @@ namespace bgfx { namespace d3d12
 							const uint32_t size  = slice*mip.m_depth;
 
 							uint8_t* temp = (uint8_t*)bx::alloc(g_allocator, size);
-							bimg::imageDecodeToBgra8(
-								  g_allocator
-								, temp
+							imageDecodeToBgra8(
+								  temp
 								, mip.m_data
 								, mip.m_width
 								, mip.m_height
+								, mip.m_depth
 								, pitch
+								, slice
 								, mip.m_format
 								);
 
@@ -7597,8 +7645,8 @@ namespace bgfx { namespace d3d12
 		if (convert)
 		{
 			copyPitch = rectPitch;
-			temp = (uint8_t*)bx::alloc(g_allocator, slicePitch);
-			bimg::imageDecodeToBgra8(g_allocator, temp, srcData, _rect.m_width, _rect.m_height, copyPitch, bimg::TextureFormat::Enum(m_requestedFormat) );
+			temp = (uint8_t*)bx::alloc(g_allocator, slicePitch*_depth);
+			imageDecodeToBgra8(temp, srcData, _rect.m_width, _rect.m_height, _depth, copyPitch, slicePitch, bimg::TextureFormat::Enum(m_requestedFormat) );
 			srcData = temp;
 
 			box.right  = bx::clamp<uint32_t>(box.right,  box.left, bx::max(1u, m_width  >> _mip) - _rect.m_x);
@@ -7651,9 +7699,7 @@ namespace bgfx { namespace d3d12
 
 		const uint32_t dstSlicePitch = rowPitch  * numRows;
 		const uint32_t srcSlicePitch = copyPitch * numRows;
-		const uint32_t numSlices     = convert ? 1 : _depth;
-
-		for (uint32_t zz = 0; zz < numSlices; ++zz)
+		for (uint32_t zz = 0; zz < _depth; ++zz)
 		{
 			bx::memCopy(dstData + zz*dstSlicePitch, rowPitch, srcData + zz*srcSlicePitch, copyPitch, rectPitch, numRows);
 		}
@@ -7770,9 +7816,8 @@ namespace bgfx { namespace d3d12
 
 	bool TextureD3D12::isMsaaSurface() const
 	{
-		const uint32_t msaaQuality = bx::satSub<uint32_t>(uint32_t( (m_flags&BGFX_TEXTURE_RT_MSAA_MASK) >> BGFX_TEXTURE_RT_MSAA_SHIFT), 1u);
 		return true
-			&& 1  < s_msaa[msaaQuality].Count
+			&& 1  < m_sampleDesc.Count
 			&& 0 != (m_flags & BGFX_TEXTURE_MSAA_SAMPLE)
 			&& !bimg::isDepth(bimg::TextureFormat::Enum(m_textureFormat) )
 			;
@@ -7780,8 +7825,7 @@ namespace bgfx { namespace d3d12
 
 	bool TextureD3D12::isMultisampled() const
 	{
-		const uint32_t msaaQuality = bx::satSub<uint32_t>(uint32_t( (m_flags&BGFX_TEXTURE_RT_MSAA_MASK) >> BGFX_TEXTURE_RT_MSAA_SHIFT), 1u);
-		return 1 < s_msaa[msaaQuality].Count;
+		return 1 < m_sampleDesc.Count;
 	}
 
 	uint32_t TextureD3D12::getNumSlices() const
@@ -8108,6 +8152,7 @@ namespace bgfx { namespace d3d12
 		scd.nwh        = m_desc.nwh;
 		scd.ndt        = m_desc.ndt;
 		scd.sampleDesc = s_msaa[(m_desc.flags&BGFX_SWAP_CHAIN_MSAA_MASK)>>BGFX_SWAP_CHAIN_MSAA_SHIFT];
+		scd.hdr10      = 0 != (m_desc.flags & BGFX_SWAP_CHAIN_HDR10);
 		scd.waitable   = true;
 
 		return scd;
@@ -8166,7 +8211,9 @@ namespace bgfx { namespace d3d12
 			return;
 		}
 
+#if BX_PLATFORM_WINDOWS
 		const SwapChain prev = m_desc;
+#endif // BX_PLATFORM_WINDOWS
 
 		m_desc = _desc;
 		m_nwh  = _desc.nwh;
@@ -8414,6 +8461,8 @@ namespace bgfx { namespace d3d12
 			DX_RELEASE(m_backBufferDepthStencil, 0);
 			DX_RELEASE(m_msaaRt, 0);
 		}
+#else
+		BX_UNUSED(_defer);
 #endif // BX_PLATFORM_WINDOWS
 	}
 
@@ -8515,8 +8564,7 @@ namespace bgfx { namespace d3d12
 						m_height = bx::max<uint32_t>(1, uint32_t(desc.Height) >> at.mip);
 					}
 
-					const uint32_t msaaQuality = bx::satSub<uint32_t>(uint32_t( (texture.m_flags & BGFX_TEXTURE_RT_MSAA_MASK) >> BGFX_TEXTURE_RT_MSAA_SHIFT ), 1u);
-					const DXGI_SAMPLE_DESC& msaa = s_msaa[msaaQuality];
+					const DXGI_SAMPLE_DESC& msaa = texture.m_sampleDesc;
 
 					if (bimg::isDepth(bimg::TextureFormat::Enum(texture.m_textureFormat) ) )
 					{
@@ -8995,7 +9043,7 @@ namespace bgfx { namespace d3d12
 
 		m_handle[m_control.m_current] = _handle;
 		_commandList->BeginQuery(m_queryHeap
-			, D3D12_QUERY_TYPE_BINARY_OCCLUSION
+			, D3D12_QUERY_TYPE_OCCLUSION
 			, _handle.idx
 			);
 	}
@@ -9005,11 +9053,11 @@ namespace bgfx { namespace d3d12
 		const uint32_t idx = m_control.m_current;
 		OcclusionQueryHandle handle = m_handle[idx];
 		_commandList->EndQuery(m_queryHeap
-			, D3D12_QUERY_TYPE_BINARY_OCCLUSION
+			, D3D12_QUERY_TYPE_OCCLUSION
 			, handle.idx
 			);
 		_commandList->ResolveQueryData(m_queryHeap
-			, D3D12_QUERY_TYPE_BINARY_OCCLUSION
+			, D3D12_QUERY_TYPE_OCCLUSION
 			, handle.idx
 			, 1
 			, m_readback
@@ -10414,12 +10462,12 @@ namespace bgfx { namespace d3d12
 					uint8_t numStreams = 0;
 					if (UINT32_MAX != draw.m_streamMask)
 					{
-						for (BitMaskToIndexIteratorT it(draw.m_streamMask)
+						for (bx::BitMaskToIndexIteratorT it(draw.m_streamMask)
 							; !it.isDone()
 							; it.next(), numStreams++
 							)
 						{
-							const uint8_t idx = it.idx;
+							const uint8_t idx = it.getIndex();
 
 							currentState.m_stream[idx].m_layoutHandle = draw.m_stream[idx].m_layoutHandle;
 							currentState.m_stream[idx].m_handle       = draw.m_stream[idx].m_handle;

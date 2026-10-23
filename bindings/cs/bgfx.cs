@@ -1241,29 +1241,49 @@ public static partial class bgfx
 		TextureFramebuffer     = 0x00001000,
 	
 		/// <summary>
-		/// Texture format can be used as MSAA frame buffer.
-		/// </summary>
-		TextureFramebufferMsaa = 0x00002000,
-	
-		/// <summary>
 		/// Texture can be sampled as MSAA.
 		/// </summary>
-		TextureMsaa            = 0x00004000,
+		TextureMsaa            = 0x00002000,
 	
 		/// <summary>
 		/// Texture format supports auto-generated mips.
 		/// </summary>
-		TextureMipAutogen      = 0x00008000,
+		TextureMipAutogen      = 0x00004000,
 	
 		/// <summary>
 		/// Texture format can be used as back buffer format.
 		/// </summary>
-		TextureBackbuffer      = 0x00010000,
+		TextureBackbuffer      = 0x00008000,
 	
 		/// <summary>
 		/// Texture format can be used as video decode destination.
 		/// </summary>
-		TextureVideoDecodeDst  = 0x00020000,
+		TextureVideoDecodeDst  = 0x00010000,
+	
+		/// <summary>
+		/// Texture format can be used as MSAA frame buffer with 2 samples.
+		/// </summary>
+		TextureFramebufferMsaaX2 = 0x00020000,
+	
+		/// <summary>
+		/// Texture format can be used as MSAA frame buffer with 4 samples.
+		/// </summary>
+		TextureFramebufferMsaaX4 = 0x00040000,
+	
+		/// <summary>
+		/// Texture format can be used as MSAA frame buffer with 8 samples.
+		/// </summary>
+		TextureFramebufferMsaaX8 = 0x00080000,
+	
+		/// <summary>
+		/// Texture format can be used as MSAA frame buffer with 16 samples.
+		/// </summary>
+		TextureFramebufferMsaaX16 = 0x00100000,
+	
+		/// <summary>
+		/// Texture format can be used as MSAA frame buffer with any sample count.
+		/// </summary>
+		TextureFramebufferMsaa = 0x001e0000,
 	}
 	
 	[Flags]
@@ -3221,7 +3241,7 @@ public static partial class bgfx
 	/// </summary>
 	///
 	/// <param name="_flags">See: `BGFX_RESET_*` for more info.   - `BGFX_RESET_NONE` - No reset flags.   - `BGFX_RESET_VSYNC` - Enable V-Sync.   - `BGFX_RESET_MAXANISOTROPY` - Turn on/off max anisotropy.   - `BGFX_RESET_CAPTURE` - Begin screen capture.   - `BGFX_RESET_FLUSH_AFTER_RENDER` - Flush rendering after submitting to GPU.   - `BGFX_RESET_FLIP_AFTER_RENDER` - This flag  specifies where flip     occurs. Default behaviour is that flip occurs before rendering new     frame. This flag only has effect when `BGFX_CONFIG_MULTITHREADED=0`.   - `BGFX_RESET_LOW_LATENCY_ON` - Enable low latency mode (NVIDIA Reflex).     Availability depends on: `BGFX_CAPS_LOW_LATENCY`.   - `BGFX_RESET_LOW_LATENCY_BOOST` - Enable low latency mode, and keep GPU     clocks high even when GPU is mostly idle. Availability depends on:     `BGFX_CAPS_LOW_LATENCY`. Set either `BGFX_RESET_LOW_LATENCY_ON` or     `BGFX_RESET_LOW_LATENCY_BOOST`, not both. Per-surface settings are not here. `BGFX_SWAP_CHAIN_*` flags belong on `SwapChain::flags`, and are ignored if passed here.</param>
-	/// <param name="_swapChain">Main window swap chain. When `NULL` the main window is left untouched and only the device and frame globals above are applied, which is what an application driving its own swap chains wants. Otherwise the main window takes on this description: resize it, change its format, or change its per-surface flags. Fields left neutral keep their current value, and `nwh`/`ndt` are ignored -- main's are bgfx's own. Must be `NULL` when `bgfx::init` created no main window.</param>
+	/// <param name="_swapChain">Main window swap chain. When `NULL` the main window is left untouched and only the device and frame globals above are applied, which is what an application driving its own swap chains wants. Otherwise the main window takes on this description: resize it, change its format, or change its per-surface flags. Fields left neutral keep their current value. A new `nwh` moves the main window to another native window: the renderer recreates the main swap chain for it and keeps the device, context and every GPU resource. `ndt` must stay what `bgfx::init` received. Must be `NULL` when `bgfx::init` created no main window.</param>
 	///
 	[DllImport(DllName, EntryPoint="bgfx_reset", CallingConvention = CallingConvention.Cdecl)]
 	public static extern unsafe void reset(uint _flags, SwapChain* _swapChain);
@@ -4744,7 +4764,7 @@ public static partial class bgfx
 	/// <summary>
 	/// Set shader uniform parameter for frame.
 	/// 
-	/// @attention Uniform must be created with `bgfx::UniformFreq::View` argument.
+	/// @attention Uniform must be created with `bgfx::UniformFreq::Frame` argument.
 	/// 
 	/// </summary>
 	///

@@ -9,7 +9,7 @@ import bindbc.common.types: c_int64, c_uint64, va_list;
 import bindbc.bgfx.config;
 static import bgfx.impl;
 
-enum uint apiVersion = 166;
+enum uint apiVersion = 167;
 
 alias ViewID = ushort;
 
@@ -565,25 +565,29 @@ enum CapFlags: CapFlags_{
 
 alias CapsFormat_ = uint;
 enum CapsFormat: CapsFormat_{
-	textureNone             = 0x0000_0000, ///Texture format is not supported.
-	texture2D               = 0x0000_0001, ///Texture format is supported.
-	texture2DSRGB           = 0x0000_0002, ///Texture as sRGB format is supported.
-	texture2DEmulated       = 0x0000_0004, ///Texture format is emulated.
-	texture3D               = 0x0000_0008, ///Texture format is supported.
-	texture3DSRGB           = 0x0000_0010, ///Texture as sRGB format is supported.
-	texture3DEmulated       = 0x0000_0020, ///Texture format is emulated.
-	textureCube             = 0x0000_0040, ///Texture format is supported.
-	textureCubeSRGB         = 0x0000_0080, ///Texture as sRGB format is supported.
-	textureCubeEmulated     = 0x0000_0100, ///Texture format is emulated.
-	textureVertex           = 0x0000_0200, ///Texture format can be used from vertex shader.
-	textureImageRead        = 0x0000_0400, ///Texture format can be used as image and read from.
-	textureImageWrite       = 0x0000_0800, ///Texture format can be used as image and written to.
-	textureFramebuffer      = 0x0000_1000, ///Texture format can be used as frame buffer.
-	textureFramebufferMSAA  = 0x0000_2000, ///Texture format can be used as MSAA frame buffer.
-	textureMSAA             = 0x0000_4000, ///Texture can be sampled as MSAA.
-	textureMIPAutogen       = 0x0000_8000, ///Texture format supports auto-generated mips.
-	textureBackbuffer       = 0x0001_0000, ///Texture format can be used as back buffer format.
-	textureVideoDecodeDst   = 0x0002_0000, ///Texture format can be used as video decode destination.
+	textureNone                = 0x0000_0000, ///Texture format is not supported.
+	texture2D                  = 0x0000_0001, ///Texture format is supported.
+	texture2DSRGB              = 0x0000_0002, ///Texture as sRGB format is supported.
+	texture2DEmulated          = 0x0000_0004, ///Texture format is emulated.
+	texture3D                  = 0x0000_0008, ///Texture format is supported.
+	texture3DSRGB              = 0x0000_0010, ///Texture as sRGB format is supported.
+	texture3DEmulated          = 0x0000_0020, ///Texture format is emulated.
+	textureCube                = 0x0000_0040, ///Texture format is supported.
+	textureCubeSRGB            = 0x0000_0080, ///Texture as sRGB format is supported.
+	textureCubeEmulated        = 0x0000_0100, ///Texture format is emulated.
+	textureVertex              = 0x0000_0200, ///Texture format can be used from vertex shader.
+	textureImageRead           = 0x0000_0400, ///Texture format can be used as image and read from.
+	textureImageWrite          = 0x0000_0800, ///Texture format can be used as image and written to.
+	textureFramebuffer         = 0x0000_1000, ///Texture format can be used as frame buffer.
+	textureMSAA                = 0x0000_2000, ///Texture can be sampled as MSAA.
+	textureMIPAutogen          = 0x0000_4000, ///Texture format supports auto-generated mips.
+	textureBackbuffer          = 0x0000_8000, ///Texture format can be used as back buffer format.
+	textureVideoDecodeDst      = 0x0001_0000, ///Texture format can be used as video decode destination.
+	textureFramebufferMSAAX2   = 0x0002_0000, ///Texture format can be used as MSAA frame buffer with 2 samples.
+	textureFramebufferMSAAX4   = 0x0004_0000, ///Texture format can be used as MSAA frame buffer with 4 samples.
+	textureFramebufferMSAAX8   = 0x0008_0000, ///Texture format can be used as MSAA frame buffer with 8 samples.
+	textureFramebufferMSAAX16  = 0x0010_0000, ///Texture format can be used as MSAA frame buffer with 16 samples.
+	textureFramebufferMSAA     = 0x001E_0000, ///Texture format can be used as MSAA frame buffer with any sample count.
 }
 
 alias CapsVideoCodec_ = uint;
@@ -1266,8 +1270,10 @@ extern(C++, "bgfx") struct Caps{
 	    and written to.
 	  - `BGFX_CAPS_FORMAT_TEXTURE_FRAMEBUFFER` - Texture format can be used as frame
 	    buffer.
-	  - `BGFX_CAPS_FORMAT_TEXTURE_FRAMEBUFFER_MSAA` - Texture format can be used as MSAA
-	    frame buffer.
+	  - `BGFX_CAPS_FORMAT_TEXTURE_FRAMEBUFFER_MSAA_X2`, `_X4`, `_X8`, `_X16` - Texture
+	    format can be used as MSAA frame buffer with that many samples. A
+	    `BGFX_TEXTURE_RT_MSAA_X*` request is clamped to the highest one set.
+	    `BGFX_CAPS_FORMAT_TEXTURE_FRAMEBUFFER_MSAA` is the mask of all of them.
 	  - `BGFX_CAPS_FORMAT_TEXTURE_MSAA` - Texture can be sampled as MSAA.
 	  - `BGFX_CAPS_FORMAT_TEXTURE_MIP_AUTOGEN` - Texture format supports auto-generated
 	    mips.
@@ -2668,7 +2674,10 @@ mixin(joinFnBinds((){
 		chains wants. Otherwise the main window takes on this
 		description: resize it, change its format, or change its
 		per-surface flags. Fields left neutral keep their current
-		value, and `nwh`/`ndt` are ignored -- main's are bgfx's own.
+		value. A new `nwh` moves the main window to another native
+		window: the renderer recreates the main swap chain for it and
+		keeps the device, context and every GPU resource. `ndt` must
+		stay what `bgfx::init` received.
 		Must be `NULL` when `bgfx::init` created no main window.
 		*/
 		{q{void}, q{reset}, q{uint flags=Reset.none, const(SwapChain)* swapChain=null}, ext: `C++, "bgfx"`},
@@ -3960,7 +3969,7 @@ mixin(joinFnBinds((){
 		/**
 		* Set shader uniform parameter for frame.
 		* 
-		* Attention: Uniform must be created with `bgfx::UniformFreq::View` argument.
+		* Attention: Uniform must be created with `bgfx::UniformFreq::Frame` argument.
 		* 
 		Params:
 			handle = Uniform.

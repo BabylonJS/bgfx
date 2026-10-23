@@ -43,6 +43,8 @@ project "tint-core"
 		"TINT_BUILD_IS_WIN=0",
 
 		"TINT_ENABLE_IR_VALIDATION=0",
+		"TINT_ENABLE_IR_DUMPING=0",
+		"TINT_ENABLE_IR_VALIDATION_ASSERTS=0",
 	}
 
 	files {
@@ -53,6 +55,16 @@ project "tint-core"
 		path.join(TINT, "src/tint/lang/null/**.cc"),
 		path.join(TINT, "src/tint/lang/null/**.h"),
 	}
+
+	configuration { "mingw* or linux* or osx*" }
+		buildoptions {
+			"-Wno-shadow",
+		}
+
+	configuration { "mingw-gcc or linux-gcc" }
+		buildoptions {
+			"-Wno-dangling-pointer",
+		}
 
 	configuration { "osx*" }
 		buildoptions {
@@ -99,6 +111,12 @@ project "tint-lang"
 		path.join(TINT, "src/tint/lang/wgsl/**.h"),
 	}
 
+	configuration { "mingw-gcc or linux-gcc" }
+		buildoptions {
+			"-Wno-dangling-pointer",
+			"-Wno-maybe-uninitialized",
+		}
+
 	configuration { "osx*" }
 		buildoptions {
 			"-Wno-unknown-warning-option",
@@ -141,6 +159,11 @@ project "tint-api"
 		path.join(TINT, "src/tint/api/**.cc"),
 		path.join(TINT, "src/tint/api/**.h"),
 	}
+
+	configuration { "mingw-gcc or linux-gcc" }
+		buildoptions {
+			"-Wno-dangling-pointer",
+		}
 
 	configuration { "osx*" }
 		buildoptions {
@@ -241,6 +264,7 @@ project "spirv-opt"
 
 	configuration { "mingw* or linux* or osx*" }
 		buildoptions {
+			"-Wno-missing-field-initializers",
 			"-Wno-switch",
 		}
 
@@ -300,6 +324,10 @@ project "spirv-cross"
 			"-Wno-type-limits",
 		}
 
+	configuration { "mingw* or linux-gcc-*" }
+		buildoptions {
+			"-Wno-deprecated",
+		}
 
 	configuration { "osx*" }
 		buildoptions {

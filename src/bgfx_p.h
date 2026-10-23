@@ -597,10 +597,7 @@ namespace bgfx
 
 		bool isZero() const
 		{
-			static_assert(8 == sizeof(Rect), "");
-
-			uint64_t ui64 = *( (uint64_t*)this);
-			return UINT64_C(0) == ui64;
+			return 0 == (m_x|m_y|m_width|m_height);
 		}
 
 		bool isZeroArea() const
@@ -694,6 +691,8 @@ namespace bgfx
 	const char* getAttribNameShort(Attrib::Enum _attr);
 	void getTextureSizeFromRatio(BackbufferRatio::Enum _ratio, uint16_t& _width, uint16_t& _height);
 	TextureFormat::Enum getViableTextureFormat(const bimg::ImageContainer& _imageContainer);
+	void imageDecodeToBgra8(void* _dst, const void* _src, uint32_t _width, uint32_t _height, uint32_t _depth, uint32_t _dstPitch, uint32_t _dstSlicePitch, bimg::TextureFormat::Enum _srcFormat);
+	void imageDecodeToRgba8(void* _dst, const void* _src, uint32_t _width, uint32_t _height, uint32_t _depth, uint32_t _dstPitch, uint32_t _dstSlicePitch, bimg::TextureFormat::Enum _srcFormat);
 	const char* getName(TextureFormat::Enum _fmt);
 	const char* getName(UniformHandle _handle);
 	const char* getName(ShaderHandle _handle);
@@ -976,37 +975,6 @@ namespace bgfx
 		uint32_t m_values[maxKeys];
 	};
 
-	template<typename MaskT>
-	struct BitMaskToIndexIteratorT
-	{
-		BitMaskToIndexIteratorT(MaskT _mask)
-			: mask(0)
-			, idx(0)
-		{
-			const uint8_t ntz = bx::countTrailingZeros<MaskT>(_mask);
-			mask = 0 == _mask ? MaskT(0) : MaskT(_mask >> ntz);
-			idx  = ntz;
-		}
-
-		void next()
-		{
-			mask = MaskT(mask >> 1);
-			idx += 1;
-
-			const uint8_t ntz = bx::countTrailingZeros<MaskT>(mask);
-			mask = 0 == mask ? MaskT(0) : MaskT(mask >> ntz);
-			idx += ntz;
-		}
-
-		bool isDone() const
-		{
-			return 0 == mask;
-		}
-
-		MaskT   mask;
-		uint8_t idx;
-	};
-
 	struct ClearQuad
 	{
 		ClearQuad()
@@ -1160,6 +1128,7 @@ namespace bgfx
 			ModelViewProj,
 			AlphaRef,
 			IndirectArgBase,
+			NumWorkGroups,
 
 			Count
 		};
@@ -2633,9 +2602,9 @@ namespace bgfx
 
 		murmur.add(_mask);
 
-		for (BitMaskToIndexIteratorT<uint32_t> it(_mask); !it.isDone(); it.next() )
+		for (bx::BitMaskToIndexIteratorT<uint32_t> it(_mask); !it.isDone(); it.next() )
 		{
-			murmur.add(_bind[it.idx]);
+			murmur.add(_bind[it.getIndex()]);
 		}
 
 		return murmur.end();
@@ -2658,9 +2627,11 @@ namespace bgfx
 			return false;
 		}
 
-		for (BitMaskToIndexIteratorT<uint32_t> it(mask); !it.isDone(); it.next() )
+		for (bx::BitMaskToIndexIteratorT<uint32_t> it(mask); !it.isDone(); it.next() )
 		{
-			if (0 != bx::memCmp(&_lhs[it.idx], &_rhs[it.idx], sizeof(Binding) ) )
+			const uint8_t idx = it.getIndex();
+
+			if (0 != bx::memCmp(&_lhs[idx], &_rhs[idx], sizeof(Binding) ) )
 			{
 				return false;
 			}
@@ -2701,9 +2672,9 @@ namespace bgfx
 		{
 			if (0 != (_flags & BGFX_DISCARD_BINDINGS) )
 			{
-				for (BitMaskToIndexIteratorT<uint32_t> it(_mask); !it.isDone(); it.next() )
+				for (bx::BitMaskToIndexIteratorT<uint32_t> it(_mask); !it.isDone(); it.next() )
 				{
-					Binding& bind = m_bind[it.idx];
+					Binding& bind = m_bind[it.getIndex()];
 					bind.reset();
 				}
 			}
@@ -3012,6 +2983,7 @@ namespace bgfx
 		uint16_t m_samplerUniform[BGFX_CONFIG_MAX_TEXTURE_SAMPLERS];
 		uint8_t  m_samplerDimension[BGFX_CONFIG_MAX_TEXTURE_SAMPLERS];
 		uint8_t  m_numSamplers;
+		bool     m_hasNumWorkGroups;
 	};
 
 	struct ProgramRef
@@ -3029,6 +3001,32 @@ namespace bgfx
 		uint16_t          m_num;
 		int16_t           m_refCount;
 	};
+
+	inline uint64_t clampTextureMsaa(TextureFormat::Enum _format, uint64_t _flags)
+	{
+		const uint32_t rt = uint32_t( (_flags & BGFX_TEXTURE_RT_MSAA_MASK) >> BGFX_TEXTURE_RT_MSAA_SHIFT);
+
+		if (1 >= rt)
+		{
+			return _flags;
+		}
+
+		uint32_t msaa = rt - 1;
+
+		while (0 < msaa
+		&&     0 == (g_caps.formats[_format] & (BGFX_CAPS_FORMAT_TEXTURE_FRAMEBUFFER_MSAA_X2 << (msaa - 1) ) ) )
+		{
+			--msaa;
+		}
+
+		return (_flags & ~BGFX_TEXTURE_RT_MSAA_MASK) | (uint64_t(msaa + 1) << BGFX_TEXTURE_RT_MSAA_SHIFT);
+	}
+
+	inline uint8_t getTextureMsaaSamples(TextureFormat::Enum _format, uint64_t _flags)
+	{
+		const uint64_t flags = clampTextureMsaa(_format, _flags);
+		return uint8_t(1 << bx::satSub<uint32_t>(uint32_t( (flags & BGFX_TEXTURE_RT_MSAA_MASK) >> BGFX_TEXTURE_RT_MSAA_SHIFT), 1u) );
+	}
 
 	struct TextureRef
 	{
@@ -6241,8 +6239,6 @@ namespace bgfx
 
 			dump(m_init.swapChain, m_init.reset);
 
-			m_flipAfterRender = !!(resetFlags & BGFX_RESET_FLIP_AFTER_RENDER);
-
 			for (uint32_t ii = 0; ii < BGFX_CONFIG_MAX_VIEWS; ++ii)
 			{
 				View* view = m_view.find(ii);
@@ -7292,6 +7288,7 @@ namespace bgfx
 			sr.m_num      = 0;
 			sr.m_uniforms = NULL;
 			sr.m_numSamplers = 0;
+			sr.m_hasNumWorkGroups = false;
 
 			UniformHandle* uniforms = (UniformHandle*)BX_STACK_ALLOC(count*sizeof(UniformHandle) );
 
@@ -7335,6 +7332,8 @@ namespace bgfx
 				}
 
 				PredefinedUniform::Enum predefined = nameToPredefinedUniformEnum(name);
+				sr.m_hasNumWorkGroups |= PredefinedUniform::NumWorkGroups == predefined;
+
 				if (PredefinedUniform::Count == predefined
 				&&  UniformType::End != UniformType::Enum(type) )
 				{
@@ -7689,6 +7688,7 @@ namespace bgfx
 			}
 
 			_flags |= imageContainer.m_srgb ? BGFX_TEXTURE_SRGB : 0;
+			_flags  = clampTextureMsaa(_info->format, _flags);
 
 			TextureHandle handle = { m_textureHandle.alloc() };
 			BX_WARN(isValid(handle), "Failed to allocate texture handle.");
@@ -8275,7 +8275,10 @@ namespace bgfx
 				);
 
 			const uint32_t msaa = (_desc.flags & BGFX_SWAP_CHAIN_MSAA_MASK) >> BGFX_SWAP_CHAIN_MSAA_SHIFT;
-			const uint32_t numSamples = 0 == msaa ? 1 : 1<<msaa;
+			const uint32_t numSamples = getTextureMsaaSamples(
+				  TextureFormat::Enum(ref.m_format)
+				, uint64_t(msaa + 1) << BGFX_TEXTURE_RT_MSAA_SHIFT
+				);
 
 			BX_ASSERT(ref.m_numSamples == numSamples
 				, "SwapChain::depth has %d sample(s), but the swap chain has %d."
@@ -8783,7 +8786,7 @@ namespace bgfx
 			if (ok)
 			{
 				m_render->m_waitSubmit = bx::getHPCounter()-start;
-				m_submit->m_perfStats.waitSubmit = m_submit->m_waitSubmit;
+				m_render->m_perfStats.waitSubmit = m_render->m_waitSubmit;
 				return true;
 			}
 
