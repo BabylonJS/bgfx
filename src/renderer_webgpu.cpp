@@ -1302,6 +1302,11 @@ WGPU_IMPORT
 
 					BX_TRACE("");
 
+					const char* disabledToggles[] =
+					{
+						"timestamp_quantization",
+					};
+
 					WGPUDawnTogglesDescriptor dawnTogglesDescriptor =
 					{
 						.chain =
@@ -1311,8 +1316,8 @@ WGPU_IMPORT
 						},
 						.enabledToggleCount  = enabledTogglesCount,
 						.enabledToggles      = enabledToggles,
-						.disabledToggleCount = 0,
-						.disabledToggles     = NULL,
+						.disabledToggleCount = BX_COUNTOF(disabledToggles),
+						.disabledToggles     = disabledToggles,
 					};
 #endif // !BX_PLATFORM_EMSCRIPTEN
 
@@ -2372,6 +2377,7 @@ WGPU_IMPORT
 			const uint32_t height = frameBuffer.m_height;
 
 			frameBuffer.m_needPresent = true;
+			frameBuffer.m_swapChain.acquire();
 
 			float proj[16];
 			bx::mtxOrtho(proj, 0.0f, (float)width, (float)height, 0.0f, 0.0f, 1000.0f, 0.0f, false);
@@ -3275,11 +3281,6 @@ WGPU_IMPORT
 			{
 				flags &= ~BGFX_RESET_INTERNAL_FORCE;
 
-				if (m_backBuffer.m_swapChain.m_nwh != m_mainSwapChain.nwh)
-				{
-					m_backBuffer.m_swapChain.m_nwh = m_mainSwapChain.nwh;
-				}
-
 				m_mainSwapChain = _swapChain;
 				m_reset = flags;
 
@@ -3743,7 +3744,7 @@ WGPU_IMPORT
 					}
 					else
 					{
-						elem->format = WGPUVertexFormat_Float32x3;
+						elem->format = WGPUVertexFormat_Unorm8x4;
 						elem->offset = 0;
 					}
 
@@ -5987,6 +5988,7 @@ WGPU_IMPORT
 		wgpuRelease(m_textureView);
 		wgpuRelease(m_texture);
 
+#if !BX_PLATFORM_EMSCRIPTEN
 		WGPUSurfaceTexture surfaceTexture = WGPU_SURFACE_TEXTURE_INIT;
 		WGPU_CHECK(wgpuSurfaceGetCurrentTexture(m_surface, &surfaceTexture) );
 
@@ -5998,6 +6000,7 @@ WGPU_IMPORT
 
 		m_texture     = surfaceTexture.texture;
 		m_textureView = createTextureView();
+#endif // !BX_PLATFORM_EMSCRIPTEN
 
 		const uint32_t msaa = s_msaa[(_desc.flags&BGFX_SWAP_CHAIN_MSAA_MASK)>>BGFX_SWAP_CHAIN_MSAA_SHIFT];
 
@@ -6125,7 +6128,21 @@ WGPU_IMPORT
 
 	void SwapChainWGPU::update(void* _nwh, const SwapChain& _desc)
 	{
-		BX_UNUSED(_nwh);
+		if (NULL != _nwh
+		&& (m_nwh != _nwh || NULL == m_surface) )
+		{
+			if (NULL != m_surface)
+			{
+				destroy();
+			}
+
+			if (!createSurface(_nwh) )
+			{
+				m_descPending             = _desc;
+				m_needToRecreateSwapChain = true;
+				return;
+			}
+		}
 
 		wgpuRelease(m_textureView);
 		wgpuRelease(m_msaaTextureView);
@@ -6346,13 +6363,13 @@ WGPU_IMPORT
 		return textureView;
 	}
 
-	void SwapChainWGPU::present()
+	void SwapChainWGPU::acquire()
 	{
-		wgpuRelease(m_textureView);
-		wgpuRelease(m_texture);
-#if !BX_PLATFORM_EMSCRIPTEN
-		WGPU_CHECK(wgpuSurfacePresent(m_surface) );
-#endif // !BX_PLATFORM_EMSCRIPTEN
+		if (NULL != m_texture
+		||  NULL == m_surface)
+		{
+			return;
+		}
 
 		WGPUSurfaceTexture surfaceTexture = WGPU_SURFACE_TEXTURE_INIT;
 		wgpuSurfaceGetCurrentTexture(m_surface, &surfaceTexture);
@@ -6383,6 +6400,17 @@ WGPU_IMPORT
 		{
 			m_textureView = createTextureView();
 		}
+	}
+
+	void SwapChainWGPU::present()
+	{
+		wgpuRelease(m_textureView);
+		wgpuRelease(m_texture);
+
+#if !BX_PLATFORM_EMSCRIPTEN
+		WGPU_CHECK(wgpuSurfacePresent(m_surface) );
+		acquire();
+#endif // !BX_PLATFORM_EMSCRIPTEN
 	}
 
 	void FrameBufferWGPU::create(uint8_t _num, const Attachment* _attachment)
@@ -6513,7 +6541,7 @@ WGPU_IMPORT
 
 	void FrameBufferWGPU::update(const SwapChain& _desc)
 	{
-		m_swapChain.update(m_swapChain.m_nwh, _desc);
+		m_swapChain.update(_desc.nwh, _desc);
 		m_width  = _desc.width;
 		m_height = _desc.height;
 		m_formatDepthStencil = m_swapChain.m_formatDepthStencil;
@@ -6585,15 +6613,23 @@ WGPU_IMPORT
 
 	WGPUCommandEncoder CommandQueueWGPU::alloc()
 	{
-		s_renderWGPU->m_uniformScratchBuffer.flush();
-
-		kick();
+		if (++m_numPasses >= kPassesPerKick)
+		{
+			kick();
+		}
 
 		return m_commandEncoder;
 	}
 
 	void CommandQueueWGPU::kick()
 	{
+		m_numPasses = 0;
+
+		if (0 != s_renderWGPU->m_uniformScratchBuffer.m_chunkPos)
+		{
+			s_renderWGPU->m_uniformScratchBuffer.flush();
+		}
+
 		WGPUCommandBuffer commandBuffer = WGPU_CHECK(wgpuCommandEncoderFinish(m_commandEncoder, NULL) );
 
 		WGPU_CHECK(wgpuQueueSubmit(m_queue, 1, &commandBuffer) );
@@ -7516,6 +7552,16 @@ WGPU_IMPORT
 		WGPU_CHECK(wgpuInstanceProcessEvents(s_renderWGPU->m_instance) );
 		m_gpuTimer.resize(getNumTimerQueries(_render, m_gpuTimer.m_control.getSize() ) );
 
+#if BX_PLATFORM_EMSCRIPTEN
+		// Canvas texture may expire once the acquiring task ends, and flip is skipped after BGFX_FRAME_FLUSH.
+		for (uint16_t ii = 0; ii < m_numWindows; ++ii)
+		{
+			SwapChainWGPU& swapChain = getFrameBuffer(m_windows[ii]).m_swapChain;
+			wgpuRelease(swapChain.m_textureView);
+			wgpuRelease(swapChain.m_texture);
+		}
+#endif // BX_PLATFORM_EMSCRIPTEN
+
 		if (updateResolution(_render->m_mainSwapChain, _render->m_reset) )
 		{
 			return;
@@ -7760,6 +7806,7 @@ WGPU_IMPORT
 					if (isSwapChain)
 					{
 						fb.m_needPresent = true;
+						fb.m_swapChain.acquire();
 					}
 
 					WGPUTextureView depthStencilTextureView = isSwapChain

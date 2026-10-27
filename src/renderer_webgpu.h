@@ -696,6 +696,7 @@ namespace wgpu {
 
 		bool configure(const SwapChain& _desc);
 		WGPUTextureView createTextureView();
+		void acquire();
 		void present();
 
 		void* m_nwh;
@@ -784,6 +785,7 @@ namespace wgpu {
 			: m_queue(NULL)
 			, m_commandEncoder(NULL)
 			, m_counter(0)
+			, m_numPasses(0)
 		{
 		}
 
@@ -807,6 +809,9 @@ namespace wgpu {
 		WGPUCommandEncoder m_commandEncoder;
 		uint32_t m_currentFrameInFlight;
 		uint32_t m_counter;
+		uint32_t m_numPasses;
+
+		static constexpr uint32_t kPassesPerKick = 64;
 	};
 
 	struct TimerQueryWGPU
