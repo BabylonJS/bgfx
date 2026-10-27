@@ -4431,18 +4431,16 @@ namespace bgfx
 
 		uint32_t getAvailTransientIndexBuffer(uint32_t _num, uint16_t _indexSize)
 		{
-			const uint32_t offset = bx::strideAlign(m_iboffset, _indexSize);
-			uint32_t iboffset = offset + _num*_indexSize;
-			iboffset = bx::min<uint32_t>(iboffset, g_caps.limits.maxTransientIbSize);
-			const uint32_t num = (iboffset-offset)/_indexSize;
-			return num;
+			const uint64_t offset   = bx::strideAlign(m_iboffset, _indexSize);
+			const uint64_t iboffset = bx::min<uint64_t>(offset + uint64_t(_num)*_indexSize, g_caps.limits.maxTransientIbSize);
+			return uint32_t(bx::max(iboffset, offset) - offset)/_indexSize;
 		}
 
 		uint32_t allocTransientIndexBuffer(uint32_t& _num, uint16_t _indexSize)
 		{
-			uint32_t offset = bx::strideAlign(m_iboffset, _indexSize);
-			uint32_t num    = getAvailTransientIndexBuffer(_num, _indexSize);
-			m_iboffset = offset + num*_indexSize;
+			const uint32_t offset = bx::strideAlign(m_iboffset, _indexSize);
+			const uint32_t num    = getAvailTransientIndexBuffer(_num, _indexSize);
+			m_iboffset = 0 == num ? m_iboffset : offset + num*_indexSize;
 			_num = num;
 
 			return offset;
@@ -4450,18 +4448,16 @@ namespace bgfx
 
 		uint32_t getAvailTransientVertexBuffer(uint32_t _num, uint16_t _stride)
 		{
-			uint32_t offset   = bx::strideAlign(m_vboffset, _stride);
-			uint32_t vboffset = offset + _num * _stride;
-			vboffset = bx::min<uint32_t>(vboffset, g_caps.limits.maxTransientVbSize);
-			uint32_t num = (vboffset-offset)/_stride;
-			return num;
+			const uint64_t offset   = bx::strideAlign(m_vboffset, _stride);
+			const uint64_t vboffset = bx::min<uint64_t>(offset + uint64_t(_num)*_stride, g_caps.limits.maxTransientVbSize);
+			return uint32_t(bx::max(vboffset, offset) - offset)/_stride;
 		}
 
 		uint32_t allocTransientVertexBuffer(uint32_t& _num, uint16_t _stride)
 		{
-			uint32_t offset = bx::strideAlign(m_vboffset, _stride);
-			uint32_t num    = getAvailTransientVertexBuffer(_num, _stride);
-			m_vboffset = offset + num * _stride;
+			const uint32_t offset = bx::strideAlign(m_vboffset, _stride);
+			const uint32_t num    = getAvailTransientVertexBuffer(_num, _stride);
+			m_vboffset = 0 == num ? m_vboffset : offset + num*_stride;
 			_num = num;
 
 			return offset;
@@ -6489,6 +6485,7 @@ namespace bgfx
 				{
 					BX_TRACE("WARNING: Failed to allocate vertex layout handle (BGFX_CONFIG_MAX_VERTEX_LAYOUTS, max: %d).", BGFX_CONFIG_MAX_VERTEX_LAYOUTS);
 					m_vertexBufferHandle.free(handle.idx);
+					release(_mem);
 					return BGFX_INVALID_HANDLE;
 				}
 
@@ -7684,6 +7681,7 @@ namespace bgfx
 					.cubeMap      = false,
 				};
 
+				release(_mem);
 				return BGFX_INVALID_HANDLE;
 			}
 
@@ -7695,6 +7693,21 @@ namespace bgfx
 
 			if (!isValid(handle) )
 			{
+				bx::MemoryReader reader(_mem->data, _mem->size);
+				bx::Error err;
+				uint32_t magic = 0;
+				bx::read(&reader, magic, &err);
+
+				if (kChunkMagicTex == magic)
+				{
+					TextureCreate tc{};
+					bx::read(&reader, tc, &err);
+					if (err.isOk() && NULL != tc.m_mem)
+					{
+						release(tc.m_mem);
+					}
+				}
+
 				release(_mem);
 				return BGFX_INVALID_HANDLE;
 			}
