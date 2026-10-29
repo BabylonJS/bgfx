@@ -96,14 +96,14 @@ namespace bgfx { namespace mtl
 
 	static const MTL::VertexFormat s_attribType[][4][2] = //type, count, normalized
 	{
-		{ // Uint8
-			{ MTL::VertexFormatChar2,                 MTL::VertexFormatChar2Normalized       },
+		{ // Int8
+			{ MTL::VertexFormatChar,                  MTL::VertexFormatCharNormalized        },
 			{ MTL::VertexFormatChar2,                 MTL::VertexFormatChar2Normalized       },
 			{ MTL::VertexFormatChar3,                 MTL::VertexFormatChar3Normalized       },
 			{ MTL::VertexFormatChar4,                 MTL::VertexFormatChar4Normalized       },
 		},
 		{ // Uint8
-			{ MTL::VertexFormatUChar2,                MTL::VertexFormatUChar2Normalized      },
+			{ MTL::VertexFormatUChar,                 MTL::VertexFormatUCharNormalized       },
 			{ MTL::VertexFormatUChar2,                MTL::VertexFormatUChar2Normalized      },
 			{ MTL::VertexFormatUChar3,                MTL::VertexFormatUChar3Normalized      },
 			{ MTL::VertexFormatUChar4,                MTL::VertexFormatUChar4Normalized      },
@@ -115,19 +115,19 @@ namespace bgfx { namespace mtl
 			{ MTL::VertexFormatUInt1010102Normalized, MTL::VertexFormatUInt1010102Normalized },
 		},
 		{ // Int16
-			{ MTL::VertexFormatShort2,                MTL::VertexFormatShort2Normalized      },
+			{ MTL::VertexFormatShort,                 MTL::VertexFormatShortNormalized       },
 			{ MTL::VertexFormatShort2,                MTL::VertexFormatShort2Normalized      },
 			{ MTL::VertexFormatShort3,                MTL::VertexFormatShort3Normalized      },
 			{ MTL::VertexFormatShort4,                MTL::VertexFormatShort4Normalized      },
 		},
-		{ // Int16
-			{ MTL::VertexFormatUShort2,               MTL::VertexFormatUShort2Normalized     },
+		{ // Uint16
+			{ MTL::VertexFormatUShort,                MTL::VertexFormatUShortNormalized      },
 			{ MTL::VertexFormatUShort2,               MTL::VertexFormatUShort2Normalized     },
 			{ MTL::VertexFormatUShort3,               MTL::VertexFormatUShort3Normalized     },
 			{ MTL::VertexFormatUShort4,               MTL::VertexFormatUShort4Normalized     },
 		},
 		{ // Half
-			{ MTL::VertexFormatHalf2,                 MTL::VertexFormatHalf2                 },
+			{ MTL::VertexFormatHalf,                  MTL::VertexFormatHalf                  },
 			{ MTL::VertexFormatHalf2,                 MTL::VertexFormatHalf2                 },
 			{ MTL::VertexFormatHalf3,                 MTL::VertexFormatHalf3                 },
 			{ MTL::VertexFormatHalf4,                 MTL::VertexFormatHalf4                 },
@@ -337,8 +337,8 @@ BX_PRAGMA_DIAGNOSTIC_IGNORED_CLANG("-Wunguarded-availability-new");
 		{ MTL::PixelFormatRGBA16Uint,            MTL::PixelFormatInvalid,              MTL::ReadWriteTextureTier2,    { $R, $G, $B, $A }, false }, // RGBA16U
 		{ MTL::PixelFormatRGBA16Float,           MTL::PixelFormatInvalid,              MTL::ReadWriteTextureTier2,    { $R, $G, $B, $A }, true  }, // RGBA16F
 		{ MTL::PixelFormatRGBA16Snorm,           MTL::PixelFormatInvalid,              MTL::ReadWriteTextureTierNone, { $R, $G, $B, $A }, true  }, // RGBA16S
-		{ MTL::PixelFormatRGBA32Sint,            MTL::PixelFormatInvalid,              MTL::ReadWriteTextureTier2,    { $R, $G, $B, $A }, true  }, // RGBA32I
-		{ MTL::PixelFormatRGBA32Uint,            MTL::PixelFormatInvalid,              MTL::ReadWriteTextureTier2,    { $R, $G, $B, $A }, true  }, // RGBA32U
+		{ MTL::PixelFormatRGBA32Sint,            MTL::PixelFormatInvalid,              MTL::ReadWriteTextureTier2,    { $R, $G, $B, $A }, false }, // RGBA32I
+		{ MTL::PixelFormatRGBA32Uint,            MTL::PixelFormatInvalid,              MTL::ReadWriteTextureTier2,    { $R, $G, $B, $A }, false }, // RGBA32U
 		{ MTL::PixelFormatRGBA32Float,           MTL::PixelFormatInvalid,              MTL::ReadWriteTextureTier2,    { $R, $G, $B, $A }, true  }, // RGBA32F
 		{ MTL::PixelFormatB5G6R5Unorm,           MTL::PixelFormatInvalid,              MTL::ReadWriteTextureTierNone, { $R, $G, $B, $A }, true  }, // B5G6R5
 		{ MTL::PixelFormatB5G6R5Unorm,           MTL::PixelFormatInvalid,              MTL::ReadWriteTextureTierNone, { $B, $G, $R, $A }, true  }, // R5G6B5
@@ -2893,6 +2893,8 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 
 		void processArguments(
 			  PipelineStateMtl* ps
+			, const ShaderMtl* _vsh
+			, const ShaderMtl* _fsh
 			, NS::Array* _vertexArgs
 			, NS::Array* _fragmentArgs
 			)
@@ -2906,6 +2908,7 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 					: ps->m_fshConstantBuffer
 					;
 				const int8_t fragmentBit = (1 == shaderType ? kUniformFragmentBit : 0);
+				const ShaderMtl* shader = shaderType == 0 ? _vsh : _fsh;
 
 				NS::Array* args = shaderType == 0 ? _vertexArgs : _fragmentArgs;
 				if (NULL == args)
@@ -2994,10 +2997,26 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 										}
 										else
 										{
-											const UniformRegInfo* info = s_renderMtl->m_uniformReg.find(name);
-											BX_WARN(NULL != info, "User defined uniform '%s' is not found, it won't be set.", name);
+											UniformHandle handle = BGFX_INVALID_HANDLE;
 
-											if (NULL != info)
+											if (NULL != shader)
+											{
+												handle = shader->findUniform(name);
+											}
+
+											if (!isValid(handle) )
+											{
+												const UniformRegInfo* info = s_renderMtl->m_uniformReg.find(name);
+
+												if (NULL != info)
+												{
+													handle = info->m_handle;
+												}
+											}
+
+											BX_WARN(isValid(handle), "User defined uniform '%s' is not found, it won't be set.", name);
+
+											if (isValid(handle) )
 											{
 												if (NULL == constantBuffer)
 												{
@@ -3005,8 +3024,8 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 												}
 
 												UniformType::Enum type = convertMtlType(dataType);
-												constantBuffer->writeUniformHandle(type|fragmentBit, uint32_t(uniform->offset() ), info->m_handle, uint16_t(num) );
-												BX_TRACE("store %s %d offset:%d", name, info->m_handle, uint32_t(uniform->offset() ) );
+												constantBuffer->writeUniformHandle(type|fragmentBit, uint32_t(uniform->offset() ), handle, uint16_t(num) );
+												BX_TRACE("store %s %d offset:%d", name, handle.idx, uint32_t(uniform->offset() ) );
 											}
 										}
 									}
@@ -3419,16 +3438,6 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 					}
 				}
 
-				MTL::VertexBufferLayoutDescriptor* vbld = vertexDesc->layouts()->object(1);
-
-				if (usedFallbackAttrib
-				&&  0 == vbld->stride() )
-				{
-					vbld->setStride(4);
-					vbld->setStepFunction(MTL::VertexStepFunctionConstant);
-					vbld->setStepRate(0);
-				}
-
 				if (0 < _numInstanceData)
 				{
 					uint32_t numAttribs = 0;
@@ -3451,6 +3460,30 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 						vertexDesc->layouts()->object(stream+1)->setStepRate(1);
 					}
 				}
+				else
+				{
+					for (uint32_t ii = 0; ii < BX_COUNTOF(s_instanceDataName); ++ii)
+					{
+						const uint32_t loc = program.m_instanceData[ii];
+						if (UINT32_MAX != loc)
+						{
+							vertexDesc->attributes()->object(loc)->setFormat(MTL::VertexFormatUChar4);
+							vertexDesc->attributes()->object(loc)->setBufferIndex(1);
+							vertexDesc->attributes()->object(loc)->setOffset(0);
+							usedFallbackAttrib = true;
+						}
+					}
+				}
+
+				MTL::VertexBufferLayoutDescriptor* vbld = vertexDesc->layouts()->object(1);
+
+				if (usedFallbackAttrib
+				&&  0 == vbld->stride() )
+				{
+					vbld->setStride(4);
+					vbld->setStepFunction(MTL::VertexStepFunctionConstant);
+					vbld->setStepRate(0);
+				}
 
 				pd->setVertexDescriptor(vertexDesc);
 
@@ -3458,17 +3491,17 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 					MTL::RenderPipelineReflection* reflection = NULL;
 					pso->m_rps = newRenderPipelineStateWithDescriptor(m_device, pd, MTL::PipelineOptionBufferTypeInfo, &reflection);
 
-					BGFX_FATAL(NULL != pso->m_rps, Fatal::InvalidShader, "Failed to create graphics PSO!");
+					BGFX_FATAL(NULL != pso->m_rps, Fatal::InvalidShader, "Failed to create graphics PSO: %s", s_lastPipelineError);
 
 					if (NULL != reflection)
 					{
 						if (m_usesMTLBindings)
 						{
-							processArguments(pso, reflection->vertexBindings(), reflection->fragmentBindings() );
+							processArguments(pso, program.m_vsh, program.m_fsh, reflection->vertexBindings(), reflection->fragmentBindings() );
 						}
 						else
 						{
-							processArguments(pso, reflection->vertexArguments(), reflection->fragmentArguments() );
+							processArguments(pso, program.m_vsh, program.m_fsh, reflection->vertexArguments(), reflection->fragmentArguments() );
 						}
 					}
 				}
@@ -3522,11 +3555,11 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 
 				if (m_usesMTLBindings)
 				{
-					processArguments(pso, reflection->bindings(), NULL);
+					processArguments(pso, program.m_vsh, NULL, reflection->bindings(), NULL);
 				}
 				else
 				{
-					processArguments(pso, reflection->arguments(), NULL);
+					processArguments(pso, program.m_vsh, NULL, reflection->arguments(), NULL);
 				}
 
 				for (uint32_t ii = 0; ii < 3; ++ii)
@@ -3947,6 +3980,19 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 		bx::write(_writer, _str, (int32_t)bx::strLen(_str), bx::ErrorAssert{});
 	}
 
+	UniformHandle ShaderMtl::findUniform(const char* _name) const
+	{
+		UniformHandle handle = BGFX_INVALID_HANDLE;
+
+		UniformMap::const_iterator it = m_uniforms.find(bx::hash<bx::HashMurmur2A>(_name) );
+		if (m_uniforms.end() != it)
+		{
+			handle = it->second;
+		}
+
+		return handle;
+	}
+
 	void ShaderMtl::create(const Memory* _mem)
 	{
 		bx::MemoryReader reader(_mem->data, _mem->size);
@@ -3996,14 +4042,23 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 			uint8_t type;
 			bx::read(&reader, type, &err);
 
-			uint8_t num;
-			bx::read(&reader, num, &err);
+			readUniformNum(&reader, magic, &err);
 
 			uint16_t regIndex;
 			bx::read(&reader, regIndex, &err);
 
 			uint16_t regCount;
 			bx::read(&reader, regCount, &err);
+
+			if (PredefinedUniform::Count == nameToPredefinedUniformEnum(name) )
+			{
+				const UniformRegInfo* info = s_renderMtl->m_uniformReg.find(name);
+
+				if (NULL != info)
+				{
+					m_uniforms[bx::hash<bx::HashMurmur2A>(bx::StringView(name) )] = info->m_handle;
+				}
+			}
 
 			if (!isShaderVerLess(magic, 8) )
 			{
@@ -4659,6 +4714,7 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 
 		MTL_RELEASE_DEFERRED(m_ptrMsaa);
 		MTL_RELEASE_DEFERRED(m_ptrStencil);
+		MTL_RELEASE_DEFERRED(m_ptrMsaaStencil);
 		MTL_RELEASE_DEFERRED(m_ptrAlt);
 		MTL_RELEASE_DEFERRED(m_ptrMsaaAlt);
 
@@ -4812,12 +4868,41 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 			;
 	}
 
+	MTL::Texture* TextureMtl::getMultisampleStencilView()
+	{
+		if (NULL == m_ptrMsaa
+		||  0 == (m_flags & BGFX_TEXTURE_MSAA_SAMPLE) )
+		{
+			return NULL;
+		}
+
+		if (NULL != m_ptrMsaaStencil)
+		{
+			return m_ptrMsaaStencil;
+		}
+
+		MTL::PixelFormat format;
+		switch (m_ptrMsaa->pixelFormat() )
+		{
+		case MTL::PixelFormatDepth32Float_Stencil8: format = MTL::PixelFormatX32_Stencil8; break;
+		case MTL::PixelFormatDepth24Unorm_Stencil8: format = MTL::PixelFormatX24_Stencil8; break;
+		case MTL::PixelFormatStencil8:              return m_ptrMsaa;
+		default:                                    return NULL;
+		}
+
+		m_ptrMsaaStencil = m_ptrMsaa->newTextureView(format);
+		return m_ptrMsaaStencil;
+	}
+
 	MTL::Texture* TextureMtl::getSampledView(uint8_t _textureType, uint32_t _flags, uint16_t _firstLayer, uint16_t _numLayers, uint8_t _firstMip, uint8_t _numMips, bool _stencil)
 	{
 		if (MTL::TextureType2DMultisample      == _textureType
 		||  MTL::TextureType2DMultisampleArray == _textureType)
 		{
-			MTL::Texture* ptr = getMultisampleView(_flags);
+			MTL::Texture* ptr = _stencil
+				? getMultisampleStencilView()
+				: getMultisampleView(_flags)
+				;
 
 			if (NULL != ptr)
 			{
@@ -4925,8 +5010,12 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 		}
 
 		const bool     isCube      = TextureCube == m_type;
-		const uint32_t rangeScale  = isCube ? 6 : 1;
-		const uint32_t totalUnits  = uint32_t(ptr->arrayLength() );
+		const bool     wants2D     = MTL::TextureType2D   == _textureType || MTL::TextureType2DArray   == _textureType;
+		const bool     wantsCube   = MTL::TextureTypeCube == _textureType || MTL::TextureTypeCubeArray == _textureType;
+
+		const bool     facesAsLayers = isCube && wants2D;
+		const uint32_t rangeScale  = isCube && !facesAsLayers ? 6 : 1;
+		const uint32_t totalUnits  = uint32_t(ptr->arrayLength() ) * (facesAsLayers ? 6 : 1);
 		const uint32_t totalLayers = totalUnits * rangeScale;
 
 		const uint8_t  firstMip   = bx::min<uint8_t>(_firstMip, uint8_t(m_numMips - 1) );
@@ -4938,7 +5027,14 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 
 		MTL::TextureType type = ptr->textureType();
 
-		if (isCube)
+		if (facesAsLayers)
+		{
+			type = 1 == numLayers && MTL::TextureType2D == _textureType
+				? (MTL::TextureType)MTL::TextureType2D
+				: (MTL::TextureType)MTL::TextureType2DArray
+				;
+		}
+		else if (isCube)
 		{
 			type = 1 == numUnits
 				? (MTL::TextureType)MTL::TextureTypeCube
@@ -4953,8 +5049,6 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 
 		const bool arrayOf2D   = MTL::TextureType2D   == type || MTL::TextureType2DArray   == type;
 		const bool arrayOfCube = MTL::TextureTypeCube == type || MTL::TextureTypeCubeArray == type;
-		const bool wants2D     = MTL::TextureType2D   == _textureType || MTL::TextureType2DArray   == _textureType;
-		const bool wantsCube   = MTL::TextureTypeCube == _textureType || MTL::TextureTypeCubeArray == _textureType;
 
 		if ( (arrayOf2D   && wants2D   && (MTL::TextureType2DArray   == _textureType || 1 == numLayers) )
 		||   (arrayOfCube && wantsCube && (MTL::TextureTypeCubeArray == _textureType || 1 == numUnits ) ) )
