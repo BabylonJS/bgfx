@@ -7170,6 +7170,15 @@ VK_DESTROY
 
 		for (uint8_t stage = 0; stage < BX_COUNTOF(m_bindInfo); ++stage)
 		{
+			m_bindInfo[stage] =
+			{
+				.uniformHandle  = BGFX_INVALID_HANDLE,
+				.type           = BindType::Count,
+				.binding        = 0,
+				.samplerBinding = 0,
+				.index          = UINT32_MAX,
+			};
+
 			const ShaderVK* shader = NULL;
 			if (isValid(m_vsh->m_bindInfo[stage].uniformHandle) )
 			{
@@ -8186,16 +8195,18 @@ VK_DESTROY
 					{
 						if (convert)
 						{
-							const uint32_t pitch = bx::strideAlign(bx::max<uint32_t>(mip.m_width, 4) * bpp / 8, alignment);
-							const uint32_t slice = bx::strideAlign(bx::max<uint32_t>(mip.m_height, 4) * pitch, alignment);
-							const uint32_t size  = slice * mip.m_depth;
+							const uint32_t width  = bx::max<uint32_t>(1, m_width  >> lod);
+							const uint32_t height = bx::max<uint32_t>(1, m_height >> lod);
+							const uint32_t pitch  = bx::strideAlign(width * bpp / 8, alignment);
+							const uint32_t slice  = bx::strideAlign(height * pitch, alignment);
+							const uint32_t size   = slice * mip.m_depth;
 
 							uint8_t* temp = (uint8_t*)bx::alloc(g_allocator, size);
 							imageDecodeToBgra8(
 								  temp
 								, mip.m_data
-								, mip.m_width
-								, mip.m_height
+								, width
+								, height
 								, mip.m_depth
 								, pitch
 								, slice
@@ -8203,8 +8214,8 @@ VK_DESTROY
 								);
 
 							imageInfos[kk].data     = temp;
-							imageInfos[kk].width    = mip.m_width;
-							imageInfos[kk].height   = mip.m_height;
+							imageInfos[kk].width    = width;
+							imageInfos[kk].height   = height;
 							imageInfos[kk].depth    = mip.m_depth;
 							imageInfos[kk].pitch    = pitch;
 							imageInfos[kk].slice    = slice;
@@ -9180,6 +9191,11 @@ VK_DESTROY
 
 		errorState = ErrorState::SwapChainCreated;
 
+		if (m_needToRecreateSwapchain)
+		{
+			return VK_SUCCESS;
+		}
+
 		{
 			result = createAttachments(_commandBuffer);
 
@@ -9232,7 +9248,8 @@ VK_DESTROY
 
 	void SwapChainVK::destroy()
 	{
-		if (VK_NULL_HANDLE != m_swapChain)
+		if (VK_NULL_HANDLE != m_swapChain
+		||  VK_NULL_HANDLE != m_surface)
 		{
 			releaseFrameBuffer();
 			releaseAttachments();
@@ -9738,6 +9755,15 @@ VK_DESTROY
 		m_sci.presentMode        = s_presentMode[presentModeIdx].mode;
 		m_sci.clipped            = VK_FALSE;
 
+		if (0 == width
+		||  0 == height)
+		{
+			BX_TRACE("Create swapchain: surface extent is %dx%d, deferred.", width, height);
+			m_sampler = s_msaa[(m_desc.flags & BGFX_SWAP_CHAIN_MSAA_MASK) >> BGFX_SWAP_CHAIN_MSAA_SHIFT];
+			m_needToRecreateSwapchain = true;
+			return VK_SUCCESS;
+		}
+
 		VkPresentModeKHR modes[2];
 		VkSwapchainPresentModesCreateInfoEXT modesInfo;
 
@@ -10070,7 +10096,7 @@ VK_DESTROY
 				: m_backBufferColorImageView[ii]
 				;
 
-			if (NULL != m_backBufferDepthStencilImageView)
+			if (VK_NULL_HANDLE != m_backBufferDepthStencilImageView)
 			{
 				attachments[numAttachments++] = m_backBufferDepthStencilImageView;
 			}
@@ -10733,7 +10759,10 @@ VK_DESTROY
 
 		const bool acquired = m_swapChain.acquire(_commandBuffer, _block);
 		m_needPresent = m_swapChain.m_needPresent;
-		m_currentFramebuffer = m_swapChain.m_backBufferFrameBuffer[m_swapChain.m_backBufferColorIdx];
+		m_currentFramebuffer = acquired
+			? m_swapChain.m_backBufferFrameBuffer[m_swapChain.m_backBufferColorIdx]
+			: VkFramebuffer(VK_NULL_HANDLE)
+			;
 
 		return acquired;
 	}
@@ -11238,6 +11267,11 @@ VK_DESTROY
 				const bool is3D = VK_IMAGE_VIEW_TYPE_3D == texture.m_type;
 				const uint32_t depth = bx::max<uint32_t>(1, blit.m_depth);
 				const uint16_t z = toBuffer ? blit.m_srcZ : blit.m_dstZ;
+				const uint8_t  mip = toBuffer ? blit.m_srcMip : blit.m_dstMip;
+				const uint16_t x   = toBuffer ? blit.m_srcX   : blit.m_dstX;
+				const uint16_t y   = toBuffer ? blit.m_srcY   : blit.m_dstY;
+				const uint32_t mipWidth  = bx::max<uint32_t>(1, texture.m_width  >> mip);
+				const uint32_t mipHeight = bx::max<uint32_t>(1, texture.m_height >> mip);
 
 				uint32_t rowLength, imageHeight;
 				calcTextureRegionTexelPitch(
@@ -11256,20 +11290,20 @@ VK_DESTROY
 					.imageSubresource  =
 					{
 						.aspectMask     = texture.m_aspectFlags,
-						.mipLevel       = toBuffer ? blit.m_srcMip : blit.m_dstMip,
+						.mipLevel       = mip,
 						.baseArrayLayer = is3D ? 0u : uint32_t(z),
 						.layerCount     = is3D ? 1u : depth,
 					},
 					.imageOffset =
 					{
-						.x = toBuffer ? blit.m_srcX : blit.m_dstX,
-						.y = toBuffer ? blit.m_srcY : blit.m_dstY,
+						.x = x,
+						.y = y,
 						.z = is3D ? z : 0,
 					},
 					.imageExtent =
 					{
-						.width  = blit.m_width,
-						.height = blit.m_height,
+						.width  = bx::min<uint32_t>(blit.m_width,  mipWidth  - x),
+						.height = bx::min<uint32_t>(blit.m_height, mipHeight - y),
 						.depth  = is3D ? depth : 1,
 					},
 				};
@@ -11397,16 +11431,26 @@ VK_DESTROY
 			const bimg::ImageBlockInfo& srcBlockInfo = bimg::getBlockInfo(bimg::TextureFormat::Enum(src.m_textureFormat) );
 			const bimg::ImageBlockInfo& dstBlockInfo = bimg::getBlockInfo(bimg::TextureFormat::Enum(dst.m_textureFormat) );
 
-			const bool stageCompressed3D = true
+			const auto isBlockRegion = [&](const bimg::ImageBlockInfo& _blockInfo, const VkOffset3D& _offset, uint32_t _mipWidth, uint32_t _mipHeight)
+			{
+				return true
+					&& (0 == copyInfo.extent.width  % _blockInfo.blockWidth  || uint32_t(_offset.x) + copyInfo.extent.width  == _mipWidth )
+					&& (0 == copyInfo.extent.height % _blockInfo.blockHeight || uint32_t(_offset.y) + copyInfo.extent.height == _mipHeight)
+					;
+			};
+
+			const bool stageCompressed = true
 				&& !resolve
 				&& !srcSingleMsaa
 				&& blit.m_src.idx != blit.m_dst.idx
 				&& bimg::isCompressed(bimg::TextureFormat::Enum(src.m_textureFormat) )
 				&& ( (isSrc3D && (0 != srcMipWidth % srcBlockInfo.blockWidth || 0 != srcMipHeight % srcBlockInfo.blockHeight) )
-				||   (isDst3D && (0 != dstMipWidth % dstBlockInfo.blockWidth || 0 != dstMipHeight % dstBlockInfo.blockHeight) ) )
+				||   (isDst3D && (0 != dstMipWidth % dstBlockInfo.blockWidth || 0 != dstMipHeight % dstBlockInfo.blockHeight) )
+				||   !isBlockRegion(srcBlockInfo, copyInfo.srcOffset, srcMipWidth, srcMipHeight)
+				||   !isBlockRegion(dstBlockInfo, copyInfo.dstOffset, dstMipWidth, dstMipHeight) )
 				;
 
-			if (stageCompressed3D)
+			if (stageCompressed)
 			{
 				const uint32_t numBlocksX = (copyInfo.extent.width  + srcBlockInfo.blockWidth  - 1) / srcBlockInfo.blockWidth;
 				const uint32_t numBlocksY = (copyInfo.extent.height + srcBlockInfo.blockHeight - 1) / srcBlockInfo.blockHeight;
@@ -11423,8 +11467,8 @@ VK_DESTROY
 					.imageOffset       = copyInfo.srcOffset,
 					.imageExtent       =
 					{
-						.width  = copyInfo.extent.width,
-						.height = copyInfo.extent.height,
+						.width  = bx::min<uint32_t>(numBlocksX * srcBlockInfo.blockWidth,  srcMipWidth  - blit.m_srcX),
+						.height = bx::min<uint32_t>(numBlocksY * srcBlockInfo.blockHeight, srcMipHeight - blit.m_srcY),
 						.depth  = isSrc3D ? depth : 1,
 					},
 				};
@@ -11635,6 +11679,8 @@ VK_DESTROY
 		VkDescriptorSet currentDescriptorSet = VK_NULL_HANDLE;
 		uint32_t currentBindHash = 0;
 		uint32_t descriptorSetCount = 0;
+		ChunkedScratchBufferOffset currentSbo = { .buffer = VK_NULL_HANDLE, .offsets = { 0, 0 } };
+		uint32_t currentNumOffsets = 0;
 
 		struct PipelineState
 		{
@@ -12070,18 +12116,18 @@ VK_DESTROY
 
 					if (VK_NULL_HANDLE != program.m_descriptorSetLayout)
 					{
-						ChunkedScratchBufferOffset sbo;
-
 						const uint32_t vsSize = program.m_vsh->m_size;
-						uint32_t numOffsets = 0;
 
 						if (constantsChanged
 						||  hasPredefined)
 						{
+							currentSbo.buffer = VK_NULL_HANDLE;
+							currentNumOffsets = 0;
+
 							if (vsSize > 0)
 							{
-								uniformScratchBuffer.write(sbo, m_vsScratch, vsSize);
-								numOffsets = 1;
+								uniformScratchBuffer.write(currentSbo, m_vsScratch, vsSize);
+								currentNumOffsets = 1;
 							}
 						}
 
@@ -12090,7 +12136,7 @@ VK_DESTROY
 						hash.add(program.m_descriptorSetLayout);
 						hash.add(program.m_msaaMask);
 						hash.add(bindIdx);
-						hash.add(sbo.buffer);
+						hash.add(currentSbo.buffer);
 						hash.add(vsSize);
 						hash.add(0);
 
@@ -12111,7 +12157,7 @@ VK_DESTROY
 								VkDescriptorSet descriptorSet = getDescriptorSet(
 									  program
 									, renderBind
-									, sbo.buffer
+									, currentSbo.buffer
 									, _render->m_colorPalette
 								);
 
@@ -12133,8 +12179,8 @@ VK_DESTROY
 							, 0
 							, 1
 							, &currentDescriptorSet
-							, numOffsets
-							, sbo.offsets
+							, currentNumOffsets
+							, currentSbo.offsets
 							);
 					}
 
@@ -12431,19 +12477,21 @@ VK_DESTROY
 
 					if (VK_NULL_HANDLE != program.m_descriptorSetLayout)
 					{
-						ChunkedScratchBufferOffset sbo;
-
 						const uint32_t vsSize = program.m_vsh->m_size;
 						const uint32_t fsSize = NULL != program.m_fsh ? program.m_fsh->m_size : 0;
-						uint32_t numOffsets = 0;
 
-						if (true
-						&& (constantsChanged || hasPredefined)
-						&& (0 < vsSize || 0 < fsSize)
-						   )
+						if (constantsChanged
+						||  hasPredefined)
 						{
-							uniformScratchBuffer.write(sbo, m_vsScratch, vsSize, m_fsScratch, fsSize);
-							numOffsets = (0 < vsSize) + (0 < fsSize);
+							currentSbo.buffer = VK_NULL_HANDLE;
+							currentNumOffsets = 0;
+
+							if (0 < vsSize
+							||  0 < fsSize)
+							{
+								uniformScratchBuffer.write(currentSbo, m_vsScratch, vsSize, m_fsScratch, fsSize);
+								currentNumOffsets = (0 < vsSize) + (0 < fsSize);
+							}
 						}
 
 						bx::HashMurmur2A hash;
@@ -12451,7 +12499,7 @@ VK_DESTROY
 						hash.add(program.m_descriptorSetLayout);
 						hash.add(program.m_msaaMask);
 						hash.add(bindIdx);
-						hash.add(sbo.buffer);
+						hash.add(currentSbo.buffer);
 						hash.add(vsSize);
 						hash.add(fsSize);
 
@@ -12472,7 +12520,7 @@ VK_DESTROY
 								VkDescriptorSet descriptorSet = getDescriptorSet(
 									  program
 									, renderBind
-									, sbo.buffer
+									, currentSbo.buffer
 									, _render->m_colorPalette
 									);
 
@@ -12494,8 +12542,8 @@ VK_DESTROY
 							, 0
 							, 1
 							, &currentDescriptorSet
-							, numOffsets
-							, sbo.offsets
+							, currentNumOffsets
+							, currentSbo.offsets
 							);
 					}
 

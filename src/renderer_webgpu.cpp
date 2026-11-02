@@ -1915,8 +1915,8 @@ WGPU_IMPORT
 			const uint32_t blockWidth  = bx::max<uint32_t>(1, blockInfo.blockWidth);
 			const uint32_t blockHeight = bx::max<uint32_t>(1, blockInfo.blockHeight);
 
-			const uint32_t srcWidth  = bx::alignUp(bx::max<uint32_t>(1, texture.m_width  >> _mip), blockWidth);
-			const uint32_t srcHeight = bx::alignUp(bx::max<uint32_t>(1, texture.m_height >> _mip), blockHeight);
+			const uint32_t srcWidth  = bx::strideAlign(bx::max<uint32_t>(1, texture.m_width  >> _mip), blockWidth);
+			const uint32_t srcHeight = bx::strideAlign(bx::max<uint32_t>(1, texture.m_height >> _mip), blockHeight);
 
 			const uint32_t numRows  = srcHeight/blockHeight;
 			const uint32_t dstPitch = (srcWidth/blockWidth)*blockInfo.blockSize;
@@ -3583,6 +3583,12 @@ WGPU_IMPORT
 							sampleType = WGPUTextureSampleType_Uint;
 						}
 
+						if (shaderBind.multisampled
+						&&  WGPUTextureSampleType_Float == sampleType)
+						{
+							sampleType = WGPUTextureSampleType_UnfilterableFloat;
+						}
+
 						WGPUSamplerBindingType samplerBindingType = WGPUSamplerBindingType_Filtering;
 						switch (sampleType)
 						{
@@ -4415,12 +4421,16 @@ WGPU_IMPORT
 
 		bool hasStencil(TextureFormat::Enum _format)
 		{
-			return 0 < bimg::getBlockInfo(bimg::TextureFormat::Enum(_format) ).stencilBits;
+			return bimg::isDepth(bimg::TextureFormat::Enum(_format) )
+				&& 0 < bimg::getBlockInfo(bimg::TextureFormat::Enum(_format) ).stencilBits
+				;
 		}
 
 		bool hasDepth(TextureFormat::Enum _format)
 		{
-			return 0 < bimg::getBlockInfo(bimg::TextureFormat::Enum(_format) ).depthBits;
+			return bimg::isDepth(bimg::TextureFormat::Enum(_format) )
+				&& 0 < bimg::getBlockInfo(bimg::TextureFormat::Enum(_format) ).depthBits
+				;
 		}
 
 		void addAttachmentState(bx::HashMurmur3& _murmur, const FrameBufferWGPU& _fb) const
@@ -5399,7 +5409,13 @@ WGPU_IMPORT
 			{
 				textureDesc.usage           = 0
 					| WGPUTextureUsage_RenderAttachment
-					| (bimg::isDepth(bimg::TextureFormat::Enum(m_textureFormat) ) ? WGPUTextureUsage_TextureBinding : 0)
+					| (false
+						|| bimg::isDepth(bimg::TextureFormat::Enum(m_textureFormat) )
+						|| 0 != (m_flags&BGFX_TEXTURE_MSAA_SAMPLE)
+						? WGPUTextureUsage_TextureBinding
+						: 0
+						)
+					| (0 != (m_flags&BGFX_TEXTURE_MSAA_SAMPLE) ? WGPUTextureUsage_CopySrc|WGPUTextureUsage_CopyDst : 0)
 					;
 				textureDesc.mipLevelCount   = 1;
 				textureDesc.sampleCount     = m_msaaCount;
@@ -5627,7 +5643,7 @@ WGPU_IMPORT
 
 		if (bimg::isCompressed(bimg::TextureFormat::Enum(m_textureFormat) ) )
 		{
-			const uint32_t alignedWidth = bx::max<uint32_t>(blockInfo.blockWidth, bx::alignUp(_rect.m_width, blockInfo.blockWidth) );
+			const uint32_t alignedWidth = bx::max<uint32_t>(blockInfo.blockWidth, bx::strideAlign(_rect.m_width, blockInfo.blockWidth) );
 			rectPitch = (alignedWidth / blockInfo.blockWidth) * blockInfo.blockSize;
 		}
 
@@ -5647,11 +5663,11 @@ WGPU_IMPORT
 			srcData = temp;
 		}
 
-		const uint32_t mipWidth  = bx::alignUp(bx::max(1u, m_width  >> _mip), blockInfo.blockWidth);
-		const uint32_t mipHeight = bx::alignUp(bx::max(1u, m_height >> _mip), blockInfo.blockHeight);
+		const uint32_t mipWidth  = bx::strideAlign(bx::max(1u, m_width  >> _mip), blockInfo.blockWidth);
+		const uint32_t mipHeight = bx::strideAlign(bx::max(1u, m_height >> _mip), blockInfo.blockHeight);
 
-		const uint32_t rectWidth  = bx::alignUp<uint32_t>(_rect.m_width,  blockInfo.blockWidth);
-		const uint32_t rectHeight = bx::alignUp<uint32_t>(_rect.m_height, blockInfo.blockHeight);
+		const uint32_t rectWidth  = bx::strideAlign(_rect.m_width,  blockInfo.blockWidth);
+		const uint32_t rectHeight = bx::strideAlign(_rect.m_height, blockInfo.blockHeight);
 
 		const uint32_t width   = bx::min<uint32_t>(rectWidth,  mipWidth  - bx::min<uint32_t>(_rect.m_x, mipWidth ) );
 		const uint32_t height  = bx::min<uint32_t>(rectHeight, mipHeight - bx::min<uint32_t>(_rect.m_y, mipHeight) );
@@ -7221,7 +7237,7 @@ WGPU_IMPORT
 
 			const WGPUExtent3D copySize =
 			{
-				.width              = bx::alignUp<uint32_t>(_blit.m_width, blockWidth),
+				.width              = bx::strideAlign(_blit.m_width, blockWidth),
 				.height             = copyRows*blockHeight,
 				.depthOrArrayLayers = copyDepth,
 			};
@@ -7294,6 +7310,32 @@ WGPU_IMPORT
 					.depthOrArrayLayers = bx::max<uint32_t>(1, blit.m_depth),
 				}
 				);
+
+			if (NULL != src.m_textureMsaa
+			&&  NULL != dst.m_textureMsaa
+			&&  src.m_msaaCount == dst.m_msaaCount
+			&&  0 != (src.m_flags & dst.m_flags & BGFX_TEXTURE_MSAA_SAMPLE) )
+			{
+				s_renderWGPU->m_cmd.copyTextureToTexture(
+					{
+						.texture  = src.m_textureMsaa,
+						.mipLevel = 0,
+						.origin   = { .x = 0, .y = 0, .z = blit.m_srcZ },
+						.aspect   = WGPUTextureAspect_All,
+					},
+					{
+						.texture  = dst.m_textureMsaa,
+						.mipLevel = 0,
+						.origin   = { .x = 0, .y = 0, .z = blit.m_dstZ },
+						.aspect   = WGPUTextureAspect_All,
+					},
+					{
+						.width              = blit.m_width,
+						.height             = blit.m_height,
+						.depthOrArrayLayers = bx::max<uint32_t>(1, blit.m_depth),
+					}
+					);
+			}
 		}
 	}
 
@@ -7655,6 +7697,7 @@ WGPU_IMPORT
 
 		ProgramHandle currentProgram = BGFX_INVALID_HANDLE;
 		bool hasPredefined = false;
+		ChunkedScratchBufferOffset currentSbo = { .buffer = NULL, .offsets = { 0, 0 } };
 		SortKey key;
 		uint16_t view = UINT16_MAX;
 		const View* renderView = &_render->view(0);
@@ -8095,14 +8138,13 @@ WGPU_IMPORT
 						}
 					}
 
-					ChunkedScratchBufferOffset sbo;
 					const uint32_t vsSize = program.m_vsh->m_size;
 
 					if (constantsChanged
 					||  hasPredefined)
 					{
 						viewState.setPredefined<4>(this, view, *renderView, program, _render, compute);
-						m_uniformScratchBuffer.write(sbo, m_vsScratch, vsSize);
+						m_uniformScratchBuffer.write(currentSbo, m_vsScratch, vsSize);
 					}
 
 					if (programChanged)
@@ -8115,7 +8157,7 @@ WGPU_IMPORT
 					bx::HashMurmur3 murmur;
 					murmur.begin(0x434f4d50);
 					murmur.add(renderBind.m_bind, sizeof(renderBind.m_bind) );
-					murmur.add(sbo.buffer);
+					murmur.add(currentSbo.buffer);
 					murmur.add(vsSize);
 					murmur.add(uintptr_t(bindGroupLayout) );
 					const uint32_t bindHash = murmur.end();
@@ -8123,12 +8165,12 @@ WGPU_IMPORT
 					BindGroupMap::iterator it = m_bindGroupMap.find(bindHash);
 					if (it == m_bindGroupMap.end() )
 					{
-						const BindGroup bindGroup = createBindGroup(bindGroupLayout, program, renderBind, sbo, true);
+						const BindGroup bindGroup = createBindGroup(bindGroupLayout, program, renderBind, currentSbo, true);
 						it = m_bindGroupMap.insert(stl::make_pair(bindHash, bindGroup) ).first;
 					}
 					const BindGroup* bindGroupCached = &it->second;
 
-					WGPU_CHECK(wgpuComputePassEncoderSetBindGroup(computePassEncoder, 0, bindGroupCached->bindGroup, bindGroupCached->numOffsets, sbo.offsets) );
+					WGPU_CHECK(wgpuComputePassEncoderSetBindGroup(computePassEncoder, 0, bindGroupCached->bindGroup, bindGroupCached->numOffsets, currentSbo.offsets) );
 
 					if (isValid(compute.m_indirectBuffer) )
 					{

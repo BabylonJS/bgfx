@@ -914,17 +914,20 @@ constdef PciIdFlags : inline ushort
 	// Apple adapter.
 	APPLE                  = 0x106b,
 
+	// ARM adapter.
+	ARM                    = 0x13b5,
+
+	// Google adapter.
+	GOOGLE                 = 0x1ae0,
+
 	// Intel adapter.
 	INTEL                  = 0x8086,
-
-	// NVIDIA adapter.
-	NVIDIA                 = 0x10de,
 
 	// Microsoft adapter.
 	MICROSOFT              = 0x1414,
 
-	// ARM adapter.
-	ARM                    = 0x13b5,
+	// NVIDIA adapter.
+	NVIDIA                 = 0x10de,
 }
 
 constdef CubeMapFlags : inline uint
@@ -3778,6 +3781,10 @@ extern fn void encoder_discard(Encoder* _this, char _flags) @cname("bgfx_encoder
 // 
 // @attention Destination texture must be created with `BGFX_TEXTURE_BLIT_DST` flag.
 // 
+// @attention A depth texture, or one created with `BGFX_TEXTURE_MSAA_SAMPLE`, can only
+//   be blitted whole: both sides start at the origin of mips of the same size, and
+//   the copy covers the whole mip.
+// 
 // _id : `View id.`
 // _dst : `Destination texture region.`
 // _src : `Source texture region.`
@@ -4268,6 +4275,10 @@ extern fn void discard(char _flags) @cname("bgfx_discard");
 //   draw commands are executed after blit and compute commands.
 // 
 // @attention Destination texture must be created with `BGFX_TEXTURE_BLIT_DST` flag.
+// 
+// @attention A depth texture, or one created with `BGFX_TEXTURE_MSAA_SAMPLE`, can only
+//   be blitted whole: both sides start at the origin of mips of the same size, and
+//   the copy covers the whole mip.
 // 
 // _id : `View id.`
 // _dst : `Destination texture region.`
