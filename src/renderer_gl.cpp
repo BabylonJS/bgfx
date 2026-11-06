@@ -1250,7 +1250,7 @@ namespace bgfx { namespace gl
 
 	void lazyEnableVertexAttribArray(GLuint index)
 	{
-		if (BX_ENABLED(BX_PLATFORM_EMSCRIPTEN) )
+		if constexpr (BX_ENABLED(BX_PLATFORM_EMSCRIPTEN) )
 		{
 			if (index >= 64)
 			{
@@ -1272,7 +1272,7 @@ namespace bgfx { namespace gl
 
 	void lazyDisableVertexAttribArray(GLuint index)
 	{
-		if (BX_ENABLED(BX_PLATFORM_EMSCRIPTEN) )
+		if constexpr (BX_ENABLED(BX_PLATFORM_EMSCRIPTEN) )
 		{
 			if (index >= 64)
 			{
@@ -1294,7 +1294,7 @@ namespace bgfx { namespace gl
 
 	void applyLazyEnabledVertexAttributes()
 	{
-		if (BX_ENABLED(BX_PLATFORM_EMSCRIPTEN) )
+		if constexpr (BX_ENABLED(BX_PLATFORM_EMSCRIPTEN) )
 		{
 			while (s_vertexAttribArraysPendingDisable)
 			{
@@ -1594,7 +1594,7 @@ namespace bgfx { namespace gl
 			;
 
 		GLsizei bpp  = bimg::getBitsPerPixel(bimg::TextureFormat::Enum(_format) );
-		GLsizei size = (_dim*_dim*bpp)/8;
+		GLsizei size = GLsizei(bimg::imageGetSize(NULL, _dim, _dim, 0, false, false, 1, bimg::TextureFormat::Enum(_format) ) );
 		void* data = NULL;
 
 		if (bimg::isDepth(bimg::TextureFormat::Enum(_format) ) )
@@ -1621,8 +1621,7 @@ namespace bgfx { namespace gl
 			for (uint32_t ii = 0, dim = _dim; ii < (_mipmaps ? 5u : 1u) && 0 == err; ++ii, dim >>= 1)
 			{
 				dim = bx::max(1, dim);
-				uint32_t block = bx::max(4, dim);
-				size = (block*block*bpp)/8;
+				size = GLsizei(bimg::imageGetSize(NULL, dim, dim, 0, false, false, 1, bimg::TextureFormat::Enum(_format) ) );
 				compressedTexImage(target, ii, internalFmt, dim, dim, 0, 0, size, data);
 				err |= getGlError();
 			}
@@ -1774,11 +1773,19 @@ namespace bgfx { namespace gl
 					;
 
 			case TextureFormat::ASTC4x4:
+			case TextureFormat::ASTC5x4:
 			case TextureFormat::ASTC5x5:
+			case TextureFormat::ASTC6x5:
 			case TextureFormat::ASTC6x6:
 			case TextureFormat::ASTC8x5:
 			case TextureFormat::ASTC8x6:
+			case TextureFormat::ASTC8x8:
 			case TextureFormat::ASTC10x5:
+			case TextureFormat::ASTC10x6:
+			case TextureFormat::ASTC10x8:
+			case TextureFormat::ASTC10x10:
+			case TextureFormat::ASTC12x10:
+			case TextureFormat::ASTC12x12:
 				return emscripten_webgl_enable_extension(ctx, "WEBGL_compressed_texture_astc");
 
 			default:
@@ -2351,7 +2358,7 @@ namespace bgfx { namespace gl
 			m_version     = getGLString(GL_VERSION);
 			m_glslVersion = getGLString(GL_SHADING_LANGUAGE_VERSION);
 
-			if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES) )
+			if constexpr (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES) )
 			{
 				const bx::StringView essl = bx::strFind(m_glslVersion, "GLSL ES ");
 
@@ -2403,7 +2410,7 @@ namespace bgfx { namespace gl
 				}
 			}
 
-			if (BX_ENABLED(BGFX_CONFIG_DEBUG) )
+			if constexpr (BX_ENABLED(BGFX_CONFIG_DEBUG) )
 			{
 #define GL_GET(_pname, _min) BX_TRACE("  " #_pname " %d (min: %d)", glGet(_pname), _min)
 				BX_TRACE("Defaults:");
@@ -2458,7 +2465,7 @@ namespace bgfx { namespace gl
 				s_extension[Extension::KHR_debug].m_initialize = false;
 			}
 
-			if (BX_ENABLED(BGFX_CONFIG_RENDERER_USE_EXTENSIONS) )
+			if constexpr (BX_ENABLED(BGFX_CONFIG_RENDERER_USE_EXTENSIONS) )
 			{
 				const char* extensions = (const char*)glGetString(GL_EXTENSIONS);
 				getGlError(); // ignore error if glGetString returns NULL.
@@ -2593,7 +2600,7 @@ namespace bgfx { namespace gl
 				s_textureFormat[TextureFormat::PTC22].m_supported |= ptc2Supported;
 				s_textureFormat[TextureFormat::PTC24].m_supported |= ptc2Supported;
 
-				if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES) )
+				if constexpr (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES) )
 				{
 					setTextureFormat(TextureFormat::R16F,    GL_R16F,    GL_RED,  0x140B /* == GL_HALF_FLOAT, but bgfx overwrites it globally with GL_HALF_FLOAT_OES */);
 					setTextureFormat(TextureFormat::RG16F,   GL_RG16F,   GL_RG,   0x140B /* == GL_HALF_FLOAT, but bgfx overwrites it globally with GL_HALF_FLOAT_OES */);
@@ -2626,7 +2633,7 @@ namespace bgfx { namespace gl
 					setTextureFormatSrgb(TextureFormat::R5G6B5, GL_ZERO,  GL_BGR);
 				}
 
-				if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGL)
+				if constexpr (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGL)
 				||  BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES))
 				{
 					setTextureFormat(TextureFormat::R8I,     GL_R8I,      GL_RED_INTEGER,  GL_BYTE);
@@ -2645,7 +2652,7 @@ namespace bgfx { namespace gl
 				||  s_extension[Extension::IMG_texture_format_BGRA8888  ].m_supported
 				||  s_extension[Extension::APPLE_texture_format_BGRA8888].m_supported)
 				{
-					if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGL) )
+					if constexpr (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGL) )
 					{
 						m_readPixelsFmt = GL_BGRA;
 					}
@@ -2674,7 +2681,7 @@ namespace bgfx { namespace gl
 					}
 				}
 
-				if (BX_ENABLED(BX_PLATFORM_EMSCRIPTEN) )
+				if constexpr (BX_ENABLED(BX_PLATFORM_EMSCRIPTEN) )
 				{
 					// OpenGL ES does not have reversed BGRA4 and BGR5A1 support.
 					setTextureFormat(TextureFormat::BGRA4,  GL_RGBA, GL_RGBA, GL_UNSIGNED_SHORT_4_4_4_4);
@@ -2725,7 +2732,7 @@ namespace bgfx { namespace gl
 					}
 				}
 
-				if (BX_ENABLED(0) )
+				if constexpr (BX_ENABLED(0) )
 				{
 					// Disable all compressed texture formats. For testing only.
 					for (uint32_t ii = 0; ii < TextureFormat::Unknown; ++ii)
@@ -2896,7 +2903,7 @@ namespace bgfx { namespace gl
 					: 0
 					;
 
-				if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES) )
+				if constexpr (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES) )
 				{
 					glPolygonMode = s_extension[Extension::NV_polygon_mode].m_supported
 						? glPolygonModeNV
@@ -2988,7 +2995,7 @@ namespace bgfx { namespace gl
 						);
 				}
 
-				if (!BX_ENABLED(BGFX_CONFIG_GL_NORMALIZE_NDC_CONVENTIONS) )
+				if constexpr (!BX_ENABLED(BGFX_CONFIG_GL_NORMALIZE_NDC_CONVENTIONS) )
 				{
 					g_caps.homogeneousDepth = true;
 					g_caps.originBottomLeft = true;
@@ -3063,7 +3070,7 @@ namespace bgfx { namespace gl
 
 				g_caps.supported |= m_glctx.getCaps();
 
-				if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES) )
+				if constexpr (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES) )
 				{
 					m_srgbWriteControlSupport = s_extension[Extension::EXT_sRGB_write_control].m_supported;
 
@@ -3265,12 +3272,14 @@ namespace bgfx { namespace gl
 
 		RendererType::Enum getRendererType() const override
 		{
-			if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGL) )
+			if constexpr (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGL) )
 			{
 				return RendererType::OpenGL;
 			}
-
-			return RendererType::OpenGLES;
+			else
+			{
+				return RendererType::OpenGLES;
+			}
 		}
 
 		const char* getRendererName() const override
@@ -3656,16 +3665,21 @@ namespace bgfx { namespace gl
 				{
 					GL_CHECK(glBindTexture(texture.m_target, texture.m_id) );
 
+					const GLenum target = GL_TEXTURE_CUBE_MAP == texture.m_target
+						? GL_TEXTURE_CUBE_MAP_POSITIVE_X + _layer
+						: texture.m_target
+						;
+
 					if (compressed)
 					{
-						GL_CHECK(glGetCompressedTexImage(texture.m_target
+						GL_CHECK(glGetCompressedTexImage(target
 							, _mip
 							, _data
 							) );
 					}
 					else
 					{
-						GL_CHECK(glGetTexImage(texture.m_target
+						GL_CHECK(glGetTexImage(target
 							, _mip
 							, texture.m_fmt
 							, texture.m_type
@@ -4392,7 +4406,7 @@ namespace bgfx { namespace gl
 				GL_CHECK(glGenFramebuffers(1, &m_msaaBackBufferFbo) );
 				GL_CHECK(glBindFramebuffer(GL_FRAMEBUFFER, m_msaaBackBufferFbo) );
 
-				if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES))
+				if constexpr (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES))
 				{
 					GL_CHECK(glGenTextures(BX_COUNTOF(m_msaaBackBufferTextures), m_msaaBackBufferTextures) );
 					GL_CHECK(glBindTexture(GL_TEXTURE_2D, m_msaaBackBufferTextures[0]) );
@@ -4558,7 +4572,7 @@ namespace bgfx { namespace gl
 				GL_CHECK(glDeleteFramebuffers(1, &m_msaaBackBufferFbo) );
 				m_msaaBackBufferFbo = 0;
 
-				if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES))
+				if constexpr (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES))
 				{
 					if (0 != m_msaaBackBufferTextures[0])
 					{
@@ -4601,7 +4615,7 @@ namespace bgfx { namespace gl
 					: GL_LINEAR
 					;
 
-				if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES))
+				if constexpr (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES))
 				{
 					GL_CHECK(glUseProgram(m_msaaBlitProgram) );
 					GL_CHECK(glActiveTexture(GL_TEXTURE0) );
@@ -4723,7 +4737,7 @@ namespace bgfx { namespace gl
 					GL_CHECK(glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, magFilter) );
 					GL_CHECK(glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, minFilter) );
 
-					if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGL) )
+					if constexpr (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGL) )
 					{
 						GL_CHECK(glSamplerParameterf(sampler, GL_TEXTURE_LOD_BIAS, float(BGFX_CONFIG_MIP_LOD_BIAS) ) );
 					}
@@ -7003,11 +7017,11 @@ namespace bgfx { namespace gl
 								imageDecodeToRgba8(
 									  temp
 									, mip.m_data
-									, mip.m_width
-									, mip.m_height
+									, width
+									, height
 									, mip.m_depth
-									, mip.m_width*4
-									, mip.m_width*4*mip.m_height
+									, width*4
+									, width*4*height
 									, mip.m_format
 									);
 								data = temp;
@@ -7353,12 +7367,12 @@ namespace bgfx { namespace gl
 			GL_CHECK(glTexParameteri(target, GL_TEXTURE_MAG_FILTER, magFilter) );
 			GL_CHECK(glTexParameteri(target, GL_TEXTURE_MIN_FILTER, minFilter) );
 
-			if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGL) )
+			if constexpr (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGL) )
 			{
 				GL_CHECK(glTexParameterf(target, GL_TEXTURE_LOD_BIAS, float(BGFX_CONFIG_MIP_LOD_BIAS) ) );
 			}
 
-			if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGL)
+			if constexpr (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGL)
 			||  BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES >= 30) )
 			{
 				GL_CHECK(glTexParameterf(target, GL_TEXTURE_MIN_LOD, float(_lodMin) * 0.25f) );
@@ -7860,8 +7874,7 @@ namespace bgfx { namespace gl
 			uint8_t type;
 			bx::read(&reader, type, &err);
 
-			uint8_t num;
-			bx::read(&reader, num, &err);
+			readUniformNum(&reader, magic, &err);
 
 			uint16_t regIndex;
 			bx::read(&reader, regIndex, &err);
@@ -7898,7 +7911,7 @@ namespace bgfx { namespace gl
 				char* temp = (char*)BX_STACK_ALLOC(tempLen);
 				bx::StaticMemoryBlockWriter writer(temp, tempLen);
 
-				if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES) )
+				if constexpr (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES) )
 				{
 					const bool cubeArray = !bx::strFind(code, "CubeArray").isEmpty();
 
@@ -8446,7 +8459,7 @@ namespace bgfx { namespace gl
 		GL_CHECK(glBindFramebuffer(GL_READ_FRAMEBUFFER, m_fbo[0]) );
 		GL_CHECK(glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0) );
 
-		if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES) )
+		if constexpr (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES) )
 		{
 			GL_CHECK(glUseProgram(s_renderGL->m_msaaBlitProgram) );
 			GL_CHECK(glActiveTexture(GL_TEXTURE0) );
@@ -8546,7 +8559,7 @@ namespace bgfx { namespace gl
 
 						GL_CHECK(glReadBuffer(GL_COLOR_ATTACHMENT0 + colorIdx) );
 
-						if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGL) )
+						if constexpr (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGL) )
 						{
 							GL_CHECK(glDrawBuffer(GL_COLOR_ATTACHMENT0 + colorIdx) );
 						}
@@ -8939,6 +8952,137 @@ namespace bgfx { namespace gl
 		return true;
 	}
 
+	static void compressedTexSubImage(
+		  const TextureGL& _dst
+		, uint8_t _mip
+		, uint32_t _x
+		, uint32_t _y
+		, uint32_t _z
+		, uint32_t _width
+		, uint32_t _height
+		, uint32_t _depth
+		, uint32_t _size
+		, const void* _data
+		)
+	{
+		if (GL_TEXTURE_3D             == _dst.m_target
+		||  GL_TEXTURE_2D_ARRAY       == _dst.m_target
+		||  GL_TEXTURE_CUBE_MAP_ARRAY == _dst.m_target)
+		{
+			GL_CHECK(glCompressedTexSubImage3D(_dst.m_target
+				, _mip
+				, _x
+				, _y
+				, _z
+				, _width
+				, _height
+				, _depth
+				, _dst.m_internalFmt
+				, _size
+				, _data
+				) );
+
+			return;
+		}
+
+		const uint32_t sliceSize = _size/_depth;
+
+		for (uint32_t ii = 0; ii < _depth; ++ii)
+		{
+			GL_CHECK(glCompressedTexSubImage2D(GL_TEXTURE_CUBE_MAP == _dst.m_target
+					? GL_TEXTURE_CUBE_MAP_POSITIVE_X + _z + ii
+					: _dst.m_target
+				, _mip
+				, _x
+				, _y
+				, _width
+				, _height
+				, _dst.m_internalFmt
+				, sliceSize
+				, (const uint8_t*)_data + ii*sliceSize
+				) );
+		}
+	}
+
+	static bool blitCompressedRegion(
+		  const BlitItem& _bi
+		, const TextureGL& _src
+		, const TextureGL& _dst
+		, bimg::TextureFormat::Enum _format
+		)
+	{
+		if (GL_ZERO == _dst.m_internalFmt
+		||  NULL == glGetCompressedTextureSubImage)
+		{
+			return false;
+		}
+
+		const bimg::ImageBlockInfo& info = bimg::getBlockInfo(_format);
+
+		const uint32_t blockW    = bx::max<uint32_t>(1, info.blockWidth);
+		const uint32_t blockH    = bx::max<uint32_t>(1, info.blockHeight);
+		const uint32_t blockSize = info.blockSize;
+
+		if (0 != _bi.m_srcX % blockW
+		||  0 != _bi.m_srcY % blockH
+		||  0 != _bi.m_dstX % blockW
+		||  0 != _bi.m_dstY % blockH)
+		{
+			return false;
+		}
+
+		const uint32_t srcMipW = bx::max<uint32_t>(1, _src.m_width  >> _bi.m_srcMip);
+		const uint32_t srcMipH = bx::max<uint32_t>(1, _src.m_height >> _bi.m_srcMip);
+		const uint32_t dstMipW = bx::max<uint32_t>(1, _dst.m_width  >> _bi.m_dstMip);
+		const uint32_t dstMipH = bx::max<uint32_t>(1, _dst.m_height >> _bi.m_dstMip);
+
+		const uint32_t copyW = bx::min<uint32_t>(_bi.m_width,  bx::min(srcMipW - _bi.m_srcX, dstMipW - _bi.m_dstX) );
+		const uint32_t copyH = bx::min<uint32_t>(_bi.m_height, bx::min(srcMipH - _bi.m_srcY, dstMipH - _bi.m_dstY) );
+
+		const uint32_t numBlocksX = (copyW + blockW - 1)/blockW;
+		const uint32_t numBlocksY = (copyH + blockH - 1)/blockH;
+		const uint32_t depth      = bx::max<uint32_t>(1, _bi.m_depth);
+
+		if (0 == numBlocksX
+		||  0 == numBlocksY)
+		{
+			return false;
+		}
+
+		const uint32_t size = numBlocksX*numBlocksY*blockSize*depth;
+		uint8_t* blocks = (uint8_t*)bx::alloc(g_allocator, size);
+
+		GL_CHECK(glGetCompressedTextureSubImage(_src.m_id
+			, _bi.m_srcMip
+			, _bi.m_srcX
+			, _bi.m_srcY
+			, _bi.m_srcZ
+			, bx::min<uint32_t>(numBlocksX*blockW, srcMipW - _bi.m_srcX)
+			, bx::min<uint32_t>(numBlocksY*blockH, srcMipH - _bi.m_srcY)
+			, depth
+			, size
+			, blocks
+			) );
+
+		GL_CHECK(glBindTexture(_dst.m_target, _dst.m_id) );
+		compressedTexSubImage(_dst
+			, _bi.m_dstMip
+			, _bi.m_dstX
+			, _bi.m_dstY
+			, _bi.m_dstZ
+			, bx::min<uint32_t>(numBlocksX*blockW, dstMipW - _bi.m_dstX)
+			, bx::min<uint32_t>(numBlocksY*blockH, dstMipH - _bi.m_dstY)
+			, depth
+			, size
+			, blocks
+			);
+		GL_CHECK(glBindTexture(_dst.m_target, 0) );
+
+		bx::free(g_allocator, blocks);
+
+		return true;
+	}
+
 	static void blitBuffer(GLuint _src, GLuint _dst, const BlitItem& _bi)
 	{
 		if (NULL == glCopyBufferSubData)
@@ -8976,6 +9120,48 @@ namespace bgfx { namespace gl
 		GL_CHECK(glBindBuffer(GL_PIXEL_UNPACK_BUFFER, _src) );
 		GL_CHECK(glPixelStorei(GL_UNPACK_ALIGNMENT, 1) );
 		GL_CHECK(glBindTexture(_dst.m_target, _dst.m_id) );
+
+		const bimg::TextureFormat::Enum format = bimg::TextureFormat::Enum(_dst.m_textureFormat);
+
+		if (bimg::isCompressed(format) )
+		{
+			const bimg::ImageBlockInfo& info = bimg::getBlockInfo(format);
+
+			const uint32_t blockW = bx::max<uint32_t>(1, info.blockWidth);
+			const uint32_t blockH = bx::max<uint32_t>(1, info.blockHeight);
+			const uint32_t mipW   = bx::max<uint32_t>(1, _dst.m_width  >> _bi.m_dstMip);
+			const uint32_t mipH   = bx::max<uint32_t>(1, _dst.m_height >> _bi.m_dstMip);
+			const uint32_t width  = bx::min<uint32_t>(_bi.m_width,  mipW - _bi.m_dstX);
+			const uint32_t height = bx::min<uint32_t>(_bi.m_height, mipH - _bi.m_dstY);
+			const uint32_t numRows  = (height + blockH - 1)/blockH;
+			const uint32_t rowBytes = (width + blockW - 1)/blockW*info.blockSize;
+
+			for (uint32_t slice = 0, depth = bx::max<uint32_t>(1, _bi.m_depth); slice < depth; ++slice)
+			{
+				for (uint32_t row = 0; row < numRows; ++row)
+				{
+					const uint32_t y = _bi.m_dstY + row*blockH;
+
+					compressedTexSubImage(_dst
+						, _bi.m_dstMip
+						, _bi.m_dstX
+						, y
+						, _bi.m_dstZ + slice
+						, width
+						, bx::min<uint32_t>(blockH, mipH - y)
+						, 1
+						, rowBytes
+						, (const GLvoid*)uintptr_t(_bi.m_srcOffset + slice*_bi.m_slicePitch + row*_bi.m_rowPitch)
+						);
+				}
+			}
+
+			GL_CHECK(glBindTexture(_dst.m_target, 0) );
+			GL_CHECK(glPixelStorei(GL_UNPACK_ALIGNMENT, 4) );
+			GL_CHECK(glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0) );
+
+			return;
+		}
 
 		uint32_t rowLength, imageHeight;
 		calcTextureRegionTexelPitch(
@@ -9033,17 +9219,134 @@ namespace bgfx { namespace gl
 		GL_CHECK(glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0) );
 	}
 
-	static void blitTextureToBuffer(GLuint _dst, const TextureGL& _src, const BlitItem& _bi)
+	static void blitTextureToBufferReadPixels(GLuint _dst, const TextureGL& _src, const BlitItem& _bi, GLenum _readPixelsFmt, GLuint _currentFbo)
+	{
+		const TextureFormat::Enum format = TextureFormat::Enum(_src.m_textureFormat);
+		const GLenum attachment = attachmentFor(format);
+		const bool   color      = GL_COLOR_ATTACHMENT0 == attachment;
+
+		if (bimg::isCompressed(bimg::TextureFormat::Enum(format) )
+		||  _src.isMsaaSurface()
+		||  (color && 0 == (g_caps.formats[format] & BGFX_CAPS_FORMAT_TEXTURE_FRAMEBUFFER) )
+		||  !isReadPixelsSupported(format)
+		||  (TextureFormat::BGRA8 == format && GL_BGRA != _readPixelsFmt) )
+		{
+			BX_WARN(false, "Blit texture into buffer is not supported for %s.", bimg::getName(bimg::TextureFormat::Enum(format) ) );
+
+			return;
+		}
+
+		uint32_t rowLength, imageHeight;
+		calcTextureRegionTexelPitch(
+			  rowLength
+			, imageHeight
+			, format
+			, _bi.m_rowPitch
+			, _bi.m_slicePitch
+			);
+		BX_UNUSED(imageHeight);
+
+		GLuint fbo;
+		GL_CHECK(glGenFramebuffers(1, &fbo) );
+		GL_CHECK(glBindFramebuffer(GL_FRAMEBUFFER, fbo) );
+		GL_CHECK(glBindBuffer(GL_PIXEL_PACK_BUFFER, _dst) );
+		GL_CHECK(glPixelStorei(GL_PACK_ALIGNMENT, 1) );
+		GL_CHECK(glPixelStorei(GL_PACK_ROW_LENGTH, rowLength) );
+
+		for (uint32_t slice = 0, depth = bx::max<uint32_t>(1, _bi.m_depth); slice < depth; ++slice)
+		{
+			framebufferAttachSlice(attachment, _src, _bi.m_srcMip, uint16_t(_bi.m_srcZ + slice) );
+			GL_CHECK(glReadBuffer(color ? GL_COLOR_ATTACHMENT0 : GL_NONE) );
+
+			GLenum readFmt  = TextureFormat::BGRA8 == format ? _readPixelsFmt : _src.m_fmt;
+			GLenum readType = _src.m_type;
+
+			if (color)
+			{
+				GLint implFmt  = 0;
+				GLint implType = 0;
+				GL_CHECK(glGetIntegerv(GL_IMPLEMENTATION_COLOR_READ_FORMAT, &implFmt) );
+				GL_CHECK(glGetIntegerv(GL_IMPLEMENTATION_COLOR_READ_TYPE, &implType) );
+
+				if (GLenum(implFmt) == readFmt
+				&&  GLenum(implType) != readType
+				&&  isHalfFloatType(readType)
+				&&  isHalfFloatType(GLenum(implType) ) )
+				{
+					readType = GLenum(implType);
+				}
+			}
+
+			GL_CHECK(glReadPixels(
+				  _bi.m_srcX
+				, _bi.m_srcY
+				, _bi.m_width
+				, _bi.m_height
+				, readFmt
+				, readType
+				, (GLvoid*)uintptr_t(_bi.m_dstOffset + slice*_bi.m_slicePitch)
+				) );
+		}
+
+		GL_CHECK(glPixelStorei(GL_PACK_ROW_LENGTH, 0) );
+		GL_CHECK(glPixelStorei(GL_PACK_ALIGNMENT, 4) );
+		GL_CHECK(glBindBuffer(GL_PIXEL_PACK_BUFFER, 0) );
+		GL_CHECK(glBindFramebuffer(GL_FRAMEBUFFER, _currentFbo) );
+		GL_CHECK(glDeleteFramebuffers(1, &fbo) );
+	}
+
+	static void blitTextureToBuffer(GLuint _dst, const TextureGL& _src, const BlitItem& _bi, GLenum _readPixelsFmt, GLuint _currentFbo)
 	{
 		if (NULL == glGetTextureSubImage)
 		{
-			BX_WARN(false, "Blit texture into buffer is not supported. glGetTextureSubImage is unavailable.");
+			blitTextureToBufferReadPixels(_dst, _src, _bi, _readPixelsFmt, _currentFbo);
 
 			return;
 		}
 
 		GL_CHECK(glBindBuffer(GL_PIXEL_PACK_BUFFER, _dst) );
 		GL_CHECK(glPixelStorei(GL_PACK_ALIGNMENT, 1) );
+
+		const bimg::TextureFormat::Enum format = bimg::TextureFormat::Enum(_src.m_textureFormat);
+
+		if (bimg::isCompressed(format) )
+		{
+			const bimg::ImageBlockInfo& info = bimg::getBlockInfo(format);
+
+			const uint32_t blockW = bx::max<uint32_t>(1, info.blockWidth);
+			const uint32_t blockH = bx::max<uint32_t>(1, info.blockHeight);
+			const uint32_t mipW   = bx::max<uint32_t>(1, _src.m_width  >> _bi.m_srcMip);
+			const uint32_t mipH   = bx::max<uint32_t>(1, _src.m_height >> _bi.m_srcMip);
+			const uint32_t width  = bx::min<uint32_t>(_bi.m_width,  mipW - _bi.m_srcX);
+			const uint32_t height = bx::min<uint32_t>(_bi.m_height, mipH - _bi.m_srcY);
+			const uint32_t numRows  = (height + blockH - 1)/blockH;
+			const uint32_t rowBytes = (width + blockW - 1)/blockW*info.blockSize;
+
+			for (uint32_t slice = 0, depth = bx::max<uint32_t>(1, _bi.m_depth); slice < depth; ++slice)
+			{
+				for (uint32_t row = 0; row < numRows; ++row)
+				{
+					const uint32_t y = _bi.m_srcY + row*blockH;
+
+					GL_CHECK(glGetCompressedTextureSubImage(_src.m_id
+						, _bi.m_srcMip
+						, _bi.m_srcX
+						, y
+						, _bi.m_srcZ + slice
+						, width
+						, bx::min<uint32_t>(blockH, mipH - y)
+						, 1
+						, rowBytes
+						, (GLvoid*)uintptr_t(_bi.m_dstOffset + slice*_bi.m_slicePitch + row*_bi.m_rowPitch)
+						) );
+				}
+			}
+
+			GL_CHECK(glPixelStorei(GL_PACK_ALIGNMENT, 4) );
+			GL_CHECK(glBindBuffer(GL_PIXEL_PACK_BUFFER, 0) );
+
+			return;
+		}
 
 		uint32_t rowLength, imageHeight;
 		calcTextureRegionTexelPitch(
@@ -9093,7 +9396,7 @@ namespace bgfx { namespace gl
 
 		if (dstIsBuffer)
 		{
-			blitTextureToBuffer(getBufferId(_bi.m_dst), m_textures[_bi.m_src.idx], _bi);
+			blitTextureToBuffer(getBufferId(_bi.m_dst), m_textures[_bi.m_src.idx], _bi, m_readPixelsFmt, m_currentFbo);
 
 			return true;
 		}
@@ -9148,7 +9451,7 @@ namespace bgfx { namespace gl
 					||    !isCompressedRegionCopyable(bi.m_dstX, width,  dstMipWidth,  blockW)
 					||    !isCompressedRegionCopyable(bi.m_srcY, height, srcMipHeight, blockH)
 					||    !isCompressedRegionCopyable(bi.m_dstY, height, dstMipHeight, blockH) )
-					&&   blitCompressed2D(bi, src, dst, format) )
+					&&   (blitCompressedRegion(bi, src, dst, format) || blitCompressed2D(bi, src, dst, format) ) )
 					{
 						continue;
 					}
@@ -9599,6 +9902,10 @@ namespace bgfx { namespace gl
 												level = 0;
 												layer = 0;
 											}
+											else if (1 == bind.m_numLayers)
+											{
+												layered = GL_FALSE;
+											}
 										}
 
 										GL_CHECK(glBindImageTexture(ii
@@ -9990,7 +10297,7 @@ namespace bgfx { namespace gl
 						viewState.m_alphaRef = ref/255.0f;
 					}
 
-					if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGL) )
+					if constexpr (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGL) )
 					{
 						if ( (BGFX_STATE_PT_POINTS|BGFX_STATE_POINT_SIZE_MASK) & changedFlags)
 						{
@@ -10239,6 +10546,10 @@ namespace bgfx { namespace gl
 													id    = viewId;
 													level = 0;
 													layer = 0;
+												}
+												else if (1 == bind.m_numLayers)
+												{
+													layered = GL_FALSE;
 												}
 											}
 

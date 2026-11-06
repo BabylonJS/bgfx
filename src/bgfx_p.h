@@ -113,10 +113,12 @@ namespace bgfx
 	if (!BX_IGNORE_C4127(_condition) )                                  \
 	{                                                                   \
 		BX_ERROR_SET(_err, _result, _msg);                              \
+		const bx::StringLiteral bgfxErrorMsg = _err->getMessage();      \
+		BX_UNUSED(bgfxErrorMsg);                                        \
 		BX_TRACE("%S: 0x%08x '%S' - " _format                           \
 			, &bxErrorScope.getName()                                   \
 			, _err->get().code                                          \
-			, &_err->getMessage()                                       \
+			, &bgfxErrorMsg                                             \
 			, ##__VA_ARGS__                                             \
 			);                                                          \
 		return;                                                         \
@@ -468,6 +470,20 @@ namespace bgfx
 	inline bool isShaderVerLess(uint32_t _magic, uint8_t _version)
 	{
 		return (_magic & BX_MAKEFOURCC(0, 0, 0, 0xff) ) < BX_MAKEFOURCC(0, 0, 0, _version);
+	}
+
+	inline uint16_t readUniformNum(bx::ReaderI* _reader, uint32_t _magic, bx::Error* _err)
+	{
+		if (isShaderVerLess(_magic, 14) )
+		{
+			uint8_t num = 0;
+			bx::read(_reader, num, _err);
+			return num;
+		}
+
+		uint16_t num = 0;
+		bx::read(_reader, num, _err);
+		return num;
 	}
 
 	inline bool hasReadOnlyDepth(const Attachment* _attachment, uint8_t _num)
@@ -1046,6 +1062,8 @@ namespace bgfx
 		{
 			TextureToBuffer,
 			BufferToTexture,
+			TextureToBufferUint,
+			BufferToTextureUint,
 
 			Count
 		};
@@ -1914,7 +1932,7 @@ namespace bgfx
 		{
 			m_capacity = bx::min<uint32_t>(_numMax, BGFX_CONFIG_MAX_MATRIX_CACHE);
 
-			if (!BX_ENABLED(BGFX_CONFIG_DYNAMIC_FRAME_STORAGE) )
+			if constexpr (!BX_ENABLED(BGFX_CONFIG_DYNAMIC_FRAME_STORAGE) )
 			{
 				_numReserved   = m_capacity;
 				_numPeakFrames = 0;
@@ -4075,7 +4093,7 @@ namespace bgfx
 
 		bool queue(Ty _handle)
 		{
-			if (BX_ENABLED(BGFX_CONFIG_DEBUG) )
+			if constexpr (BX_ENABLED(BGFX_CONFIG_DEBUG) )
 			{
 				if (isQueued(_handle) )
 				{
@@ -4342,7 +4360,7 @@ namespace bgfx
 			reset();
 			start(0);
 			m_textVideoMem = NULL;
-			if (BX_ENABLED(BGFX_CONFIG_DEBUG_TEXT) )
+			if constexpr (BX_ENABLED(BGFX_CONFIG_DEBUG_TEXT) )
 			{
 				m_textVideoMem = BX_NEW(g_allocator, TextVideoMem);
 			}
@@ -4688,12 +4706,12 @@ namespace bgfx
 				m_cpuTimeEnd = bx::getHPCounter();
 			}
 
-			if (BX_ENABLED(BGFX_CONFIG_DEBUG_OCCLUSION) )
+			if constexpr (BX_ENABLED(BGFX_CONFIG_DEBUG_OCCLUSION) )
 			{
 				m_occlusionQuerySet.clear();
 			}
 
-			if (BX_ENABLED(BGFX_CONFIG_DEBUG_UNIFORM) )
+			if constexpr (BX_ENABLED(BGFX_CONFIG_DEBUG_UNIFORM) )
 			{
 				m_uniformSet.clear();
 			}
@@ -4767,7 +4785,7 @@ namespace bgfx
 
 		void setUniform(UniformType::Enum _type, UniformHandle _handle, const void* _value, uint16_t _num)
 		{
-			if (BX_ENABLED(BGFX_CONFIG_DEBUG_UNIFORM) )
+			if constexpr (BX_ENABLED(BGFX_CONFIG_DEBUG_UNIFORM) )
 			{
 				BX_ASSERT(m_uniformSet.end() == m_uniformSet.find(_handle.idx)
 					, "Uniform %d (%s) was already set for this draw call."
@@ -4791,7 +4809,7 @@ namespace bgfx
 
 		void setUniformRef(UniformType::Enum _type, UniformHandle _handle, const void* _ptr, uint16_t _num)
 		{
-			if (BX_ENABLED(BGFX_CONFIG_DEBUG_UNIFORM) )
+			if constexpr (BX_ENABLED(BGFX_CONFIG_DEBUG_UNIFORM) )
 			{
 				BX_ASSERT(m_uniformSet.end() == m_uniformSet.find(_handle.idx)
 					, "Uniform %d (%s) was already set for this draw call."
@@ -5186,7 +5204,7 @@ namespace bgfx
 
 		void discard(uint8_t _flags)
 		{
-			if (BX_ENABLED(BGFX_CONFIG_DEBUG_UNIFORM) )
+			if constexpr (BX_ENABLED(BGFX_CONFIG_DEBUG_UNIFORM) )
 			{
 				m_uniformSet.clear();
 			}
@@ -6290,7 +6308,7 @@ namespace bgfx
 		{
 			BGFX_MUTEX_SCOPE(m_resourceApiLock);
 
-			if (BX_ENABLED(BGFX_CONFIG_DEBUG_TEXT) )
+			if constexpr (BX_ENABLED(BGFX_CONFIG_DEBUG_TEXT) )
 			{
 				uint16_t width;
 				uint16_t height;
@@ -6309,7 +6327,7 @@ namespace bgfx
 		{
 			BGFX_MUTEX_SCOPE(m_resourceApiLock);
 
-			if (BX_ENABLED(BGFX_CONFIG_DEBUG_TEXT) )
+			if constexpr (BX_ENABLED(BGFX_CONFIG_DEBUG_TEXT) )
 			{
 				m_submit->m_textVideoMem->printfVargs(_x, _y, _attr, _format, _argList);
 			}
@@ -6319,7 +6337,7 @@ namespace bgfx
 		{
 			BGFX_MUTEX_SCOPE(m_resourceApiLock);
 
-			if (BX_ENABLED(BGFX_CONFIG_DEBUG_TEXT) )
+			if constexpr (BX_ENABLED(BGFX_CONFIG_DEBUG_TEXT) )
 			{
 				m_submit->m_textVideoMem->image(_x, _y, _width, _height, _data, _pitch);
 			}
@@ -6335,7 +6353,7 @@ namespace bgfx
 			stats.height = uint16_t(resolution.height);
 			stats.textWidth  = 0;
 			stats.textHeight = 0;
-			if (BX_ENABLED(BGFX_CONFIG_DEBUG_TEXT) )
+			if constexpr (BX_ENABLED(BGFX_CONFIG_DEBUG_TEXT) )
 			{
 				const TextVideoMem* tvm = m_submit->m_textVideoMem;
 				stats.textWidth  = tvm->m_width;
@@ -7303,8 +7321,7 @@ namespace bgfx
 				type &= ~kUniformMask;
 				const bool isSampler = UniformType::Sampler == UniformType::Enum(type);
 
-				uint8_t num;
-				bx::read(&reader, num, &err);
+				const uint16_t num = readUniformNum(&reader, magic, &err);
 
 				uint16_t regIndex;
 				bx::read(&reader, regIndex, &err);
@@ -7386,12 +7403,13 @@ namespace bgfx
 		void setNameForHandle(Handle _handle, const bx::StringView& _name)
 		{
 			char tmp[1024];
-			uint16_t len = 1+(uint16_t)bx::snprintf(tmp, BX_COUNTOF(tmp)
+			const int32_t total = bx::snprintf(tmp, BX_COUNTOF(tmp)
 				, "%sH %d: %S"
 				, _handle.getTypeName().abrvName
 				, _handle.idx
 				, &_name
 				);
+			const uint16_t len = uint16_t(bx::min<int32_t>(total, BX_COUNTOF(tmp) - 1) + 1);
 
 			CommandBuffer& cmdbuf = getCommandBuffer(CommandBuffer::SetName);
 			cmdbuf.write(_handle);
@@ -7401,7 +7419,7 @@ namespace bgfx
 
 		void setDebugNameForHandle(Handle _handle, const bx::StringView& _name = "")
 		{
-			if (BX_ENABLED(BGFX_CONFIG_DEBUG) )
+			if constexpr (BX_ENABLED(BGFX_CONFIG_DEBUG) )
 			{
 				setNameForHandle(_handle, _name);
 			}

@@ -3309,6 +3309,10 @@ public final class Bgfx {
 	 *   draw commands are executed after blit and compute commands.
 	 * <p>
 	 * <strong>Attention:</strong> Destination texture must be created with {@code BGFX_TEXTURE_BLIT_DST} flag.
+	 * <p>
+	 * <strong>Attention:</strong> A depth texture, or one created with {@code BGFX_TEXTURE_MSAA_SAMPLE}, can only
+	 *   be blitted whole: both sides start at the origin of mips of the same size, and
+	 *   the copy covers the whole mip.
 	 * @param _id View id.
 	 * @param _dst Destination texture region.
 	 * @param _src Source texture region.
@@ -5255,14 +5259,19 @@ public final class Bgfx {
 		public static final short Apple = (short) 0x106b;
 
 		/**
+		 * ARM adapter.
+		 */
+		public static final short Arm = (short) 0x13b5;
+
+		/**
+		 * Google adapter.
+		 */
+		public static final short Google = (short) 0x1ae0;
+
+		/**
 		 * Intel adapter.
 		 */
 		public static final short Intel = (short) 0x8086;
-
-		/**
-		 * NVIDIA adapter.
-		 */
-		public static final short Nvidia = (short) 0x10de;
 
 		/**
 		 * Microsoft adapter.
@@ -5270,9 +5279,9 @@ public final class Bgfx {
 		public static final short Microsoft = (short) 0x1414;
 
 		/**
-		 * ARM adapter.
+		 * NVIDIA adapter.
 		 */
-		public static final short Arm = (short) 0x13b5;
+		public static final short Nvidia = (short) 0x10de;
 	}
 
 	/**
@@ -13075,6 +13084,10 @@ public final class Bgfx {
 		 *   draw commands are executed after blit and compute commands.
 		 * <p>
 		 * <strong>Attention:</strong> Destination texture must be created with {@code BGFX_TEXTURE_BLIT_DST} flag.
+		 * <p>
+		 * <strong>Attention:</strong> A depth texture, or one created with {@code BGFX_TEXTURE_MSAA_SAMPLE}, can only
+		 *   be blitted whole: both sides start at the origin of mips of the same size, and
+		 *   the copy covers the whole mip.
 		 * @param _id View id.
 		 * @param _dst Destination texture region.
 		 * @param _src Source texture region.

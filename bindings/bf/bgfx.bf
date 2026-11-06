@@ -1437,14 +1437,19 @@ public static class bgfx
 		Apple                  = 0x106b,
 	
 		/// <summary>
+		/// ARM adapter.
+		/// </summary>
+		Arm                    = 0x13b5,
+	
+		/// <summary>
+		/// Google adapter.
+		/// </summary>
+		Google                 = 0x1ae0,
+	
+		/// <summary>
 		/// Intel adapter.
 		/// </summary>
 		Intel                  = 0x8086,
-	
-		/// <summary>
-		/// NVIDIA adapter.
-		/// </summary>
-		Nvidia                 = 0x10de,
 	
 		/// <summary>
 		/// Microsoft adapter.
@@ -1452,9 +1457,9 @@ public static class bgfx
 		Microsoft              = 0x1414,
 	
 		/// <summary>
-		/// ARM adapter.
+		/// NVIDIA adapter.
 		/// </summary>
-		Arm                    = 0x13b5,
+		Nvidia                 = 0x10de,
 	}
 	
 	[AllowDuplicates]
@@ -5247,6 +5252,10 @@ public static class bgfx
 	/// 
 	/// @attention Destination texture must be created with `BGFX_TEXTURE_BLIT_DST` flag.
 	/// 
+	/// @attention A depth texture, or one created with `BGFX_TEXTURE_MSAA_SAMPLE`, can only
+	///   be blitted whole: both sides start at the origin of mips of the same size, and
+	///   the copy covers the whole mip.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_id">View id.</param>
@@ -5996,6 +6005,10 @@ public static class bgfx
 	///   draw commands are executed after blit and compute commands.
 	/// 
 	/// @attention Destination texture must be created with `BGFX_TEXTURE_BLIT_DST` flag.
+	/// 
+	/// @attention A depth texture, or one created with `BGFX_TEXTURE_MSAA_SAMPLE`, can only
+	///   be blitted whole: both sides start at the origin of mips of the same size, and
+	///   the copy covers the whole mip.
 	/// 
 	/// </summary>
 	///

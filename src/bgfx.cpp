@@ -79,7 +79,7 @@ namespace bgfx
 
 		CallbackStub()
 		{
-			if (BX_ENABLED(BGFX_CONFIG_PROFILER) )
+			if constexpr (BX_ENABLED(BGFX_CONFIG_PROFILER) )
 			{
 				m_superluminal.load();
 			}
@@ -108,11 +108,11 @@ namespace bgfx
 			int32_t len   = bx::snprintf(out, sizeof(temp), "%s (%d): ", _filePath, _line);
 			int32_t total = len + bx::vsnprintf(out + len, sizeof(temp)-len, _format, argListCopy);
 			va_end(argListCopy);
-			if ( (int32_t)sizeof(temp) < total)
+			if ( (int32_t)sizeof(temp) <= total)
 			{
 				out = (char*)BX_STACK_ALLOC(total+1);
 				bx::memCopy(out, temp, len);
-				bx::vsnprintf(out + len, total-len, _format, _argList);
+				bx::vsnprintf(out + len, total-len+1, _format, _argList);
 			}
 			out[total] = '\0';
 			bx::debugOutput(out);
@@ -494,6 +494,8 @@ namespace bgfx
 #if BGFX_CONFIG_BLIT_FALLBACK
 #	include "cs_blit_texture_to_buffer.bin.h"
 #	include "cs_blit_buffer_to_texture.bin.h"
+#	include "cs_blit_texture_to_buffer_uint.bin.h"
+#	include "cs_blit_buffer_to_texture_uint.bin.h"
 #endif // BGFX_CONFIG_BLIT_FALLBACK
 
 	static const EmbeddedShader s_embeddedShaders[] =
@@ -530,6 +532,8 @@ namespace bgfx
 #if BGFX_CONFIG_BLIT_FALLBACK
 		BGFX_EMBEDDED_SHADER(cs_blit_texture_to_buffer),
 		BGFX_EMBEDDED_SHADER(cs_blit_buffer_to_texture),
+		BGFX_EMBEDDED_SHADER(cs_blit_texture_to_buffer_uint),
+		BGFX_EMBEDDED_SHADER(cs_blit_buffer_to_texture_uint),
 #endif // BGFX_CONFIG_BLIT_FALLBACK
 
 		BGFX_EMBEDDED_SHADER_END()
@@ -564,7 +568,7 @@ namespace bgfx
 
 	void dump(const VertexLayout& _layout)
 	{
-		if (BX_ENABLED(BGFX_CONFIG_DEBUG) )
+		if constexpr (BX_ENABLED(BGFX_CONFIG_DEBUG) )
 		{
 			BX_TRACE("VertexLayout %08x (%08x), stride %d"
 				, _layout.m_hash
@@ -1098,6 +1102,8 @@ namespace bgfx
 			{
 				"cs_blit_texture_to_buffer",
 				"cs_blit_buffer_to_texture",
+				"cs_blit_texture_to_buffer_uint",
+				"cs_blit_buffer_to_texture_uint",
 			};
 
 			for (uint32_t ii = 0; ii < BX_COUNTOF(m_program); ++ii)
@@ -1560,7 +1566,7 @@ namespace bgfx
 
 	void EncoderImpl::submit(ViewId _id, ProgramHandle _program, OcclusionQueryHandle _occlusionQuery, uint32_t _depth, uint8_t _flags)
 	{
-		if (BX_ENABLED(BGFX_CONFIG_DEBUG_UNIFORM) )
+		if constexpr (BX_ENABLED(BGFX_CONFIG_DEBUG_UNIFORM) )
 		{
 			m_uniformSet.clear();
 		}
@@ -1693,7 +1699,7 @@ namespace bgfx
 
 	void EncoderImpl::dispatch(ViewId _id, ProgramHandle _handle, uint32_t _numX, uint32_t _numY, uint32_t _numZ, uint8_t _flags)
 	{
-		if (BX_ENABLED(BGFX_CONFIG_DEBUG_UNIFORM) )
+		if constexpr (BX_ENABLED(BGFX_CONFIG_DEBUG_UNIFORM) )
 		{
 			m_uniformSet.clear();
 		}
@@ -1908,7 +1914,7 @@ namespace bgfx
 
 	RenderFrame::Enum renderFrame(int32_t _msecs)
 	{
-		if (BX_ENABLED(BGFX_CONFIG_MULTITHREADED) )
+		if constexpr (BX_ENABLED(BGFX_CONFIG_MULTITHREADED) )
 		{
 			if (s_renderFrameCalled)
 			{
@@ -1937,9 +1943,11 @@ namespace bgfx
 
 			return result;
 		}
-
-		BX_ASSERT(false, "This call only makes sense if used with multi-threaded renderer.");
-		return RenderFrame::NoContext;
+		else
+		{
+			BX_ASSERT(false, "This call only makes sense if used with multi-threaded renderer.");
+			return RenderFrame::NoContext;
+		}
 	}
 
 	const uint32_t g_uniformTypeSize[] =
@@ -2689,7 +2697,7 @@ namespace bgfx
 		m_submit->m_transientIb = createTransientIndexBuffer(_init.limits.maxTransientIbSize);
 		frame();
 
-		if (BX_ENABLED(BGFX_CONFIG_MULTITHREADED) )
+		if constexpr (BX_ENABLED(BGFX_CONFIG_MULTITHREADED) )
 		{
 			m_submit->m_transientVb = createTransientVertexBuffer(_init.limits.maxTransientVbSize);
 			m_submit->m_transientIb = createTransientIndexBuffer(_init.limits.maxTransientIbSize);
@@ -2726,7 +2734,7 @@ namespace bgfx
 		m_videoDecode.shutdown();
 		frame();
 
-		if (BX_ENABLED(BGFX_CONFIG_MULTITHREADED) )
+		if constexpr (BX_ENABLED(BGFX_CONFIG_MULTITHREADED) )
 		{
 			destroyTransientVertexBuffer(m_submit->m_transientVb);
 			destroyTransientIndexBuffer(m_submit->m_transientIb);
@@ -2794,7 +2802,7 @@ namespace bgfx
 		m_viewNames.destroy();
 		m_submit->destroy();
 
-		if (BX_ENABLED(BGFX_CONFIG_DEBUG) )
+		if constexpr (BX_ENABLED(BGFX_CONFIG_DEBUG) )
 		{
 #define CHECK_HANDLE_LEAK(_name, _handleAlloc)           \
 	BX_MACRO_BLOCK_BEGIN                                 \
@@ -3354,7 +3362,7 @@ namespace bgfx
 		uint32_t nextFrameNum = m_render->m_frameNum + 1;
 		m_submit->start(nextFrameNum);
 
-		if (BX_ENABLED(BGFX_CONFIG_DEBUG_TEXT) )
+		if constexpr (BX_ENABLED(BGFX_CONFIG_DEBUG_TEXT) )
 		{
 			m_submit->m_textVideoMem->resize(
 				  m_render->m_textVideoMem->m_small
@@ -3809,7 +3817,7 @@ namespace bgfx
 
 				score += RendererType::Noop != renderer ? 1 : 0;
 
-				if (BX_ENABLED(BX_PLATFORM_WINDOWS) )
+				if constexpr (BX_ENABLED(BX_PLATFORM_WINDOWS) )
 				{
 					if (windowsVersionIs(Condition::GreaterEqual, 0x0602) )
 					{
@@ -3826,7 +3834,7 @@ namespace bgfx
 						score += RendererType::Direct3D12 == renderer ? -100 : 0;
 					}
 				}
-				else if (BX_ENABLED(BX_PLATFORM_LINUX) )
+				else if constexpr (BX_ENABLED(BX_PLATFORM_LINUX) )
 				{
 					score += RendererType::Vulkan     == renderer ? 50 : 0;
 					score += RendererType::OpenGL     == renderer ? 40 : 0;
@@ -3834,16 +3842,16 @@ namespace bgfx
 					score += RendererType::Direct3D12 == renderer ? 20 : 0;
 					score += RendererType::Direct3D11 == renderer ? 10 : 0;
 				}
-				else if (BX_ENABLED(BX_PLATFORM_OSX) )
+				else if constexpr (BX_ENABLED(BX_PLATFORM_OSX) )
 				{
 					score += RendererType::Metal    == renderer ? 20 : 0;
 					score += RendererType::Vulkan   == renderer ? 10 : 0;
 				}
-				else if (BX_ENABLED(BX_PLATFORM_IOS) || BX_ENABLED(BX_PLATFORM_VISIONOS))
+				else if constexpr (BX_ENABLED(BX_PLATFORM_IOS) || BX_ENABLED(BX_PLATFORM_VISIONOS))
 				{
 					score += RendererType::Metal    == renderer ? 20 : 0;
 				}
-				else if (BX_ENABLED(0
+				else if constexpr (BX_ENABLED(0
 					 ||  BX_PLATFORM_ANDROID
 					 ||  BX_PLATFORM_EMSCRIPTEN
 					 ||  BX_PLATFORM_RPI
@@ -3851,11 +3859,11 @@ namespace bgfx
 				{
 					score += RendererType::OpenGLES == renderer ? 20 : 0;
 				}
-				else if (BX_ENABLED(BX_PLATFORM_PS4) )
+				else if constexpr (BX_ENABLED(BX_PLATFORM_PS4) )
 				{
 					score += RendererType::Gnm      == renderer ? 20 : 0;
 				}
-				else if (BX_ENABLED(0
+				else if constexpr (BX_ENABLED(0
 					 ||  BX_PLATFORM_XBOXONE
 					 ||  BX_PLATFORM_WINRT
 					 ) )
@@ -5421,6 +5429,11 @@ namespace bgfx
 			, dstWidth, dstHeight, dstDepth
 			);
 
+		const uint32_t srcMipWidth  = srcWidth;
+		const uint32_t srcMipHeight = srcHeight;
+		const uint32_t dstMipWidth  = dstWidth;
+		const uint32_t dstMipHeight = dstHeight;
+
 		srcWidth  = clampRegionExtent(srcWidth,  _src.x, _src.width );
 		srcHeight = clampRegionExtent(srcHeight, _src.y, _src.height);
 		srcDepth  = clampRegionExtent(srcDepth,  _src.z, _src.depth );
@@ -5431,6 +5444,32 @@ namespace bgfx
 		uint16_t width  = uint16_t(bx::min(srcWidth,  dstWidth ) );
 		uint16_t height = uint16_t(bx::min(srcHeight, dstHeight) );
 		const uint16_t depth = uint16_t(bx::min(srcDepth, dstDepth) );
+
+		if (false
+		||  src.isDepth()
+		||  dst.isDepth()
+		||  0 != ( (src.m_flags | dst.m_flags) & BGFX_TEXTURE_MSAA_SAMPLE) )
+		{
+			const bool whole = true
+				&& 0 == (_src.x | _src.y | _dst.x | _dst.y)
+				&& srcMipWidth  == dstMipWidth
+				&& srcMipHeight == dstMipHeight
+				&& width  == srcMipWidth
+				&& height == srcMipHeight
+				;
+
+			BX_ASSERT(whole
+				, "Blit of a depth or BGFX_TEXTURE_MSAA_SAMPLE texture must copy the whole mip (src %dx%d at (%d, %d), dst %dx%d at (%d, %d), size %dx%d)."
+				, srcMipWidth, srcMipHeight, _src.x, _src.y
+				, dstMipWidth, dstMipHeight, _dst.x, _dst.y
+				, width, height
+				);
+
+			if (!whole)
+			{
+				return;
+			}
+		}
 
 		alignTextureRegion(width, height, TextureFormat::Enum(src.m_format) );
 
@@ -5535,6 +5574,17 @@ namespace bgfx
 			, dst.m_name
 			);
 
+		BX_ASSERT(1 == src.m_numSamples
+			, "Can't blit multisampled texture (handle %d, '%S') into a buffer."
+			, _src.handle.idx
+			, &src.m_name
+			);
+
+		if (1 != src.m_numSamples)
+		{
+			return;
+		}
+
 		BX_ASSERT(_src.mip < src.m_numMips, "Invalid blit src mip (%d > %d)", _src.mip, src.m_numMips - 1);
 
 		uint32_t srcWidth, srcHeight, srcDepth;
@@ -5612,6 +5662,17 @@ namespace bgfx
 			, _dst.handle.idx
 			, &dst.m_name
 			);
+
+		BX_ASSERT(1 == dst.m_numSamples
+			, "Can't blit a buffer into multisampled texture (handle %d, '%S')."
+			, _dst.handle.idx
+			, &dst.m_name
+			);
+
+		if (1 != dst.m_numSamples)
+		{
+			return;
+		}
 
 		BX_ASSERT(_dst.mip < dst.m_numMips, "Invalid blit dst mip (%d > %d)", _dst.mip, dst.m_numMips - 1);
 
@@ -6081,7 +6142,6 @@ namespace bgfx
 		{
 			const Attachment&   at = _attachment[ii];
 			const TextureHandle texHandle = at.handle;
-			const TextureRef&   tr = s_ctx->m_textureRef[texHandle.idx];
 
 			BGFX_ERROR_CHECK(true
 				&& isValid(texHandle)
@@ -6093,6 +6153,8 @@ namespace bgfx
 				, ii
 				, texHandle.idx
 				);
+
+			const TextureRef& tr = s_ctx->m_textureRef[texHandle.idx];
 
 			BGFX_ERROR_CHECK(true
 				&& at.mip < tr.m_numMips
@@ -7252,7 +7314,7 @@ namespace bgfx
 	{
 		BX_ASSERT(checkView(_id), "Invalid view id: %d", _id);
 
-		if (BX_ENABLED(BGFX_CONFIG_DEBUG) )
+		if constexpr (BX_ENABLED(BGFX_CONFIG_DEBUG) )
 		{
 			const uint8_t index[] = { _0, _1, _2, _3, _4, _5, _6, _7 };
 
