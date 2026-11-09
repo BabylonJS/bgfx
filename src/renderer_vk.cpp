@@ -392,6 +392,7 @@ VK_IMPORT_DEVICE
 			EXT_surface_maintenance1,
 			EXT_swapchain_colorspace,
 			EXT_swapchain_maintenance1,
+			EXT_validation_features,
 			KHR_16bit_storage,
 			KHR_draw_indirect_count,
 			KHR_fragment_shading_rate,
@@ -445,6 +446,7 @@ VK_IMPORT_DEVICE
 		{ "VK_EXT_surface_maintenance1",            1, false, false, true,                                                          Layer::Count },
 		{ "VK_EXT_swapchain_colorspace",            1, false, false, true,                                                          Layer::Count },
 		{ "VK_EXT_swapchain_maintenance1",          1, false, false, true,                                                          Layer::Count },
+		{ "VK_EXT_validation_features",             1, false, false, false,                                                         Layer::VK_LAYER_KHRONOS_validation },
 		{ "VK_KHR_16bit_storage",                   1, false, false, true,                                                          Layer::Count },
 		{ "VK_KHR_draw_indirect_count",             1, false, false, true,                                                          Layer::Count },
 		{ "VK_KHR_fragment_shading_rate",           1, false, false, true,                                                          Layer::Count },
@@ -1411,6 +1413,7 @@ VK_IMPORT_DEVICE
 			bool shaderOutputLayer       = false;
 
 			m_fbh = BGFX_INVALID_HANDLE;
+			m_diagnostics = _init.diagnostics;
 			m_readOnlyDepthLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 			bx::memSet(&m_mainSwapChain, 0, sizeof(m_mainSwapChain) );
 
@@ -1480,6 +1483,10 @@ VK_IMPORT
 				s_layer[Layer::VK_LAYER_KHRONOS_validation        ].m_instance.m_initialize = _init.debug;
 
 				s_extension[Extension::EXT_debug_report].m_initialize = _init.debug;
+				s_extension[Extension::EXT_validation_features].m_initialize = true
+					&& _init.debug
+					&& 0 != (_init.diagnostics & (BGFX_DIAGNOSTIC_GPU_VALIDATION | BGFX_DIAGNOSTIC_SYNC_VALIDATION) )
+					;
 
 				s_extension[Extension::EXT_conservative_rasterization ].m_initialize = !!(_init.capabilities & BGFX_CAPS_CONSERVATIVE_RASTER  );
 				s_extension[Extension::EXT_shader_viewport_index_layer].m_initialize = !!(_init.capabilities & BGFX_CAPS_VIEWPORT_LAYER_ARRAY );
@@ -1607,6 +1614,45 @@ VK_IMPORT
 				ici.enabledExtensionCount   = numEnabledExtensions;
 				ici.ppEnabledExtensionNames = enabledExtension;
 
+				VkValidationFeatureEnableEXT validationFeatureEnable[2];
+				uint32_t numValidationFeatureEnable = 0;
+
+				if (0 != (_init.diagnostics & BGFX_DIAGNOSTIC_GPU_VALIDATION) )
+				{
+					validationFeatureEnable[numValidationFeatureEnable++] = VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT;
+				}
+
+				if (0 != (_init.diagnostics & BGFX_DIAGNOSTIC_SYNC_VALIDATION) )
+				{
+					validationFeatureEnable[numValidationFeatureEnable++] = VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT;
+				}
+
+				const VkValidationFeaturesEXT validationFeatures =
+				{
+					.sType                          = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT,
+					.pNext                          = NULL,
+					.enabledValidationFeatureCount  = numValidationFeatureEnable,
+					.pEnabledValidationFeatures     = validationFeatureEnable,
+					.disabledValidationFeatureCount = 0,
+					.pDisabledValidationFeatures    = NULL,
+				};
+
+				const bool validationFeaturesEnabled = true
+					&& s_extension[Extension::EXT_validation_features].m_supported
+					&& s_extension[Extension::EXT_validation_features].m_initialize
+					&& s_layer[Layer::VK_LAYER_KHRONOS_validation].m_instance.m_supported
+					&& s_layer[Layer::VK_LAYER_KHRONOS_validation].m_instance.m_initialize
+					;
+
+				BX_WARN(!s_extension[Extension::EXT_validation_features].m_initialize || validationFeaturesEnabled
+					, "VK_EXT_validation_features is not available, GPU-assisted and synchronization validation are disabled."
+					);
+
+				if (validationFeaturesEnabled)
+				{
+					ici.pNext = &validationFeatures;
+				}
+
 				if constexpr (BX_ENABLED(BGFX_CONFIG_DEBUG) )
 				{
 					// Validation layer is calling freeFunction with pointers that are not allocated
@@ -1672,6 +1718,9 @@ VK_IMPORT_INSTANCE
 				drcb.flags       = 0
 					| VK_DEBUG_REPORT_ERROR_BIT_EXT
 					| VK_DEBUG_REPORT_WARNING_BIT_EXT
+					| (0 != (m_diagnostics & BGFX_DIAGNOSTIC_VERBOSE) ? VK_DEBUG_REPORT_INFORMATION_BIT_EXT         : 0)
+					| (0 != (m_diagnostics & BGFX_DIAGNOSTIC_VERBOSE) ? VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT : 0)
+					| (0 != (m_diagnostics & BGFX_DIAGNOSTIC_VERBOSE) ? VK_DEBUG_REPORT_DEBUG_BIT_EXT               : 0)
 					;
 				result = vkCreateDebugReportCallbackEXT(m_instance
 					, &drcb
@@ -2588,6 +2637,16 @@ VK_IMPORT_DEVICE
 					{
 						BX_TRACE("Init error: creating swap chain failed %d: %s.", result, getName(result) );
 						goto error;
+					}
+
+					{
+						VkSurfaceCapabilitiesKHR surfaceCapabilities;
+
+						if (VK_SUCCESS == vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_physicalDevice, m_backBuffer.m_swapChain.m_surface, &surfaceCapabilities)
+						&&  0 == (surfaceCapabilities.supportedCompositeAlpha & ~VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR) )
+						{
+							g_caps.supported &= ~BGFX_CAPS_TRANSPARENT_BACKBUFFER;
+						}
 					}
 
 					if (m_lowLatencySupported)
@@ -6016,6 +6075,7 @@ VK_IMPORT_DEVICE
 
 		VkAllocationCallbacks*   m_allocatorCb;
 		VkDebugReportCallbackEXT m_debugReportCallback;
+		uint32_t         m_diagnostics = BGFX_DIAGNOSTIC_NONE;
 		VkInstance       m_instance;
 		VkPhysicalDevice m_physicalDevice;
 		uint32_t         m_instanceApiVersion;
@@ -7889,13 +7949,19 @@ VK_DESTROY
 			BX_ASSERT(VK_IMAGE_VIEW_TYPE_3D != m_type, "Can't create multisample 3D image.");
 		}
 
+		const VkImageCreateFlags cubeFlag = false
+			|| VK_IMAGE_VIEW_TYPE_CUBE       == m_type
+			|| VK_IMAGE_VIEW_TYPE_CUBE_ARRAY == m_type
+			? VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT
+			: 0
+			;
+
 		VkImageCreateInfo ici;
 		ici.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 		ici.pNext = NULL;
 		ici.flags = 0
-			| (VK_IMAGE_VIEW_TYPE_CUBE       == m_type
-			|| VK_IMAGE_VIEW_TYPE_CUBE_ARRAY == m_type
-				? VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT
+			| (1 == m_sampler.Count
+				? cubeFlag
 				: 0
 				)
 			| (VK_IMAGE_VIEW_TYPE_3D == m_type
@@ -8001,7 +8067,7 @@ VK_DESTROY
 			VkImageCreateInfo ici_resolve = ici;
 			ici_resolve.samples   = s_msaa[0].Sample;
 			ici_resolve.mipLevels = m_numMips;
-			ici_resolve.flags    &= ~VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+			ici_resolve.flags    |= cubeFlag;
 
 			if (0 == (m_flags & BGFX_TEXTURE_SRGB_MUTABLE) )
 			{
@@ -8567,12 +8633,13 @@ VK_DESTROY
 		const VkImageLayout oldLayout = m_currentImageLayout;
 		const VkImageLayout oldSingleMsaaLayout = m_currentSingleMsaaImageLayout;
 
-		const uint32_t numLayers = false
+		const bool isCube = false
 			|| m_type == VK_IMAGE_VIEW_TYPE_CUBE
 			|| m_type == VK_IMAGE_VIEW_TYPE_CUBE_ARRAY
-			? m_numSides
-			: _numLayers
 			;
+
+		const uint32_t layer     = isCube ? 0          : _layer;
+		const uint32_t numLayers = isCube ? m_numSides : _numLayers;
 
 		if (needResolve)
 		{
@@ -8580,11 +8647,11 @@ VK_DESTROY
 
 			if (0 != (m_aspectFlags & VK_IMAGE_ASPECT_DEPTH_BIT) )
 			{
-				s_renderVK->resolveDepth(_commandBuffer, *this, _layer, numLayers, _mip);
+				s_renderVK->resolveDepth(_commandBuffer, *this, layer, numLayers, _mip);
 			}
 			else if (resolveFormat != m_format)
 			{
-				resolveRenderPass(_commandBuffer, resolveFormat, _layer, numLayers, _mip);
+				resolveRenderPass(_commandBuffer, resolveFormat, layer, numLayers, _mip);
 				setState(_commandBuffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, true);
 			}
 			else
@@ -8598,7 +8665,7 @@ VK_DESTROY
 					{
 						.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
 						.mipLevel       = _mip,
-						.baseArrayLayer = _layer,
+						.baseArrayLayer = layer,
 						.layerCount     = numLayers,
 					},
 					.srcOffset = { .x = 0, .y = 0, .z = 0 },
@@ -8606,7 +8673,7 @@ VK_DESTROY
 					{
 						.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
 						.mipLevel       = _mip,
-						.baseArrayLayer = _layer,
+						.baseArrayLayer = layer,
 						.layerCount     = numLayers,
 					},
 					.dstOffset = { .x = 0, .y = 0, .z = 0 },
@@ -8645,11 +8712,11 @@ VK_DESTROY
 				VkImageBlit blit;
 				blit.srcOffsets[0] = { 0, 0, 0 };
 				blit.srcSubresource.aspectMask     = m_aspectFlags;
-				blit.srcSubresource.baseArrayLayer = _layer;
+				blit.srcSubresource.baseArrayLayer = layer;
 				blit.srcSubresource.layerCount     = numLayers;
 				blit.dstOffsets[0] = { 0, 0, 0 };
 				blit.dstSubresource.aspectMask     = m_aspectFlags;
-				blit.dstSubresource.baseArrayLayer = _layer;
+				blit.dstSubresource.baseArrayLayer = layer;
 				blit.dstSubresource.layerCount     = numLayers;
 
 				for (uint32_t i = _mip + 1; i < m_numMips; i++)
@@ -8673,7 +8740,7 @@ VK_DESTROY
 						, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
 						, blit.srcSubresource.mipLevel
 						, 1
-						, _layer
+						, layer
 						, numLayers
 						);
 
@@ -8697,7 +8764,7 @@ VK_DESTROY
 					, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
 					, _mip
 					, m_numMips - _mip - 1
-					, _layer
+					, layer
 					, numLayers
 					);
 			}
@@ -8722,13 +8789,13 @@ VK_DESTROY
 			blit.srcOffsets[1] = { mipWidth, mipHeight, 1 };
 			blit.srcSubresource.aspectMask     = m_aspectFlags;
 			blit.srcSubresource.mipLevel       = 0;
-			blit.srcSubresource.baseArrayLayer = _layer;
+			blit.srcSubresource.baseArrayLayer = layer;
 			blit.srcSubresource.layerCount     = numLayers;
 			blit.dstOffsets[0] = { 0, 0, 0 };
 			blit.dstOffsets[1] = { mipWidth, mipHeight, 1 };
 			blit.dstSubresource.aspectMask     = m_aspectFlags;
 			blit.dstSubresource.mipLevel       = 0;
-			blit.dstSubresource.baseArrayLayer = _layer;
+			blit.dstSubresource.baseArrayLayer = layer;
 			blit.dstSubresource.layerCount     = numLayers;
 
 			for (uint32_t i = _mip + 1; i < m_numMips; i++)
@@ -8752,7 +8819,7 @@ VK_DESTROY
 					, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
 					, blit.srcSubresource.mipLevel
 					, 1
-					, _layer
+					, layer
 					, numLayers
 					);
 
@@ -8776,7 +8843,7 @@ VK_DESTROY
 				, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
 				, _mip
 				, m_numMips - _mip - 1
-				, _layer
+				, layer
 				, numLayers
 				);
 		}
@@ -9271,7 +9338,7 @@ VK_DESTROY
 		const VkPhysicalDevice physicalDevice = s_renderVK->m_physicalDevice;
 
 		const uint64_t recreateSurfaceMask     = BGFX_SWAP_CHAIN_HIDPI;
-		const uint64_t recreateSwapchainMask   = BGFX_SWAP_CHAIN_SRGB_BACKBUFFER | BGFX_SWAP_CHAIN_HDR10;
+		const uint64_t recreateSwapchainMask   = BGFX_SWAP_CHAIN_SRGB_BACKBUFFER | BGFX_SWAP_CHAIN_HDR10 | BGFX_SWAP_CHAIN_TRANSPARENT_BACKBUFFER;
 		const uint64_t recreateAttachmentsMask = BGFX_SWAP_CHAIN_MSAA_MASK;
 
 		const bool vsync = !!(s_renderVK->m_reset & BGFX_RESET_VSYNC);
@@ -11032,7 +11099,9 @@ VK_DESTROY
 				}
 			}
 
-			if (_wait)
+			if (false
+			||  _wait
+			||  0 != (s_renderVK->m_diagnostics & BGFX_DIAGNOSTIC_SERIALIZE) )
 			{
 				BGFX_PROFILER_SCOPE("vkWaitForFences", kColorWait);
 

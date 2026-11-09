@@ -3819,20 +3819,8 @@ namespace bgfx
 
 				if constexpr (BX_ENABLED(BX_PLATFORM_WINDOWS) )
 				{
-					if (windowsVersionIs(Condition::GreaterEqual, 0x0602) )
-					{
-						score += RendererType::Direct3D11 == renderer ? 20 : 0;
-						score += RendererType::Direct3D12 == renderer ? 10 : 0;
-					}
-					else if (windowsVersionIs(Condition::GreaterEqual, 0x0601) )
-					{
-						score += RendererType::Direct3D11 == renderer ?   20 : 0;
-						score += RendererType::Direct3D12 == renderer ? -100 : 0;
-					}
-					else
-					{
-						score += RendererType::Direct3D12 == renderer ? -100 : 0;
-					}
+					score += RendererType::Direct3D12 == renderer ? 20 : 0;
+					score += RendererType::Direct3D11 == renderer ? 10 : 0;
 				}
 				else if constexpr (BX_ENABLED(BX_PLATFORM_LINUX) )
 				{
@@ -4558,12 +4546,6 @@ namespace bgfx
 		uint8_t num = 0;
 		for (uint8_t ii = 0; ii < RendererType::Count; ++ii)
 		{
-			if ( (RendererType::Direct3D11 == ii || RendererType::Direct3D12 == ii)
-			&&  windowsVersionIs(Condition::LessEqual, 0x0502) )
-			{
-				continue;
-			}
-
 			if (!s_rendererCreator[ii].supported)
 			{
 				continue;
@@ -4627,10 +4609,12 @@ namespace bgfx
 
 	Init::Init()
 		: type(RendererType::Count)
+		, backendType(RendererType::Count)
 		, vendorId(BGFX_PCI_ID_NONE)
 		, deviceId(0)
 		, capabilities(UINT64_MAX)
 		, debug(BX_ENABLED(BGFX_CONFIG_DEBUG) )
+		, diagnostics(BGFX_DIAGNOSTIC_NONE)
 		, profile(BX_ENABLED(BGFX_CONFIG_DEBUG_ANNOTATION) )
 		, fallback(true)
 		, videoDecode(false)
@@ -5224,7 +5208,6 @@ namespace bgfx
 
 	void Encoder::dispatch(ViewId _id, ProgramHandle _program, IndirectBufferHandle _indirectHandle, uint32_t _start, uint32_t _num, uint8_t _flags)
 	{
-		BGFX_CHECK_CAPS(BGFX_CAPS_DRAW_INDIRECT, "Dispatch indirect is not supported!");
 		BGFX_CHECK_CAPS(BGFX_CAPS_COMPUTE, "Compute is not supported!");
 		BGFX_CHECK_HANDLE_INVALID_OK("dispatch", s_ctx->m_programHandle, _program);
 		BGFX_CHECK_HANDLE("dispatch", s_ctx->m_vertexBufferHandle, _indirectHandle);

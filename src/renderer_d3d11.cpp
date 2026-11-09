@@ -665,31 +665,28 @@ namespace bgfx { namespace d3d11
 
 	static BX_NO_INLINE bool getIntelExtensions(ID3D11Device* _device)
 	{
-		if (windowsVersionIs(Condition::GreaterEqual, 0x0604) )
+		uint8_t temp[28];
+
+		bx::ErrorAssert err;
+
+		bx::StaticMemoryBlockWriter writer(&temp, sizeof(temp) );
+		bx::write(&writer, "INTCEXTNCAPSFUNC", 16, &err);
+		bx::write(&writer, kIntelExtensionInterfaceVersion, &err);
+		bx::write(&writer, uint32_t(0), &err);
+		bx::write(&writer, uint32_t(0), &err);
+
+		if (SUCCEEDED(setIntelExtension(_device, temp, sizeof(temp) ) ) )
 		{
-			uint8_t temp[28];
+			bx::MemoryReader reader(&temp, sizeof(temp) );
+			bx::skip(&reader, 16);
 
-			bx::ErrorAssert err;
+			uint32_t version;
+			bx::read(&reader, version, &err);
 
-			bx::StaticMemoryBlockWriter writer(&temp, sizeof(temp) );
-			bx::write(&writer, "INTCEXTNCAPSFUNC", 16, &err);
-			bx::write(&writer, kIntelExtensionInterfaceVersion, &err);
-			bx::write(&writer, uint32_t(0), &err);
-			bx::write(&writer, uint32_t(0), &err);
+			uint32_t driverVersion;
+			bx::read(&reader, driverVersion, &err);
 
-			if (SUCCEEDED(setIntelExtension(_device, temp, sizeof(temp) ) ) )
-			{
-				bx::MemoryReader reader(&temp, sizeof(temp) );
-				bx::skip(&reader, 16);
-
-				uint32_t version;
-				bx::read(&reader, version, &err);
-
-				uint32_t driverVersion;
-				bx::read(&reader, driverVersion, &err);
-
-				return version <= driverVersion;
-			}
+			return version <= driverVersion;
 		}
 
 		return false;
@@ -853,6 +850,7 @@ namespace bgfx { namespace d3d11
 			}
 
 			m_fbh = BGFX_INVALID_HANDLE;
+			m_diagnostics = _init.diagnostics;
 			bx::memSet(&m_mainSwapChain, 0, sizeof(m_mainSwapChain) );
 
 			m_ags = NULL;
@@ -2616,6 +2614,7 @@ namespace bgfx { namespace d3d11
 					&& !BX_ENABLED(BX_PLATFORM_XBOXONE)
 					&& !newWindow
 					&& (m_mainSwapChain.flags&BGFX_SWAP_CHAIN_MSAA_MASK) == (_swapChain.flags&BGFX_SWAP_CHAIN_MSAA_MASK)
+					&& (m_mainSwapChain.flags&BGFX_SWAP_CHAIN_TRANSPARENT_BACKBUFFER) == (_swapChain.flags&BGFX_SWAP_CHAIN_TRANSPARENT_BACKBUFFER)
 					;
 
 				m_mainSwapChain = _swapChain;
@@ -2629,6 +2628,10 @@ namespace bgfx { namespace d3d11
 				// see comment in init() about why we don't worry about BGFX_RESET_SRGB_BACKBUFFER here
 				m_scd.format = s_textureFormat[_swapChain.formatColor].m_fmt;
 				m_scd.hdr10  = 0 != (_swapChain.flags & BGFX_SWAP_CHAIN_HDR10);
+				m_scd.alphaMode = (_swapChain.flags & BGFX_SWAP_CHAIN_TRANSPARENT_BACKBUFFER)
+					? DXGI_ALPHA_MODE_PREMULTIPLIED
+					: DXGI_ALPHA_MODE_IGNORE
+					;
 
 				preReset();
 
@@ -4170,7 +4173,9 @@ namespace bgfx { namespace d3d11
 					continue;
 				}
 
-				if (D3D11_MESSAGE_SEVERITY_WARNING >= msg->Severity)
+				if (false
+				||  0 != (m_diagnostics & BGFX_DIAGNOSTIC_VERBOSE)
+				||  D3D11_MESSAGE_SEVERITY_WARNING >= msg->Severity)
 				{
 					BX_TRACE("D3D11 %s %s #%d: %s"
 						, s_messageSeverity[bx::min<uint32_t>(msg->Severity, BX_COUNTOF(s_messageSeverity)-1)]
@@ -4204,6 +4209,7 @@ namespace bgfx { namespace d3d11
 		ID3DUserDefinedAnnotation* m_annotation;
 		ID3D11DeviceContext1* m_deviceCtx1;
 		ID3D11InfoQueue*           m_infoQueue;
+		uint32_t                   m_diagnostics = BGFX_DIAGNOSTIC_NONE;
 
 		TimerQueryD3D11     m_gpuTimer;
 		OcclusionQueryD3D11 m_occlusionQuery;
@@ -4716,6 +4722,7 @@ namespace bgfx { namespace d3d11
 				bx::read(&reader, type, &err);
 
 				const uint16_t num = readUniformNum(&reader, magic, &err);
+				BX_UNUSED(num);
 
 				uint16_t regIndex = 0;
 				bx::read(&reader, regIndex, &err);
@@ -5410,8 +5417,11 @@ namespace bgfx { namespace d3d11
 					if (needResolve)
 					{
 						const uint32_t savedMipLevels = desc.MipLevels;
-						desc.MipLevels = 1;
+						const uint32_t savedMiscFlags = desc.MiscFlags;
+						desc.MipLevels  = 1;
+						desc.MiscFlags &= ~D3D11_RESOURCE_MISC_TEXTURECUBE;
 						DX_CHECK(s_renderD3D11->m_device->CreateTexture2D(&desc, NULL, &m_rt2d) );
+						desc.MiscFlags  = savedMiscFlags;
 
 						const bool autoGenMips = 0 != (desc.MiscFlags & D3D11_RESOURCE_MISC_GENERATE_MIPS);
 						if (!depth)
@@ -6079,6 +6089,15 @@ namespace bgfx { namespace d3d11
 			return;
 		}
 
+		s_renderD3D11->m_deviceCtx->OMSetRenderTargets(0, NULL, NULL);
+
+		if ( (m_desc.flags & BGFX_SWAP_CHAIN_TRANSPARENT_BACKBUFFER) != (_desc.flags & BGFX_SWAP_CHAIN_TRANSPARENT_BACKBUFFER) )
+		{
+			m_needToRecreateSwapChain = false;
+			create(destroy(), _desc);
+			return;
+		}
+
 		const SwapChain prev = m_desc;
 
 		m_desc = _desc;
@@ -6086,7 +6105,6 @@ namespace bgfx { namespace d3d11
 
 		const DxgiSwapChainDesc scd = getSwapChainDesc();
 
-		s_renderD3D11->m_deviceCtx->OMSetRenderTargets(0, NULL, NULL);
 		destroySwapChainViews();
 
 		const HRESULT hr = s_renderD3D11->m_dxgi.resizeBuffers(m_swapChain, scd);
@@ -6122,6 +6140,10 @@ namespace bgfx { namespace d3d11
 		scd.ndt        = m_desc.ndt;
 		scd.sampleDesc = s_msaa[(m_desc.flags&BGFX_SWAP_CHAIN_MSAA_MASK)>>BGFX_SWAP_CHAIN_MSAA_SHIFT];
 		scd.hdr10      = 0 != (m_desc.flags & BGFX_SWAP_CHAIN_HDR10);
+		scd.alphaMode  = (m_desc.flags & BGFX_SWAP_CHAIN_TRANSPARENT_BACKBUFFER)
+			? DXGI_ALPHA_MODE_PREMULTIPLIED
+			: DXGI_ALPHA_MODE_IGNORE
+			;
 		scd.waitable   = false
 			|| DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL == scd.swapEffect
 			|| DXGI_SWAP_EFFECT_FLIP_DISCARD    == scd.swapEffect
@@ -6251,6 +6273,7 @@ namespace bgfx { namespace d3d11
 		if (isSwapChain() )
 		{
 			destroySwapChainViews();
+			s_renderD3D11->m_dxgi.removeSwapChain(getSwapChainDesc() );
 			DX_RELEASE(m_swapChain, 0);
 		}
 		else
@@ -6490,7 +6513,11 @@ namespace bgfx { namespace d3d11
 								desc.Texture2DArray.MipSlice        = at.mip;
 							}
 
-							DX_CHECK(s_renderD3D11->m_device->CreateRenderTargetView(texture.m_ptr, &desc, &m_rtv[m_num]) );
+							DX_CHECK(s_renderD3D11->m_device->CreateRenderTargetView(
+								  NULL == texture.m_rt ? texture.m_ptr : texture.m_rt
+								, &desc
+								, &m_rtv[m_num]
+								) );
 							break;
 
 						case TextureD3D11::Texture3D:
