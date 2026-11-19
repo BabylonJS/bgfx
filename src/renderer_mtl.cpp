@@ -1421,16 +1421,19 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 
 		void destroyProgram(ProgramHandle _handle) override
 		{
-			for (PipelineProgramArray::iterator it = m_pipelineProgram.begin(); it != m_pipelineProgram.end();)
+			for (uint32_t ii = 0, num = m_pipelineProgram.getCount(); ii < num;)
 			{
-				if (it->program.idx == _handle.idx)
+				const PipelineProgram& pipelineProgram = m_pipelineProgram[ii];
+
+				if (pipelineProgram.program.idx == _handle.idx)
 				{
-					m_pipelineStateCache.invalidate(it->key);
-					it = m_pipelineProgram.erase(it);
+					m_pipelineStateCache.invalidate(pipelineProgram.key);
+					m_pipelineProgram.remove(ii, bx::kOrdered);
+					--num;
 				}
 				else
 				{
-					++it;
+					++ii;
 				}
 			}
 
@@ -1869,7 +1872,7 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 			const uint8_t  bpp    = bimg::getBitsPerPixel(bimg::TextureFormat::Enum(format) );
 			const uint32_t pitch  = width * bpp / 8;
 			const uint32_t size   = height*pitch;
-			uint8_t* data   = (uint8_t*)bx::alloc(g_allocator, size);
+			uint8_t* data   = (uint8_t*)bx::allocPtr(g_allocatorBlk, size);
 
 			MTL::Region region(0, 0, 0, width, height, 1);
 
@@ -1886,7 +1889,7 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 				, false
 				);
 
-			bx::free(g_allocator, data);
+			bx::freePtr(data);
 		}
 
 		void invalidateOcclusionQuery(OcclusionQueryHandle _handle) override
@@ -2214,7 +2217,7 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 			if (m_reset&BGFX_RESET_CAPTURE)
 			{
 				m_captureSize = m_mainSwapChain.width*m_mainSwapChain.height*4;
-				m_capture = bx::realloc(g_allocator, m_capture, m_captureSize);
+				m_capture = bx::reallocPtr(g_allocatorBlk, m_capture, m_captureSize);
 				g_callback->captureBegin(m_mainSwapChain.width, m_mainSwapChain.height, m_mainSwapChain.width*4, TextureFormat::BGRA8, false);
 			}
 			else
@@ -2300,7 +2303,7 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 			if (NULL != m_capture)
 			{
 				g_callback->captureEnd();
-				bx::free(g_allocator, m_capture);
+				bx::freePtr(m_capture);
 				m_capture     = NULL;
 				m_captureSize = 0;
 			}
@@ -3242,7 +3245,7 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 
 			if (NULL == pso)
 			{
-				pso = BX_NEW(g_allocator, PipelineStateMtl);
+				pso = BX_NEW_PTR(g_allocatorBlk, PipelineStateMtl);
 
 				MTL::RenderPipelineDescriptor* pd = m_renderPipelineDescriptor;
 				reset(pd);
@@ -3567,7 +3570,7 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 				}
 
 				m_pipelineStateCache.add(hash, pso);
-				m_pipelineProgram.push_back({hash, _program});
+				m_pipelineProgram.add({hash, _program});
 			}
 
 			m_lastPso = pso;
@@ -3601,7 +3604,7 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 
 			if (NULL == program.m_computePS)
 			{
-				PipelineStateMtl* pso = BX_NEW(g_allocator, PipelineStateMtl);
+				PipelineStateMtl* pso = BX_NEW_PTR(g_allocatorBlk, PipelineStateMtl);
 				program.m_computePS = pso;
 
 				MTL::ComputePipelineReflection* reflection = NULL;
@@ -3897,9 +3900,9 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 			ProgramHandle program;
 		};
 
-		typedef stl::vector<PipelineProgram> PipelineProgramArray;
+		using PipelineProgramArray = bx::ArrayT<PipelineProgram>;
 
-		PipelineProgramArray m_pipelineProgram;
+		PipelineProgramArray m_pipelineProgram{g_allocatorHandle};
 
 		StateCacheT<PipelineStateMtl*>       m_pipelineStateCache;
 		StateCacheT<MTL::DepthStencilState*> m_depthStencilStateCache;
@@ -4019,10 +4022,10 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 
 	RendererContextI* rendererCreate(const Init& _init)
 	{
-		s_renderMtl = BX_NEW(g_allocator, RendererContextMtl);
+		s_renderMtl = BX_NEW_PTR(g_allocatorBlk, RendererContextMtl);
 		if (!s_renderMtl->init(_init) )
 		{
-			bx::deleteObject(g_allocator, s_renderMtl);
+			bx::deletePtr(s_renderMtl);
 			s_renderMtl = NULL;
 		}
 		return s_renderMtl;
@@ -4031,7 +4034,7 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 	void rendererDestroy()
 	{
 		s_renderMtl->shutdown();
-		bx::deleteObject(g_allocator, s_renderMtl);
+		bx::deletePtr(s_renderMtl);
 		s_renderMtl = NULL;
 	}
 
@@ -4044,10 +4047,10 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 	{
 		UniformHandle handle = BGFX_INVALID_HANDLE;
 
-		UniformMap::const_iterator it = m_uniforms.find(bx::hash<bx::HashMurmur2A>(_name) );
-		if (m_uniforms.end() != it)
+		const UniformHandle* found = m_uniforms.find(bx::hash<bx::HashMurmur2A>(_name) );
+		if (NULL != found)
 		{
-			handle = it->second;
+			handle = *found;
 		}
 
 		return handle;
@@ -4116,7 +4119,7 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 
 				if (NULL != info)
 				{
-					m_uniforms[bx::hash<bx::HashMurmur2A>(bx::StringView(name) )] = info->m_handle;
+					m_uniforms.add(bx::hash<bx::HashMurmur2A>(bx::StringView(name) ), info->m_handle, true);
 				}
 			}
 
@@ -4183,11 +4186,11 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 			return m_function;
 		}
 
-		FunctionMap::const_iterator it = m_functions.find(_sampleMask);
+		MTL::Function* const* found = m_functions.find(_sampleMask);
 
-		if (it != m_functions.end() )
+		if (NULL != found)
 		{
-			return it->second;
+			return *found;
 		}
 
 		MTL::FunctionConstantValues* constantValues = MTL::FunctionConstantValues::alloc()->init();
@@ -4206,7 +4209,7 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 			return m_function;
 		}
 
-		m_functions[_sampleMask] = function;
+		m_functions.add(_sampleMask, function);
 
 		return function;
 	}
@@ -4272,7 +4275,7 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 		m_fsh = NULL;
 		if (NULL != m_computePS)
 		{
-			bx::deleteObject(g_allocator, m_computePS);
+			bx::deletePtr(m_computePS);
 			m_computePS = NULL;
 		}
 	}
@@ -4304,7 +4307,7 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 		{
 			if (NULL == m_dynamic)
 			{
-				m_dynamic = (uint8_t*)bx::alloc(g_allocator, m_size);
+				m_dynamic = (uint8_t*)bx::allocPtr(g_allocatorBlk, m_size);
 			}
 
 			bx::memCopy(m_dynamic + _offset, _data, _size);
@@ -4651,7 +4654,7 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 			uint8_t* temp = NULL;
 			if (convert)
 			{
-				temp = (uint8_t*)bx::alloc(g_allocator, ti.width*ti.height*ti.depth*4);
+				temp = (uint8_t*)bx::allocPtr(g_allocatorBlk, ti.width*ti.height*ti.depth*4);
 			}
 
 			for (uint16_t side = 0; side < numSides; ++side)
@@ -4758,7 +4761,7 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 
 			if (NULL != temp)
 			{
-				bx::free(g_allocator, temp);
+				bx::freePtr(temp);
 			}
 		}
 	}
@@ -4779,9 +4782,9 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 		MTL_RELEASE_DEFERRED(m_ptrAlt);
 		MTL_RELEASE_DEFERRED(m_ptrMsaaAlt);
 
-		for (stl::unordered_map<uint64_t, MTL::Texture*>::iterator it = m_ptrViews.begin(), itEnd = m_ptrViews.end(); it != itEnd; ++it)
+		for (bx::HashMapT<uint64_t, MTL::Texture*>::Iterator it = m_ptrViews.begin(), itEnd = m_ptrViews.end(); it != itEnd; ++it)
 		{
-			MTL::Texture* view = it->second;
+			MTL::Texture* view = it.getValue();
 			MTL_RELEASE_DEFERRED(view);
 		}
 		m_ptrViews.clear();
@@ -4841,7 +4844,7 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 
 		if (convert)
 		{
-			temp = (uint8_t*)bx::alloc(g_allocator, rectpitch*_rect.m_height*_depth);
+			temp = (uint8_t*)bx::allocPtr(g_allocatorBlk, rectpitch*_rect.m_height*_depth);
 			imageDecodeToBgra8(
 				  temp
 				, data
@@ -4911,7 +4914,7 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 
 		if (NULL != temp)
 		{
-			bx::free(g_allocator, temp);
+			bx::freePtr(temp);
 		}
 	}
 
@@ -5152,10 +5155,10 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 			| (uint64_t(_stencil)   << 63)
 			;
 
-		stl::unordered_map<uint64_t, MTL::Texture*>::iterator it = m_ptrViews.find(key);
-		if (it != m_ptrViews.end() )
+		MTL::Texture* const* found = m_ptrViews.find(key);
+		if (NULL != found)
 		{
-			return it->second;
+			return *found;
 		}
 
 		MTL::Texture* view = swizzleDepth
@@ -5173,7 +5176,7 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 				, NS::Range::Make(firstLayer, numLayers)
 				)
 			;
-		m_ptrViews[key] = view;
+		m_ptrViews.add(key, view);
 
 		return view;
 	}
@@ -5211,10 +5214,10 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 			| (uint64_t(1)          << 62) // image, so it can't collide with a sampled view
 			;
 
-		stl::unordered_map<uint64_t, MTL::Texture*>::iterator it = m_ptrViews.find(key);
-		if (it != m_ptrViews.end() )
+		MTL::Texture* const* found = m_ptrViews.find(key);
+		if (NULL != found)
 		{
-			return it->second;
+			return *found;
 		}
 
 		MTL::Texture* view = m_ptr->newTextureView(
@@ -5223,7 +5226,7 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 			, NS::Range::Make(firstMip, 1)
 			, NS::Range::Make(firstLayer, numLayers)
 			);
-		m_ptrViews[key] = view;
+		m_ptrViews.add(key, view);
 
 		return view;
 	}
@@ -5773,7 +5776,7 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 
 	void FrameBufferMtl::create(uint16_t _denseIdx, const SwapChain& _desc)
 	{
-		m_swapChain = BX_NEW(g_allocator, SwapChainMtl);
+		m_swapChain = BX_NEW_PTR(g_allocatorBlk, SwapChainMtl);
 		m_num       = 0;
 		m_width     = _desc.width;
 		m_height    = _desc.height;
@@ -5824,7 +5827,7 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 	{
 		if (NULL != m_swapChain)
 		{
-			bx::deleteObject(g_allocator, m_swapChain);
+			bx::deletePtr(m_swapChain);
 			m_swapChain = NULL;
 		}
 
@@ -5884,9 +5887,9 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 		{
 			NS::AutoreleasePool* pool = NS::AutoreleasePool::alloc()->init();
 
-			for (ReleaseArray::iterator it = m_release.begin(), itEnd = m_release.end(); it != itEnd; ++it)
+			for (Release& release : m_release)
 			{
-				MTL_RELEASE_I(it->ptr);
+				MTL_RELEASE_I(release.ptr);
 			}
 
 			m_release.clear();
@@ -5987,7 +5990,7 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 
 	void CommandQueueMtl::release(NS::Object* _ptr)
 	{
-		m_release.push_back({ _ptr, m_submittedFrames });
+		m_release.add({ _ptr, m_submittedFrames });
 	}
 
 	void CommandQueueMtl::consume()
@@ -5996,14 +5999,17 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 
 		const uint32_t completedFrames = bx::atomicLoad(&m_completedFrames);
 
-		ReleaseArray::iterator it = m_release.begin();
+		uint32_t numReleased = 0;
 
-		for (ReleaseArray::iterator itEnd = m_release.end(); it != itEnd && 0 < int32_t(completedFrames - it->frame); ++it)
+		for (uint32_t num = m_release.getCount(); numReleased < num && 0 < int32_t(completedFrames - m_release[numReleased].frame); ++numReleased)
 		{
-			MTL_RELEASE_I(it->ptr);
+			MTL_RELEASE_I(m_release[numReleased].ptr);
 		}
 
-		m_release.erase(m_release.begin(), it);
+		if (0 < numReleased)
+		{
+			m_release.remove(0, bx::kOrdered, numReleased);
+		}
 	}
 
 	static constexpr uint64_t kNanosecondsPerSecond = UINT64_C(1000000000);
@@ -6694,15 +6700,27 @@ static_assert(BX_COUNTOF(s_accessNames) == Access::Count, "Invalid s_accessNames
 		if (0 < _render->m_iboffset)
 		{
 			BGFX_PROFILER_SCOPE("bgfx/Update transient index buffer", kColorResource);
-			TransientIndexBuffer* ib = _render->m_transientIb;
-			m_indexBuffers[ib->handle.idx].update(0, bx::strideAlign(_render->m_iboffset,4), ib->data, true);
+
+			for (const TransientBufferChunk& chunk : _render->m_transientIb.m_chunks)
+			{
+				if (0 < chunk.m_offset)
+				{
+					m_indexBuffers[chunk.m_handle].update(0, bx::strideAlign(chunk.m_offset,4), chunk.m_data, true);
+				}
+			}
 		}
 
 		if (0 < _render->m_vboffset)
 		{
 			BGFX_PROFILER_SCOPE("bgfx/Update transient vertex buffer", kColorResource);
-			TransientVertexBuffer* vb = _render->m_transientVb;
-			m_vertexBuffers[vb->handle.idx].update(0, bx::strideAlign(_render->m_vboffset,4), vb->data, true);
+
+			for (const TransientBufferChunk& chunk : _render->m_transientVb.m_chunks)
+			{
+				if (0 < chunk.m_offset)
+				{
+					m_vertexBuffers[chunk.m_handle].update(0, bx::strideAlign(chunk.m_offset,4), chunk.m_data, true);
+				}
+			}
 		}
 
 		_render->sort();

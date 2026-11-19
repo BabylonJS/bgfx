@@ -540,9 +540,8 @@ namespace entry
 		WindowHandle findHandle(NSWindow *_window)
 		{
 			bx::MutexScope scope(m_lock);
-			for (uint16_t ii = 0, num = m_windowAlloc.getNumHandles(); ii < num; ++ii)
+			for (uint16_t idx = m_windowAlloc.findFirst(); bx::kInvalidHandle != idx; idx = m_windowAlloc.findNext(idx) )
 			{
-				uint16_t idx = m_windowAlloc.getHandleAt(ii);
 				if (_window == m_window[idx])
 				{
 					WindowHandle handle = { idx };

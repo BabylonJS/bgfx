@@ -156,7 +156,15 @@ namespace ps
 				if (m_ra.find(_width, _height, pack) )
 				{
 					handle.idx = m_handleAlloc.alloc();
-					m_pack[handle.idx] = pack;
+
+					if (bx::kInvalidHandle != handle.idx)
+					{
+						m_pack[handle.idx] = pack;
+					}
+					else
+					{
+						m_ra.clear(pack);
+					}
 				}
 			}
 
@@ -451,7 +459,7 @@ namespace ps
 				m_allocator = &allocator;
 			}
 
-			m_emitterAlloc = bx::createHandleAlloc(m_allocator, _maxEmitters);
+			m_emitterAlloc = BX_NEW(m_allocator, bx::DynamicHandleAlloc)(bx::getDefaultAllocatorBlk()->getHandle(), _maxEmitters);
 			m_emitter = (Emitter*)bx::alloc(m_allocator, sizeof(Emitter)*_maxEmitters);
 
 			PosColorTexCoord0Vertex::init();
@@ -481,7 +489,7 @@ namespace ps
 			bgfx::destroy(m_texture);
 			bgfx::destroy(s_texColor);
 
-			bx::destroyHandleAlloc(m_allocator, m_emitterAlloc);
+			bx::deleteObject(m_allocator, m_emitterAlloc);
 			bx::free(m_allocator, m_emitter);
 
 			m_allocator = NULL;
@@ -517,9 +525,8 @@ namespace ps
 		void update(float _dt)
 		{
 			uint32_t numParticles = 0;
-			for (uint16_t ii = 0, num = m_emitterAlloc->getNumHandles(); ii < num; ++ii)
+			for (uint16_t idx = m_emitterAlloc->findFirst(); bx::kInvalidHandle != idx; idx = m_emitterAlloc->findNext(idx) )
 			{
-				const uint16_t idx = m_emitterAlloc->getHandleAt(ii);
 				Emitter& emitter = m_emitter[idx];
 				emitter.update(_dt);
 				numParticles += emitter.m_num;
@@ -557,9 +564,8 @@ namespace ps
 					ParticleSort* particleSort = (ParticleSort*)bx::alloc(m_allocator, max*sizeof(ParticleSort) );
 
 					uint32_t pos = 0;
-					for (uint16_t ii = 0, numEmitters = m_emitterAlloc->getNumHandles(); ii < numEmitters; ++ii)
+					for (uint16_t idx = m_emitterAlloc->findFirst(); bx::kInvalidHandle != idx; idx = m_emitterAlloc->findNext(idx) )
 					{
-						const uint16_t idx = m_emitterAlloc->getHandleAt(ii);
 						Emitter& emitter = m_emitter[idx];
 
 						const Pack2D& pack = m_sprite.get(emitter.m_uniforms.m_handle);
@@ -665,7 +671,7 @@ namespace ps
 
 		bx::AllocatorI* m_allocator;
 
-		bx::HandleAlloc* m_emitterAlloc;
+		bx::DynamicHandleAlloc* m_emitterAlloc;
 		Emitter* m_emitter;
 
 		typedef SpriteT<256, SPRITE_TEXTURE_SIZE> Sprite;

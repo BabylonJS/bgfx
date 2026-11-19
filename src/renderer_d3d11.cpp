@@ -2984,6 +2984,28 @@ namespace bgfx { namespace d3d11
 		{
 			_state &= BGFX_D3D11_BLEND_STATE_MASK;
 
+			uint8_t intColorMask = isValid(m_fbh)
+				? m_frameBuffers[m_fbh.idx].m_intColorMask
+				: 0
+				;
+
+			if (0 != intColorMask)
+			{
+				uint8_t blendMask = 0 != (BGFX_STATE_BLEND_MASK & _state) ? UINT8_MAX : 0;
+
+				if (0 != (BGFX_STATE_BLEND_INDEPENDENT & _state) )
+				{
+					blendMask &= 1;
+
+					for (uint32_t ii = 1, rgba = _rgba; ii < D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT; ++ii, rgba >>= 11)
+					{
+						blendMask |= 0 != (rgba & 0x7ff) ? uint8_t(1<<ii) : 0;
+					}
+				}
+
+				intColorMask &= blendMask;
+			}
+
 			bx::HashMurmur2A murmur;
 			murmur.begin();
 			murmur.add(_state);
@@ -2992,6 +3014,7 @@ namespace bgfx { namespace d3d11
 				: -1
 				);
 			murmur.add(_mrtMask);
+			murmur.add(intColorMask);
 			const uint32_t hash = murmur.end();
 
 			ID3D11BlendState* bs = m_blendStateCache.find(hash);
@@ -3070,6 +3093,19 @@ namespace bgfx { namespace d3d11
 						if (0 == (_mrtMask & (1<<ii) ) )
 						{
 							desc.RenderTarget[ii].RenderTargetWriteMask = 0;
+						}
+					}
+				}
+
+				if (0 != intColorMask)
+				{
+					desc.IndependentBlendEnable = true;
+
+					for (uint32_t ii = 0; ii < BX_COUNTOF(desc.RenderTarget); ++ii)
+					{
+						if (0 != (intColorMask & (1<<ii) ) )
+						{
+							desc.RenderTarget[ii].BlendEnable = false;
 						}
 					}
 				}
@@ -3998,7 +4034,7 @@ namespace bgfx { namespace d3d11
 
 			const bool intColor = true
 				&& isValid(m_fbh)
-				&& m_frameBuffers[m_fbh.idx].m_intColor
+				&& 0 != m_frameBuffers[m_fbh.idx].m_intColorMask
 				&& 0 != (_clear.m_flags & BGFX_CLEAR_COLOR)
 				&& !isZeroColorClear(_clear, _palette)
 				;
@@ -4330,10 +4366,10 @@ namespace bgfx { namespace d3d11
 
 	RendererContextI* rendererCreate(const Init& _init)
 	{
-		s_renderD3D11 = BX_NEW(g_allocator, RendererContextD3D11);
+		s_renderD3D11 = BX_NEW_PTR(g_allocatorBlk, RendererContextD3D11);
 		if (!s_renderD3D11->init(_init) )
 		{
-			bx::deleteObject(g_allocator, s_renderD3D11);
+			bx::deletePtr(s_renderD3D11);
 			s_renderD3D11 = NULL;
 		}
 		return s_renderD3D11;
@@ -4342,7 +4378,7 @@ namespace bgfx { namespace d3d11
 	void rendererDestroy()
 	{
 		s_renderD3D11->shutdown();
-		bx::deleteObject(g_allocator, s_renderD3D11);
+		bx::deletePtr(s_renderD3D11);
 		s_renderD3D11 = NULL;
 	}
 
@@ -5171,7 +5207,7 @@ namespace bgfx { namespace d3d11
 						if (convert)
 						{
 							uint32_t srcpitch = mip.m_width*bpp/8;
-							temp = (uint8_t*)bx::alloc(g_allocator, srcpitch*mip.m_height*mip.m_depth);
+							temp = (uint8_t*)bx::allocPtr(g_allocatorBlk, srcpitch*mip.m_height*mip.m_depth);
 							imageDecodeToBgra8(temp, mip.m_data, mip.m_width, mip.m_height, mip.m_depth, srcpitch, srcpitch*mip.m_height, mip.m_format);
 
 							srd[kk].pSysMem = temp;
@@ -5189,17 +5225,17 @@ namespace bgfx { namespace d3d11
 							switch (m_textureFormat)
 							{
 							case TextureFormat::R5G6B5:
-								temp = (uint8_t*)bx::alloc(g_allocator, mip.m_size);
+								temp = (uint8_t*)bx::allocPtr(g_allocatorBlk, mip.m_size);
 								bimg::imageConvert(temp, 16, bx::packB5G6R5, mip.m_data, bx::unpackR5G6B5, mip.m_size);
 								srd[kk].pSysMem = temp;
 								break;
 							case TextureFormat::RGBA4:
-								temp = (uint8_t*)bx::alloc(g_allocator, mip.m_size);
+								temp = (uint8_t*)bx::allocPtr(g_allocatorBlk, mip.m_size);
 								bimg::imageConvert(temp, 16, bx::packBgra4, mip.m_data, bx::unpackRgba4, mip.m_size);
 								srd[kk].pSysMem = temp;
 								break;
 							case TextureFormat::RGB5A1:
-								temp = (uint8_t*)bx::alloc(g_allocator, mip.m_size);
+								temp = (uint8_t*)bx::allocPtr(g_allocatorBlk, mip.m_size);
 								bimg::imageConvert(temp, 16, bx::packBgr5a1, mip.m_data, bx::unpackRgb5a1, mip.m_size);
 								srd[kk].pSysMem = temp;
 								break;
@@ -5605,7 +5641,7 @@ namespace bgfx { namespace d3d11
 				{
 					for (uint32_t lod = 0, num = ti.numMips; lod < num; ++lod)
 					{
-						bx::free(g_allocator, const_cast<void*>(srd[kk].pSysMem) );
+						bx::freePtr(const_cast<void*>(srd[kk].pSysMem) );
 						++kk;
 					}
 				}
@@ -5712,7 +5748,7 @@ namespace bgfx { namespace d3d11
 		if (convert)
 		{
 			copyPitch = rectPitch;
-			temp = (uint8_t*)bx::alloc(g_allocator, slicePitch*numSlices);
+			temp = (uint8_t*)bx::allocPtr(g_allocatorBlk, slicePitch*numSlices);
 			imageDecodeToBgra8(temp, data, _rect.m_width, _rect.m_height, numSlices, copyPitch, slicePitch, bimg::TextureFormat::Enum(m_requestedFormat) );
 			data = temp;
 
@@ -5724,19 +5760,19 @@ namespace bgfx { namespace d3d11
 			switch (m_textureFormat)
 			{
 			case TextureFormat::R5G6B5:
-				temp = (uint8_t*)bx::alloc(g_allocator, slicePitch*numSlices);
+				temp = (uint8_t*)bx::allocPtr(g_allocatorBlk, slicePitch*numSlices);
 				bimg::imageConvert(temp, 16, bx::packB5G6R5, data, bx::unpackR5G6B5, slicePitch*numSlices);
 				data = temp;
 				break;
 
 			case TextureFormat::RGBA4:
-				temp = (uint8_t*)bx::alloc(g_allocator, slicePitch*numSlices);
+				temp = (uint8_t*)bx::allocPtr(g_allocatorBlk, slicePitch*numSlices);
 				bimg::imageConvert(temp, 16, bx::packBgra4, data, bx::unpackRgba4, slicePitch*numSlices);
 				data = temp;
 				break;
 
 			case TextureFormat::RGB5A1:
-				temp = (uint8_t*)bx::alloc(g_allocator, slicePitch*numSlices);
+				temp = (uint8_t*)bx::allocPtr(g_allocatorBlk, slicePitch*numSlices);
 				bimg::imageConvert(temp, 16, bx::packBgr5a1, data, bx::unpackRgb5a1, slicePitch*numSlices);
 				data = temp;
 				break;
@@ -5822,7 +5858,7 @@ namespace bgfx { namespace d3d11
 
 		if (NULL != temp)
 		{
-			bx::free(g_allocator, temp);
+			bx::freePtr(temp);
 		}
 	}
 
@@ -6328,7 +6364,7 @@ namespace bgfx { namespace d3d11
 		m_width  = 0;
 		m_height = 0;
 		m_needsQuadClear = false;
-		m_intColor       = false;
+		m_intColorMask   = 0;
 
 		if (0 < m_numTh)
 		{
@@ -6449,12 +6485,7 @@ namespace bgfx { namespace d3d11
 							|| 1 < texture.m_numLayers
 							;
 
-						{
-							const bx::EncodingType::Enum encoding = bx::EncodingType::Enum(bimg::getBlockInfo(bimg::TextureFormat::Enum(texture.m_textureFormat) ).encoding);
-							m_intColor |= bx::EncodingType::Int  == encoding
-								||        bx::EncodingType::Uint == encoding
-								;
-						}
+						m_intColorMask |= isIntegerFormat(TextureFormat::Enum(texture.m_textureFormat) ) ? uint8_t(1<<m_num) : 0;
 
 						D3D11_RENDER_TARGET_VIEW_DESC desc;
 						desc.Format = texture.getSrvFormat(srgbSelect(at.flags, BGFX_ATTACHMENT_SRGB) );
@@ -7457,15 +7488,27 @@ namespace bgfx { namespace d3d11
 		if (0 < _render->m_iboffset)
 		{
 			BGFX_PROFILER_SCOPE("bgfx/Update transient index buffer", kColorResource);
-			TransientIndexBuffer* ib = _render->m_transientIb;
-			m_indexBuffers[ib->handle.idx].update(0, _render->m_iboffset, ib->data, true);
+
+			for (const TransientBufferChunk& chunk : _render->m_transientIb.m_chunks)
+			{
+				if (0 < chunk.m_offset)
+				{
+					m_indexBuffers[chunk.m_handle].update(0, chunk.m_offset, chunk.m_data, true);
+				}
+			}
 		}
 
 		if (0 < _render->m_vboffset)
 		{
 			BGFX_PROFILER_SCOPE("bgfx/Update transient vertex buffer", kColorResource);
-			TransientVertexBuffer* vb = _render->m_transientVb;
-			m_vertexBuffers[vb->handle.idx].update(0, _render->m_vboffset, vb->data, true);
+
+			for (const TransientBufferChunk& chunk : _render->m_transientVb.m_chunks)
+			{
+				if (0 < chunk.m_offset)
+				{
+					m_vertexBuffers[chunk.m_handle].update(0, chunk.m_offset, chunk.m_data, true);
+				}
+			}
 		}
 
 		_render->sort();
