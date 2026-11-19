@@ -2870,6 +2870,16 @@ namespace bgfx
 #undef CHECK_HANDLE_LEAK
 #undef CHECK_HANDLE_LEAK_NAME
 		}
+
+		// Leaked shaders still own their uniform handle arrays. The handles die with the context,
+		// but the arrays come from g_allocatorBlk, which must have no live blocks when destroyed.
+		for (uint16_t idx = m_shaderHandle.findFirst(); bx::kInvalidHandle != idx; idx = m_shaderHandle.findNext(idx) )
+		{
+			ShaderRef& sr = m_shaderRef[idx];
+			bx::freePtr(sr.m_uniforms);
+			sr.m_uniforms = NULL;
+			sr.m_num = 0;
+		}
 	}
 
 	void Context::freeDynamicBuffers()
