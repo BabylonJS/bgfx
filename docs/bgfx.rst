@@ -21,14 +21,22 @@ General API for initialization, shutdown, frame management, debug, and querying 
 Initialization and Shutdown
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+.. doxygendefine:: BGFX_DIAGNOSTIC_NONE
+.. doxygendefine:: BGFX_DIAGNOSTIC_VERBOSE
+.. doxygendefine:: BGFX_DIAGNOSTIC_GPU_VALIDATION
+.. doxygendefine:: BGFX_DIAGNOSTIC_SYNC_VALIDATION
+.. doxygendefine:: BGFX_DIAGNOSTIC_SERIALIZE
+.. doxygendefine:: BGFX_DIAGNOSTIC_DRAW_VALIDATION
+
 .. doxygendefine:: BGFX_PCI_ID_NONE
 .. doxygendefine:: BGFX_PCI_ID_SOFTWARE_RASTERIZER
 .. doxygendefine:: BGFX_PCI_ID_AMD
 .. doxygendefine:: BGFX_PCI_ID_APPLE
-.. doxygendefine:: BGFX_PCI_ID_INTEL
-.. doxygendefine:: BGFX_PCI_ID_NVIDIA
-.. doxygendefine:: BGFX_PCI_ID_MICROSOFT
 .. doxygendefine:: BGFX_PCI_ID_ARM
+.. doxygendefine:: BGFX_PCI_ID_GOOGLE
+.. doxygendefine:: BGFX_PCI_ID_INTEL
+.. doxygendefine:: BGFX_PCI_ID_MICROSOFT
+.. doxygendefine:: BGFX_PCI_ID_NVIDIA
 
 .. doxygenstruct:: bgfx::Init
     :members:
@@ -178,6 +186,9 @@ Statistics
 **********
 
 Per-frame rendering statistics.
+
+.. doxygenstruct:: bgfx::ViewStatsType
+    :members:
 
 .. doxygenstruct:: bgfx::ViewStats
     :members:

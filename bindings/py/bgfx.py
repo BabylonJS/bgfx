@@ -260,6 +260,12 @@ class ViewMode(enum.IntEnum):
 	DepthDescending = 3
 	Count = 4
 
+class ViewStatsType(enum.IntEnum):
+	Blit = 0
+	Compute = 1
+	Draw = 2
+	Count = 3
+
 class ShadingRate(enum.IntEnum):
 	Rate1x1 = 0
 	Rate1x2 = 1
@@ -543,6 +549,14 @@ class DebugFlags(enum.IntFlag):
 	Text = 0x8
 	Profiler = 0x10
 
+class DiagnosticFlags(enum.IntFlag):
+	None_ = 0x0
+	Verbose = 0x1
+	GpuValidation = 0x2
+	SyncValidation = 0x4
+	Serialize = 0x8
+	DrawValidation = 0x10
+
 class SwapChainMsaaFlags(enum.IntFlag):
 	X2 = 0x10
 	X4 = 0x20
@@ -646,10 +660,11 @@ class PciIdFlags(enum.IntFlag):
 	SoftwareRasterizer = 0x1
 	Amd = 0x1002
 	Apple = 0x106b
-	Intel = 0x8086
-	Nvidia = 0x10de
-	Microsoft = 0x1414
 	Arm = 0x13b5
+	Google = 0x1ae0
+	Intel = 0x8086
+	Microsoft = 0x1414
+	Nvidia = 0x10de
 
 class CubeMapFlags(enum.IntFlag):
 	PositiveX = 0x0
@@ -866,8 +881,8 @@ CapsLimits._fields_ = [
 	("maxOcclusionQueries", ctypes.c_uint32),
 	("maxEncoders", ctypes.c_uint32),
 	("minResourceCbSize", ctypes.c_uint32),
-	("maxTransientVbSize", ctypes.c_uint32),
-	("maxTransientIbSize", ctypes.c_uint32),
+	("minTransientVbSize", ctypes.c_uint32),
+	("minTransientIbSize", ctypes.c_uint32),
 	("minUniformBufferSize", ctypes.c_uint32),
 	("minUniformCacheSize", ctypes.c_uint32),
 	("blitRowPitchAlign", ctypes.c_uint32),
@@ -918,18 +933,20 @@ InitLimits._fields_ = [
 	("numDrawCallPeakFrames", ctypes.c_uint32),
 	("minViews", ctypes.c_uint32),
 	("minResourceCbSize", ctypes.c_uint32),
-	("maxTransientVbSize", ctypes.c_uint32),
-	("maxTransientIbSize", ctypes.c_uint32),
+	("minTransientVbSize", ctypes.c_uint32),
+	("minTransientIbSize", ctypes.c_uint32),
 	("minUniformBufferSize", ctypes.c_uint32),
 	("minUniformCacheSize", ctypes.c_uint32),
 ]
 
 Init._fields_ = [
 	("type", ctypes.c_int),
+	("backendType", ctypes.c_int),
 	("vendorId", ctypes.c_uint16),
 	("deviceId", ctypes.c_uint16),
 	("capabilities", ctypes.c_uint64),
 	("debug", ctypes.c_bool),
+	("diagnostics", ctypes.c_uint32),
 	("profile", ctypes.c_bool),
 	("fallback", ctypes.c_bool),
 	("videoDecode", ctypes.c_bool),
@@ -1049,6 +1066,7 @@ Transform._fields_ = [
 ViewStats._fields_ = [
 	("name", (ctypes.c_char * 256)),
 	("view", ctypes.c_uint16),
+	("type", ctypes.c_int),
 	("cpuTimeBegin", ctypes.c_int64),
 	("cpuTimeEnd", ctypes.c_int64),
 	("gpuTimeBegin", ctypes.c_int64),
@@ -1107,7 +1125,7 @@ Stats._fields_ = [
 	("height", ctypes.c_uint16),
 	("textWidth", ctypes.c_uint16),
 	("textHeight", ctypes.c_uint16),
-	("numViews", ctypes.c_uint16),
+	("numViewStats", ctypes.c_uint16),
 	("viewStats", ctypes.POINTER(ViewStats)),
 	("numEncoders", ctypes.c_uint8),
 	("encoderStats", ctypes.POINTER(EncoderStats)),

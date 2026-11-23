@@ -62,15 +62,21 @@ namespace bgfx
 	}
 
 	static constexpr uint32_t kTimerQueryBlock = 64;
-	static constexpr uint32_t kMaxTimerQueries = BGFX_CONFIG_MAX_VIEWS*4;
+	static constexpr uint32_t kMaxTimerQueries = BGFX_CONFIG_MAX_VIEWS*ViewStatsType::Count*4;
 	static constexpr uint32_t kMinTimerQueries = bx::min<uint32_t>(kTimerQueryBlock, kMaxTimerQueries);
+	static constexpr uint32_t kTimerResultFrame = BGFX_CONFIG_MAX_VIEWS*ViewStatsType::Count;
+
+	inline uint32_t getTimerResultIdx(ViewId _view, ViewStatsType::Enum _type)
+	{
+		return uint32_t(_view)*ViewStatsType::Count + _type;
+	}
 
 	inline uint32_t getNumTimerQueries(const Frame* _frame, uint32_t _num)
 	{
-		const bool profiler     = 0 != (_frame->m_debug & BGFX_DEBUG_PROFILER);
-		const uint32_t numViews = profiler ? _frame->m_numUsedViews : 0;
-		const uint32_t spare    = profiler ? kTimerQueryBlock : 0;
-		const uint32_t num      = bx::min<uint32_t>(bx::alignUp( (numViews+1)*4, kTimerQueryBlock) + spare, kMaxTimerQueries);
+		const bool profiler         = 0 != (_frame->m_debug & BGFX_DEBUG_PROFILER);
+		const uint32_t numViewStats = profiler ? _frame->m_numUsedViewStats : 0;
+		const uint32_t spare        = profiler ? kTimerQueryBlock : 0;
+		const uint32_t num          = bx::min<uint32_t>(bx::alignUp( (numViewStats+1)*4, kTimerQueryBlock) + spare, kMaxTimerQueries);
 
 		return profiler
 			? bx::max(num, _num)
@@ -97,14 +103,14 @@ namespace bgfx
 
 		~TimerQueryArrayT()
 		{
-			bx::free(g_allocator, m_query);
+			bx::freePtr(m_query);
 		}
 
 		void resize(uint32_t _num)
 		{
 			if (_num != m_num)
 			{
-				m_query = (QueryT*)bx::realloc(g_allocator, m_query, sizeof(QueryT)*_num);
+				m_query = (QueryT*)bx::reallocPtr(g_allocatorBlk, m_query, sizeof(QueryT)*_num);
 				m_num   = _num;
 			}
 		}
@@ -151,7 +157,7 @@ namespace bgfx
 
 		~TimerResultT()
 		{
-			bx::free(g_allocator, m_result);
+			bx::freePtr(m_result);
 		}
 
 		void reset()
@@ -176,7 +182,7 @@ namespace bgfx
 
 		ResultT& operator[](uint32_t _idx)
 		{
-			if (BGFX_CONFIG_MAX_VIEWS == _idx)
+			if (kTimerResultFrame == _idx)
 			{
 				return m_frame;
 			}
@@ -194,7 +200,7 @@ namespace bgfx
 		{
 			const uint32_t num = bx::alignUp(_num, kTimerQueryBlock);
 
-			ResultT* result = (ResultT*)bx::alloc(g_allocator, sizeof(ResultT)*num);
+			ResultT* result = (ResultT*)bx::allocPtr(g_allocatorBlk, sizeof(ResultT)*num);
 			bx::memCopy(result, m_result, sizeof(ResultT)*m_num);
 
 			for (uint32_t ii = m_num; ii < num; ++ii)
@@ -202,7 +208,7 @@ namespace bgfx
 				result[ii].reset();
 			}
 
-			bx::free(g_allocator, m_result);
+			bx::freePtr(m_result);
 			m_result = result;
 			m_num    = num;
 		}
@@ -226,6 +232,11 @@ namespace bgfx
 			return m_item < m_frame->m_numBlitItems
 				&& m_key.m_view <= m_frame->m_viewOrder[_view]
 				;
+		}
+
+		ViewId getView() const
+		{
+			return m_frame->m_viewRemap[m_key.m_view];
 		}
 
 		const BlitItem& advance()
@@ -594,17 +605,17 @@ namespace bgfx
 			data.m_hash   = _key;
 			data.m_value  = _value;
 			data.m_parent = _parent;
-			m_hashMap.insert(stl::make_pair(_key, handle) );
+			m_hashMap.tryAdd(_key, handle);
 
 			return bx::addressOf(m_data[handle].m_value);
 		}
 
 		Ty* find(uint64_t _key)
 		{
-			HashMap::iterator it = m_hashMap.find(_key);
-			if (it != m_hashMap.end() )
+			const uint16_t* found = m_hashMap.find(_key);
+			if (NULL != found)
 			{
-				uint16_t handle = it->second;
+				uint16_t handle = *found;
 				m_alloc.touch(handle);
 				return bx::addressOf(m_data[handle].m_value);
 			}
@@ -614,12 +625,12 @@ namespace bgfx
 
 		void invalidate(uint64_t _key)
 		{
-			HashMap::iterator it = m_hashMap.find(_key);
-			if (it != m_hashMap.end() )
+			const uint16_t* found = m_hashMap.find(_key);
+			if (NULL != found)
 			{
-				uint16_t handle = it->second;
+				uint16_t handle = *found;
 				m_alloc.free(handle);
-				m_hashMap.erase(it);
+				m_hashMap.remove(_key);
 				release(m_data[handle].m_value);
 			}
 		}
@@ -630,36 +641,33 @@ namespace bgfx
 			{
 				m_alloc.free(_handle);
 				Data& data = m_data[_handle];
-				m_hashMap.erase(m_hashMap.find(data.m_hash) );
+				m_hashMap.tryRemove(data.m_hash);
 				release(data.m_value);
 			}
 		}
 
 		void invalidateWithParent(uint16_t _parent)
 		{
-			for (uint16_t ii = 0; ii < m_alloc.getNumHandles();)
+			for (uint16_t handle = m_alloc.getFront(); bx::kInvalidHandle != handle;)
 			{
-				uint16_t handle = m_alloc.getHandleAt(ii);
+				const uint16_t next = m_alloc.getNext(handle);
 				Data& data = m_data[handle];
 
 				if (data.m_parent == _parent)
 				{
 					m_alloc.free(handle);
-					m_hashMap.erase(m_hashMap.find(data.m_hash) );
+					m_hashMap.tryRemove(data.m_hash);
 					release(data.m_value);
 				}
-				else
-				{
-					++ii;
-				}
+
+				handle = next;
 			}
 		}
 
 		void invalidate()
 		{
-			for (uint16_t ii = 0, num = m_alloc.getNumHandles(); ii < num; ++ii)
+			for (uint16_t handle = m_alloc.getFront(); bx::kInvalidHandle != handle; handle = m_alloc.getNext(handle) )
 			{
-				uint16_t handle = m_alloc.getHandleAt(ii);
 				Data& data = m_data[handle];
 				release(data.m_value);
 			}
@@ -670,12 +678,12 @@ namespace bgfx
 
 		uint32_t getCount() const
 		{
-			return uint32_t(m_hashMap.size() );
+			return m_hashMap.getCount();
 		}
 
 	private:
-		typedef stl::unordered_map<uint64_t, uint16_t> HashMap;
-		HashMap m_hashMap;
+		using HashMap = bx::HashMapT<uint64_t, uint16_t>;
+		HashMap m_hashMap{g_allocatorHandle};
 		bx::HandleAllocLruT<MaxHandleT> m_alloc;
 		struct Data
 		{
@@ -708,15 +716,15 @@ namespace bgfx
 		{
 			invalidate(_key);
 			StateCacheFuncT<Ty>::validate(_value, _key);
-			m_hashMap.insert(stl::make_pair(_key, Data{_value, _parent}) );
+			m_hashMap.add(_key, Data{_value, _parent});
 		}
 
 		Ty find(uint64_t _key)
 		{
-			typename HashMap::iterator it = m_hashMap.find(_key);
-			if (it != m_hashMap.end() )
+			const Data* found = m_hashMap.find(_key);
+			if (NULL != found)
 			{
-				return it->second.m_value;
+				return found->m_value;
 			}
 
 			return Ty(0);
@@ -724,37 +732,31 @@ namespace bgfx
 
 		void invalidate(uint64_t _key)
 		{
-			typename HashMap::iterator it = m_hashMap.find(_key);
-			if (it != m_hashMap.end() )
+			const Data* found = m_hashMap.find(_key);
+			if (NULL != found)
 			{
-				StateCacheFuncT<Ty>::evict(it->second.m_value);
-				m_hashMap.erase(it);
+				StateCacheFuncT<Ty>::evict(found->m_value);
+				m_hashMap.remove(_key);
 			}
 		}
 
 		void invalidateWithParent(uint16_t _parent)
 		{
-			for (typename HashMap::iterator it = m_hashMap.begin(), itEnd = m_hashMap.end(); it != itEnd;)
+			for (typename HashMap::Iterator it = m_hashMap.begin(), itEnd = m_hashMap.end(); it != itEnd; ++it)
 			{
-				if (it->second.m_parent == _parent)
+				if (it.getValue().m_parent == _parent)
 				{
-					StateCacheFuncT<Ty>::evict(it->second.m_value);
-					typename HashMap::iterator itErase = it;
-					++it;
-					m_hashMap.erase(itErase);
-				}
-				else
-				{
-					++it;
+					StateCacheFuncT<Ty>::evict(it.getValue().m_value);
+					m_hashMap.remove(it);
 				}
 			}
 		}
 
 		void invalidate()
 		{
-			for (typename HashMap::iterator it = m_hashMap.begin(), itEnd = m_hashMap.end(); it != itEnd; ++it)
+			for (typename HashMap::Iterator it = m_hashMap.begin(), itEnd = m_hashMap.end(); it != itEnd; ++it)
 			{
-				StateCacheFuncT<Ty>::evict(it->second.m_value);
+				StateCacheFuncT<Ty>::evict(it.getValue().m_value);
 			}
 
 			m_hashMap.clear();
@@ -762,7 +764,7 @@ namespace bgfx
 
 		uint32_t getCount() const
 		{
-			return uint32_t(m_hashMap.size() );
+			return m_hashMap.getCount();
 		}
 
 	private:
@@ -772,8 +774,8 @@ namespace bgfx
 			uint16_t m_parent;
 		};
 
-		typedef stl::unordered_map<uint64_t, Data> HashMap;
-		HashMap m_hashMap;
+		using HashMap = bx::HashMapT<uint64_t, Data>;
+		HashMap m_hashMap{g_allocatorHandle};
 	};
 
 	class StateCache
@@ -781,16 +783,15 @@ namespace bgfx
 	public:
 		void add(uint64_t _key, uint16_t _value)
 		{
-			invalidate(_key);
-			m_hashMap.insert(stl::make_pair(_key, _value) );
+			m_hashMap.add(_key, _value, true);
 		}
 
 		uint16_t find(uint64_t _key)
 		{
-			HashMap::iterator it = m_hashMap.find(_key);
-			if (it != m_hashMap.end() )
+			const uint16_t* found = m_hashMap.find(_key);
+			if (NULL != found)
 			{
-				return it->second;
+				return *found;
 			}
 
 			return UINT16_MAX;
@@ -798,11 +799,7 @@ namespace bgfx
 
 		void invalidate(uint64_t _key)
 		{
-			HashMap::iterator it = m_hashMap.find(_key);
-			if (it != m_hashMap.end() )
-			{
-				m_hashMap.erase(it);
-			}
+			m_hashMap.tryRemove(_key);
 		}
 
 		void invalidate()
@@ -812,12 +809,12 @@ namespace bgfx
 
 		uint32_t getCount() const
 		{
-			return uint32_t(m_hashMap.size() );
+			return m_hashMap.getCount();
 		}
 
 	private:
-		typedef stl::unordered_map<uint64_t, uint16_t> HashMap;
-		HashMap m_hashMap;
+		using HashMap = bx::HashMapT<uint64_t, uint16_t>;
+		HashMap m_hashMap{g_allocatorHandle};
 	};
 
 	template<typename Derived, typename BufferTy, typename ChunkTy>
@@ -867,7 +864,7 @@ namespace bgfx
 			ChunkTy sbc;
 			static_cast<Derived*>(this)->createChunk(sbc);
 
-			const uint32_t numChunks  = uint32_t(m_chunks.size() );
+			const uint32_t numChunks  = m_chunks.getCount();
 			const uint32_t chunkIndex = UINT32_MAX == _at
 				? numChunks
 				: bx::min(_at, numChunks)
@@ -875,7 +872,7 @@ namespace bgfx
 
 			m_chunkControl.resize(m_chunkSize);
 
-			m_chunks.insert(m_chunks.begin() + chunkIndex, sbc);
+			m_chunks.add(chunkIndex, sbc);
 		}
 
 		Alloc alloc(uint32_t _size)
@@ -982,7 +979,7 @@ namespace bgfx
 
 			for (uint32_t ii = first, num = numReserved / m_chunkSize + first; ii < num; ++ii)
 			{
-				ChunkTy& chunk = m_chunks[ii % m_chunks.size()];
+				ChunkTy& chunk = m_chunks[ii % m_chunks.getCount()];
 
 				static_cast<Derived*>(this)->flushChunk(chunk, bx::min(numFlush, m_chunkSize) );
 
@@ -1001,7 +998,7 @@ namespace bgfx
 			begin();
 		}
 
-		stl::vector<ChunkTy> m_chunks;
+		bx::ArrayT<ChunkTy> m_chunks{g_allocatorHandle};
 		bx::RingBufferControl m_chunkControl;
 
 		uint32_t m_chunkPos;
@@ -1047,7 +1044,7 @@ namespace bgfx
 			: m_frame(_frame)
 			, m_gpuTimer(_gpuTimer)
 			, m_queryIdx(UINT32_MAX)
-			, m_numViews(0)
+			, m_numViewStats(0)
 			, m_enabled(0 != (_frame->m_debug & BGFX_DEBUG_PROFILER) )
 			, m_gpuTimerEnabled(_gpuTimerEnabled)
 			, m_inView(false)
@@ -1056,23 +1053,25 @@ namespace bgfx
 
 		~Profiler()
 		{
-			m_frame->m_perfStats.numViews = m_numViews;
+			m_frame->m_perfStats.numViewStats = m_numViewStats;
 		}
 
-		void begin(uint16_t _view)
+		void begin(uint16_t _view, ViewStatsType::Enum _type)
 		{
-			if (m_enabled)
+			if (m_enabled
+			&&  m_numViewStats < m_frame->m_numUsedViewStats)
 			{
-				ViewStats& viewStats   = m_frame->m_perfStats.viewStats[m_numViews];
+				ViewStats& viewStats   = m_frame->m_perfStats.viewStats[m_numViewStats];
 				viewStats.cpuTimeBegin = bx::getHPCounter();
 
 				m_queryIdx = m_gpuTimerEnabled
-					? m_gpuTimer.begin(_view, m_frame->m_frameNum)
+					? m_gpuTimer.begin(getTimerResultIdx(ViewId(_view), _type), m_frame->m_frameNum)
 					: UINT32_MAX
 					;
 				m_inView = true;
 
 				viewStats.view = ViewId(_view);
+				viewStats.type = _type;
 				bx::strCopy(viewStats.name
 					, BGFX_CONFIG_MAX_VIEW_NAME
 					, getViewName(m_frame, _view)
@@ -1084,7 +1083,7 @@ namespace bgfx
 		{
 			if (m_inView)
 			{
-				ViewStats& viewStats = m_frame->m_perfStats.viewStats[m_numViews];
+				ViewStats& viewStats = m_frame->m_perfStats.viewStats[m_numViewStats];
 				viewStats.cpuTimeEnd   = bx::getHPCounter();
 				viewStats.gpuTimeBegin = 0;
 				viewStats.gpuTimeEnd   = 0;
@@ -1094,22 +1093,54 @@ namespace bgfx
 				{
 					m_gpuTimer.end(m_queryIdx);
 
-					const typename Ty::Result& result = m_gpuTimer.m_result[viewStats.view];
+					const typename Ty::Result& result = m_gpuTimer.m_result[getTimerResultIdx(viewStats.view, viewStats.type)];
 					viewStats.gpuTimeBegin = result.m_begin;
 					viewStats.gpuTimeEnd   = result.m_end;
 					viewStats.gpuFrameNum  = result.m_frameNum;
 				}
 
-				++m_numViews;
+				++m_numViewStats;
 				m_queryIdx = UINT32_MAX;
 				m_inView   = false;
+			}
+		}
+
+		void setType(ViewStatsType::Enum _type)
+		{
+			if (m_inView)
+			{
+				const ViewStats& viewStats = m_frame->m_perfStats.viewStats[m_numViewStats];
+
+				if (_type != viewStats.type)
+				{
+					const ViewId view = viewStats.view;
+
+					end();
+					begin(view, _type);
+				}
+			}
+		}
+
+		template<typename RendererTy>
+		void blit(RendererTy* _renderer, BlitState& _bs, uint16_t _view)
+		{
+			while (m_enabled
+			&&     _bs.hasItem(_view) )
+			{
+				end();
+
+				const ViewId view = _bs.getView();
+
+				begin(view, ViewStatsType::Blit);
+				_renderer->submitBlit(_bs, view);
+				end();
 			}
 		}
 
 		Frame*   m_frame;
 		Ty&      m_gpuTimer;
 		uint32_t m_queryIdx;
-		uint16_t m_numViews;
+		uint16_t m_numViewStats;
 		bool     m_enabled;
 		bool     m_gpuTimerEnabled;
 		bool     m_inView;

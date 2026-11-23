@@ -42,7 +42,7 @@
 		WGPU_IMPORT_FUNC(false, AdapterGetFeatures);                                \
 		WGPU_IGNORE_____(false, AdapterGetFormatCapabilities);                      \
 		WGPU_IMPORT_FUNC(false, AdapterGetInfo);                                    \
-		WGPU_IGNORE_____(false, AdapterGetInstance);                                \
+		WGPU_IMPORT_FUNC(false, AdapterGetInstance);                                \
 		WGPU_IMPORT_FUNC(false, AdapterGetLimits);                                  \
 		WGPU_IMPORT_FUNC(false, AdapterHasFeature);                                 \
 		WGPU_IMPORT_FUNC(false, AdapterRequestDevice);                              \
@@ -137,7 +137,7 @@
 		WGPU_IMPORT_FUNC(false, DeviceCreateTexture);                               \
 		WGPU_IMPORT_FUNC(false, DeviceDestroy);                                     \
 		WGPU_IGNORE_____(false, DeviceForceLoss);                                   \
-		WGPU_IGNORE_____(false, DeviceGetAdapter);                                  \
+		WGPU_IMPORT_FUNC(false, DeviceGetAdapter);                                  \
 		WGPU_IMPORT_FUNC(false, DeviceGetAdapterInfo);                              \
 		WGPU_IGNORE_____(false, DeviceGetAHardwareBufferProperties);                \
 		WGPU_IMPORT_FUNC(false, DeviceGetFeatures);                                 \
@@ -155,7 +155,7 @@
 		WGPU_IGNORE_____(false, DeviceSetLoggingCallback);                          \
 		WGPU_IGNORE_____(false, DeviceTick);                                        \
 		WGPU_IGNORE_____(false, DeviceValidateTextureDescriptor);                   \
-		WGPU_IGNORE_____(false, DeviceAddRef);                                      \
+		WGPU_IMPORT_FUNC(false, DeviceAddRef);                                      \
 		WGPU_IMPORT_FUNC(false, DeviceRelease);                                     \
 		/* */                                                                       \
 		WGPU_IGNORE_____(false, ExternalTextureDestroy);                            \
@@ -524,6 +524,7 @@ namespace wgpu {
 			, m_hash(0)
 			, m_numUniforms(0)
 			, m_numPredefined(0)
+			, m_outputMask(UINT8_MAX)
 		{
 		}
 
@@ -547,6 +548,8 @@ namespace wgpu {
 		uint16_t m_blockSize;
 		uint8_t  m_numPredefined;
 		uint8_t  m_numAttrs;
+		uint8_t  m_instanceLocation[BGFX_CONFIG_MAX_INSTANCE_DATA_COUNT];
+		uint8_t  m_outputMask;
 
 		ShaderBinding m_shaderBinding[BGFX_CONFIG_MAX_TEXTURE_SAMPLERS];
 
@@ -683,6 +686,7 @@ namespace wgpu {
 			, m_viewFormat(WGPUTextureFormat_Undefined)
 			, m_formatDepthStencil(uint8_t(TextureFormat::Count) )
 			, m_readable(false)
+			, m_premultipliedAlpha(false)
 			, m_needToRecreateSwapChain(false)
 		{
 			bx::memSet(&m_descPending, 0, sizeof(m_descPending) );
@@ -714,6 +718,7 @@ namespace wgpu {
 
 		uint8_t m_formatDepthStencil;
 		bool m_readable;
+		bool m_premultipliedAlpha;
 		bool m_needToRecreateSwapChain;
 	};
 
@@ -759,6 +764,7 @@ namespace wgpu {
 		Attachment      m_attachment[BGFX_CONFIG_MAX_FRAME_BUFFER_ATTACHMENTS];
 		WGPUTextureView m_textureView[BGFX_CONFIG_MAX_FRAME_BUFFER_ATTACHMENTS];
 		WGPUTextureView m_resolveView[BGFX_CONFIG_MAX_FRAME_BUFFER_ATTACHMENTS];
+		uint32_t        m_depthSlice[BGFX_CONFIG_MAX_FRAME_BUFFER_ATTACHMENTS];
 		WGPUTextureFormat m_colorFormat[BGFX_CONFIG_MAX_FRAME_BUFFER_ATTACHMENTS];
 		WGPUTextureView m_depthStencilView;
 		uint8_t m_formatDepthStencil;
@@ -867,7 +873,7 @@ namespace wgpu {
 			uint32_t m_frameNum;
 		};
 
-		static constexpr uint32_t kMaxQueries = bx::min<uint32_t>(kMaxTimerQueries, 4096/2);
+		static constexpr uint32_t kMaxQueries = bx::min<uint32_t>(kMaxTimerQueries, (4096-1)/2);
 
 		uint64_t getBufferSize() const
 		{
@@ -900,6 +906,9 @@ namespace wgpu {
 			, m_resolve(NULL)
 			, m_readback(NULL)
 			, m_control(BX_COUNTOF(m_handle) )
+			, m_numResolved(0)
+			, m_resolved(false)
+			, m_mapPending(false)
 		{
 		}
 
@@ -918,6 +927,9 @@ namespace wgpu {
 
 		OcclusionQueryHandle m_handle[BGFX_CONFIG_MAX_OCCLUSION_QUERIES];
 		bx::RingBufferControl m_control;
+		uint32_t m_numResolved;
+		bool m_resolved;
+		bool m_mapPending;
 	};
 
 } /* namespace bgfx */ } // namespace wgpu

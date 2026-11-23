@@ -13,6 +13,10 @@
 #	include <bx/pixelformat.h>
 #	include "renderer_webgpu.h"
 
+#	if BX_PLATFORM_EMSCRIPTEN
+#		include <emscripten/emscripten.h>
+#	endif // BX_PLATFORM_EMSCRIPTEN
+
 namespace bgfx { namespace wgpu
 {
 	struct PrimInfo
@@ -38,7 +42,7 @@ namespace bgfx { namespace wgpu
 	static const uint32_t s_msaa[] =
 	{
 		1,
-		1, // 2 is not supported.
+		4,
 		4,
 		4,
 		4,
@@ -102,6 +106,23 @@ namespace bgfx { namespace wgpu
 		},
 	};
 	static_assert(AttribType::Count == BX_COUNTOF(s_attribType) );
+
+	static const WGPUBackendType s_wgpuBackendType[] =
+	{
+		WGPUBackendType_Null,      // Noop
+		WGPUBackendType_Undefined, // Agc
+		WGPUBackendType_D3D11,     // Direct3D11
+		WGPUBackendType_D3D12,     // Direct3D12
+		WGPUBackendType_Undefined, // Gnm
+		WGPUBackendType_Metal,     // Metal
+		WGPUBackendType_Undefined, // Nvn
+		WGPUBackendType_OpenGLES,  // OpenGLES
+		WGPUBackendType_OpenGL,    // OpenGL
+		WGPUBackendType_Vulkan,    // Vulkan
+		WGPUBackendType_Undefined, // WebGPU
+		WGPUBackendType_Undefined, // Count
+	};
+	static_assert(RendererType::Count+1 == BX_COUNTOF(s_wgpuBackendType) );
 
 	static const WGPUCullMode s_cullMode[] =
 	{
@@ -281,28 +302,28 @@ namespace bgfx { namespace wgpu
 		{ WGPUTextureFormat_Undefined,            WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Float,             true,  { $_, $_, $_, $_ } }, // R1
 		{ WGPUTextureFormat_R8Unorm,              WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Float,             true,  { $0, $0, $0, $R } }, // A8
 		{ WGPUTextureFormat_R8Unorm,              WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Float,             true,  { $_, $_, $_, $_ } }, // R8
-		{ WGPUTextureFormat_R8Sint,               WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Float,             true,  { $_, $_, $_, $_ } }, // R8I
-		{ WGPUTextureFormat_R8Uint,               WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Float,             true,  { $_, $_, $_, $_ } }, // R8U
+		{ WGPUTextureFormat_R8Sint,               WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Sint,              true,  { $_, $_, $_, $_ } }, // R8I
+		{ WGPUTextureFormat_R8Uint,               WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Uint,              true,  { $_, $_, $_, $_ } }, // R8U
 		{ WGPUTextureFormat_R8Snorm,              WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Float,             true,  { $_, $_, $_, $_ } }, // R8S
-		{ WGPUTextureFormat_R16Unorm,             WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Float,             true,  { $_, $_, $_, $_ } }, // R16
-		{ WGPUTextureFormat_R16Sint,              WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Float,             true,  { $_, $_, $_, $_ } }, // R16I
-		{ WGPUTextureFormat_R16Uint,              WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Float,             true,  { $_, $_, $_, $_ } }, // R16U
+		{ WGPUTextureFormat_R16Unorm,             WGPUTextureFormat_Undefined,           WGPUTextureSampleType_UnfilterableFloat, true,  { $_, $_, $_, $_ } }, // R16
+		{ WGPUTextureFormat_R16Sint,              WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Sint,              true,  { $_, $_, $_, $_ } }, // R16I
+		{ WGPUTextureFormat_R16Uint,              WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Uint,              true,  { $_, $_, $_, $_ } }, // R16U
 		{ WGPUTextureFormat_R16Float,             WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Float,             true,  { $_, $_, $_, $_ } }, // R16F
-		{ WGPUTextureFormat_R16Snorm,             WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Float,             true,  { $_, $_, $_, $_ } }, // R16S
-		{ WGPUTextureFormat_R32Sint,              WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Float,             true,  { $_, $_, $_, $_ } }, // R32I
-		{ WGPUTextureFormat_R32Uint,              WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Float,             true,  { $_, $_, $_, $_ } }, // R32U
+		{ WGPUTextureFormat_R16Snorm,             WGPUTextureFormat_Undefined,           WGPUTextureSampleType_UnfilterableFloat, true,  { $_, $_, $_, $_ } }, // R16S
+		{ WGPUTextureFormat_R32Sint,              WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Sint,              true,  { $_, $_, $_, $_ } }, // R32I
+		{ WGPUTextureFormat_R32Uint,              WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Uint,              true,  { $_, $_, $_, $_ } }, // R32U
 		{ WGPUTextureFormat_R32Float,             WGPUTextureFormat_Undefined,           WGPUTextureSampleType_UnfilterableFloat, false, { $_, $_, $_, $_ } }, // R32F
 		{ WGPUTextureFormat_RG8Unorm,             WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Float,             true,  { $_, $_, $_, $_ } }, // RG8
-		{ WGPUTextureFormat_RG8Sint,              WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Float,             true,  { $_, $_, $_, $_ } }, // RG8I
-		{ WGPUTextureFormat_RG8Uint,              WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Float,             true,  { $_, $_, $_, $_ } }, // RG8U
+		{ WGPUTextureFormat_RG8Sint,              WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Sint,              true,  { $_, $_, $_, $_ } }, // RG8I
+		{ WGPUTextureFormat_RG8Uint,              WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Uint,              true,  { $_, $_, $_, $_ } }, // RG8U
 		{ WGPUTextureFormat_RG8Snorm,             WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Float,             true,  { $_, $_, $_, $_ } }, // RG8S
-		{ WGPUTextureFormat_RG16Unorm,            WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Float,             true,  { $_, $_, $_, $_ } }, // RG16
-		{ WGPUTextureFormat_RG16Sint,             WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Float,             true,  { $_, $_, $_, $_ } }, // RG16I
-		{ WGPUTextureFormat_RG16Uint,             WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Float,             true,  { $_, $_, $_, $_ } }, // RG16U
+		{ WGPUTextureFormat_RG16Unorm,            WGPUTextureFormat_Undefined,           WGPUTextureSampleType_UnfilterableFloat, true,  { $_, $_, $_, $_ } }, // RG16
+		{ WGPUTextureFormat_RG16Sint,             WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Sint,              true,  { $_, $_, $_, $_ } }, // RG16I
+		{ WGPUTextureFormat_RG16Uint,             WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Uint,              true,  { $_, $_, $_, $_ } }, // RG16U
 		{ WGPUTextureFormat_RG16Float,            WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Float,             true,  { $_, $_, $_, $_ } }, // RG16F
-		{ WGPUTextureFormat_RG16Snorm,            WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Float,             true,  { $_, $_, $_, $_ } }, // RG16S
-		{ WGPUTextureFormat_RG32Sint,             WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Float,             true,  { $_, $_, $_, $_ } }, // RG32I
-		{ WGPUTextureFormat_RG32Uint,             WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Float,             true,  { $_, $_, $_, $_ } }, // RG32U
+		{ WGPUTextureFormat_RG16Snorm,            WGPUTextureFormat_Undefined,           WGPUTextureSampleType_UnfilterableFloat, true,  { $_, $_, $_, $_ } }, // RG16S
+		{ WGPUTextureFormat_RG32Sint,             WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Sint,              true,  { $_, $_, $_, $_ } }, // RG32I
+		{ WGPUTextureFormat_RG32Uint,             WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Uint,              true,  { $_, $_, $_, $_ } }, // RG32U
 		{ WGPUTextureFormat_RG32Float,            WGPUTextureFormat_Undefined,           WGPUTextureSampleType_UnfilterableFloat, false, { $_, $_, $_, $_ } }, // RG32F
 		{ WGPUTextureFormat_Undefined,            WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Float,             true,  { $_, $_, $_, $_ } }, // RGB8
 		{ WGPUTextureFormat_Undefined,            WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Float,             true,  { $_, $_, $_, $_ } }, // RGB8I
@@ -311,16 +332,16 @@ namespace bgfx { namespace wgpu
 		{ WGPUTextureFormat_RGB9E5Ufloat,         WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Float,             true,  { $_, $_, $_, $_ } }, // RGB9E5F
 		{ WGPUTextureFormat_BGRA8Unorm,           WGPUTextureFormat_BGRA8UnormSrgb,      WGPUTextureSampleType_Float,             true,  { $_, $_, $_, $_ } }, // BGRA8
 		{ WGPUTextureFormat_RGBA8Unorm,           WGPUTextureFormat_RGBA8UnormSrgb,      WGPUTextureSampleType_Float,             true,  { $_, $_, $_, $_ } }, // RGBA8
-		{ WGPUTextureFormat_RGBA8Sint,            WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Float,             true,  { $_, $_, $_, $_ } }, // RGBA8I
-		{ WGPUTextureFormat_RGBA8Uint,            WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Float,             true,  { $_, $_, $_, $_ } }, // RGBA8U
+		{ WGPUTextureFormat_RGBA8Sint,            WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Sint,              true,  { $_, $_, $_, $_ } }, // RGBA8I
+		{ WGPUTextureFormat_RGBA8Uint,            WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Uint,              true,  { $_, $_, $_, $_ } }, // RGBA8U
 		{ WGPUTextureFormat_RGBA8Snorm,           WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Float,             true,  { $_, $_, $_, $_ } }, // RGBA8S
-		{ WGPUTextureFormat_RGBA16Unorm,          WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Float,             true,  { $_, $_, $_, $_ } }, // RGBA16
-		{ WGPUTextureFormat_RGBA16Sint,           WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Float,             true,  { $_, $_, $_, $_ } }, // RGBA16I
-		{ WGPUTextureFormat_RGBA16Uint,           WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Float,             true,  { $_, $_, $_, $_ } }, // RGBA16U
+		{ WGPUTextureFormat_RGBA16Unorm,          WGPUTextureFormat_Undefined,           WGPUTextureSampleType_UnfilterableFloat, true,  { $_, $_, $_, $_ } }, // RGBA16
+		{ WGPUTextureFormat_RGBA16Sint,           WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Sint,              true,  { $_, $_, $_, $_ } }, // RGBA16I
+		{ WGPUTextureFormat_RGBA16Uint,           WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Uint,              true,  { $_, $_, $_, $_ } }, // RGBA16U
 		{ WGPUTextureFormat_RGBA16Float,          WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Float,             true,  { $_, $_, $_, $_ } }, // RGBA16F
-		{ WGPUTextureFormat_RGBA16Snorm,          WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Float,             true,  { $_, $_, $_, $_ } }, // RGBA16S
-		{ WGPUTextureFormat_RGBA32Sint,           WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Float,             true,  { $_, $_, $_, $_ } }, // RGBA32I
-		{ WGPUTextureFormat_RGBA32Uint,           WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Float,             true,  { $_, $_, $_, $_ } }, // RGBA32U
+		{ WGPUTextureFormat_RGBA16Snorm,          WGPUTextureFormat_Undefined,           WGPUTextureSampleType_UnfilterableFloat, true,  { $_, $_, $_, $_ } }, // RGBA16S
+		{ WGPUTextureFormat_RGBA32Sint,           WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Sint,              true,  { $_, $_, $_, $_ } }, // RGBA32I
+		{ WGPUTextureFormat_RGBA32Uint,           WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Uint,              true,  { $_, $_, $_, $_ } }, // RGBA32U
 		{ WGPUTextureFormat_RGBA32Float,          WGPUTextureFormat_Undefined,           WGPUTextureSampleType_UnfilterableFloat, false, { $_, $_, $_, $_ } }, // RGBA32F
 		{ WGPUTextureFormat_Undefined,            WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Float,             true,  { $_, $_, $_, $_ } }, // B5G6R5
 		{ WGPUTextureFormat_Undefined,            WGPUTextureFormat_Undefined,           WGPUTextureSampleType_Float,             true,  { $_, $_, $_, $_ } }, // R5G6B5
@@ -547,12 +568,21 @@ namespace bgfx { namespace wgpu
 		return 0 <= idx && s_feature[idx].supported;
 	}
 
+	static bool isMipGenFormat(TextureFormat::Enum _format)
+	{
+		return false
+			|| TextureFormat::RGBA8 == _format
+			|| TextureFormat::BGRA8 == _format
+			;
+	}
+
 	struct TextureFormatCaps
 	{
 		TextureFormatCaps()
 		{
 			m_core          = isFeatureSupported(WGPUFeatureName_CoreFeaturesAndLimits);
 			m_tier1         = isFeatureSupported(WGPUFeatureName_TextureFormatsTier1);
+			m_tier2         = isFeatureSupported(WGPUFeatureName_TextureFormatsTier2);
 			m_rg11b10Rend   = m_tier1 || isFeatureSupported(WGPUFeatureName_RG11B10UfloatRenderable);
 			m_unorm16       = m_tier1 || isFeatureSupported(WGPUFeatureName_Unorm16TextureFormats);
 			m_bgra8Storage  = isFeatureSupported(WGPUFeatureName_BGRA8UnormStorage);
@@ -566,6 +596,26 @@ namespace bgfx { namespace wgpu
 			if (m_d32fs8)
 			{
 				s_textureFormat[TextureFormat::D24S8].m_fmt = WGPUTextureFormat_Depth32FloatStencil8;
+			}
+
+			static const TextureFormat::Enum s_norm16[] =
+			{
+				TextureFormat::R16,
+				TextureFormat::R16S,
+				TextureFormat::RG16,
+				TextureFormat::RG16S,
+				TextureFormat::RGBA16,
+				TextureFormat::RGBA16S,
+			};
+
+			const WGPUTextureSampleType norm16SampleType = isFeatureSupported(WGPUFeatureName_Unorm16TextureFormats)
+				? WGPUTextureSampleType_Float
+				: WGPUTextureSampleType_UnfilterableFloat
+				;
+
+			for (uint32_t ii = 0; ii < BX_COUNTOF(s_norm16); ++ii)
+			{
+				s_textureFormat[s_norm16[ii] ].m_samplerType = norm16SampleType;
 			}
 		}
 
@@ -658,8 +708,8 @@ namespace bgfx { namespace wgpu
 			case TextureFormat::R32U:      framebuffer = true;          multisample = true;          storage = true;           supported = true; break;
 			case TextureFormat::R32F:      framebuffer = true;          multisample = m_core;        storage = true;           supported = true; break;
 			case TextureFormat::RG32I:
-			case TextureFormat::RG32U:     framebuffer = true;          multisample = m_core;        storage = false;          supported = true; break;
-			case TextureFormat::RG32F:     framebuffer = true;          multisample = m_core;        storage = false;          supported = true; break;
+			case TextureFormat::RG32U:     framebuffer = true;          multisample = m_core;        storage = m_core;         supported = true; break;
+			case TextureFormat::RG32F:     framebuffer = true;          multisample = m_core;        storage = m_core;         supported = true; break;
 			case TextureFormat::RGBA32I:
 			case TextureFormat::RGBA32U:   framebuffer = true;          multisample = m_core;        storage = true;           supported = true; break;
 			case TextureFormat::RGBA32F:   framebuffer = true;          multisample = m_core;        storage = true;           supported = true; break;
@@ -728,14 +778,46 @@ namespace bgfx { namespace wgpu
 					 ;
 			}
 
+			bool readWrite = false;
+
+			switch (_fmt)
+			{
+			case TextureFormat::R32I:
+			case TextureFormat::R32U:
+			case TextureFormat::R32F:    readWrite = true; break;
+
+			case TextureFormat::A8:
+			case TextureFormat::R8:
+			case TextureFormat::R8I:
+			case TextureFormat::R8U:
+			case TextureFormat::R16I:
+			case TextureFormat::R16U:
+			case TextureFormat::R16F:
+			case TextureFormat::RGBA8:
+			case TextureFormat::RGBA8I:
+			case TextureFormat::RGBA8U:
+			case TextureFormat::RGBA16I:
+			case TextureFormat::RGBA16U:
+			case TextureFormat::RGBA16F:
+			case TextureFormat::RGBA32I:
+			case TextureFormat::RGBA32U:
+			case TextureFormat::RGBA32F: readWrite = m_tier2; break;
+
+			default:
+				break;
+			}
+
 			if (storage)
 			{
-				caps |= BGFX_CAPS_FORMAT_TEXTURE_IMAGE_READ
-					 |  BGFX_CAPS_FORMAT_TEXTURE_IMAGE_WRITE
+				caps |= BGFX_CAPS_FORMAT_TEXTURE_IMAGE_WRITE
+					 |  (readWrite ? BGFX_CAPS_FORMAT_TEXTURE_IMAGE_READ : 0)
 					 ;
 			}
 
-			if (MipGen::isSupported(_fmt) )
+			if (true
+			&&  storage
+			&&  isMipGenFormat(_fmt)
+			&&  MipGen::isSupported(_fmt) )
 			{
 				caps |= BGFX_CAPS_FORMAT_TEXTURE_MIP_AUTOGEN;
 			}
@@ -745,6 +827,7 @@ namespace bgfx { namespace wgpu
 
 		bool m_core;
 		bool m_tier1;
+		bool m_tier2;
 		bool m_rg11b10Rend;
 		bool m_unorm16;
 		bool m_bgra8Storage;
@@ -870,6 +953,10 @@ WGPU_IMPORT
 			, m_instance(NULL)
 			, m_adapter(NULL)
 			, m_device(NULL)
+			, m_backendType(WGPUBackendType_Undefined)
+			, m_callbackMode(WGPUCallbackMode_AllowProcessEvents)
+			, m_timedWaitAny(true)
+			, m_diagnostics(BGFX_DIAGNOSTIC_NONE)
 			, m_maxAnisotropy(1)
 			, m_wireframe(false)
 			, m_mipGen(NULL)
@@ -996,6 +1083,7 @@ WGPU_IMPORT
 			ErrorState::Enum errorState = ErrorState::Default;
 
 //			m_fbh = BGFX_INVALID_HANDLE;
+			m_diagnostics = _init.diagnostics;
 			bx::memSet(&m_mainSwapChain, 0, sizeof(m_mainSwapChain) );
 
 			if (_init.debug
@@ -1009,6 +1097,7 @@ WGPU_IMPORT
 				);
 
 			const bool headless = NULL == _init.swapChain.nwh;
+			const bool externalDevice = NULL != g_platformData.context;
 
 			bool imported = true;
 
@@ -1068,13 +1157,46 @@ WGPU_IMPORT
 #endif // !BX_PLATFORM_EMSCRIPTEN
 
 			{
+				if (externalDevice)
+				{
+					m_device = (WGPUDevice)g_platformData.context;
+					wgpuDeviceAddRef(m_device);
+					errorState = ErrorState::DeviceCreated;
+
+#if !BX_PLATFORM_EMSCRIPTEN
+					m_adapter  = wgpuDeviceGetAdapter(m_device);
+					m_instance = wgpuAdapterGetInstance(m_adapter);
+#else
+					m_timedWaitAny = 0 != emscripten_has_asyncify();
+
+					const WGPUInstanceFeatureName requiredFeatures[] =
+					{
+						WGPUInstanceFeatureName_TimedWaitAny,
+					};
+
+					const WGPUInstanceDescriptor instanceDesc =
+					{
+						.nextInChain          = NULL,
+						.requiredFeatureCount = m_timedWaitAny ? uint32_t(BX_COUNTOF(requiredFeatures) ) : 0,
+						.requiredFeatures     = requiredFeatures,
+						.requiredLimits       = NULL,
+					};
+
+					m_instance     = wgpuCreateInstance(&instanceDesc);
+					m_callbackMode = WGPUCallbackMode_AllowSpontaneous;
+#endif // !BX_PLATFORM_EMSCRIPTEN
+
+					if (NULL == m_instance)
+					{
+						BX_TRACE("Failed to get instance of external device!");
+						goto error;
+					}
+				}
+				else
 				{
 					WGPUInstanceFeatureName requiredFeatures[] =
 					{
 						WGPUInstanceFeatureName_TimedWaitAny,
-#if !BX_PLATFORM_EMSCRIPTEN
-						WGPUInstanceFeatureName_ShaderSourceSPIRV,
-#endif // !BX_PLATFORM_EMSCRIPTEN
 					};
 
 					WGPUInstanceDescriptor instanceDesc =
@@ -1096,6 +1218,7 @@ WGPU_IMPORT
 					errorState = ErrorState::InstanceCreated;
 				}
 
+				if (!externalDevice)
 				{
 					WGPURequestAdapterOptions rao =
 					{
@@ -1103,7 +1226,7 @@ WGPU_IMPORT
 						.featureLevel         = WGPUFeatureLevel_Undefined,
 						.powerPreference      = WGPUPowerPreference_HighPerformance,
 						.forceFallbackAdapter = false,
-						.backendType          = WGPUBackendType_Undefined,
+						.backendType          = s_wgpuBackendType[_init.backendType],
 						.compatibleSurface    = NULL,
 					};
 
@@ -1167,7 +1290,15 @@ WGPU_IMPORT
 					BX_TRACE("");
 
 					WGPUSupportedFeatures supportedFeatures;
-					wgpuAdapterGetFeatures(m_adapter, &supportedFeatures);
+
+					if (externalDevice)
+					{
+						wgpuDeviceGetFeatures(m_device, &supportedFeatures);
+					}
+					else
+					{
+						wgpuAdapterGetFeatures(m_adapter, &supportedFeatures);
+					}
 
 					BX_TRACE("Supported features (%d):", supportedFeatures.featureCount);
 
@@ -1199,14 +1330,17 @@ WGPU_IMPORT
 					BX_TRACE("");
 
 					wgpuSupportedFeaturesFreeMembers(supportedFeatures);
+				}
 
+				if (!externalDevice)
+				{
 					WGPUFeatureName requiredFeatures[] =
 					{
 						ifSupported(WGPUFeatureName_TimestampQuery),
 
 						ifSupported(WGPUFeatureName_DepthClipControl),
 
-						WGPUFeatureName_IndirectFirstInstance,
+						ifSupported(WGPUFeatureName_IndirectFirstInstance),
 
 						ifSupported(WGPUFeatureName_Unorm16TextureFormats),
 						ifSupported(WGPUFeatureName_BGRA8UnormStorage),
@@ -1378,7 +1512,7 @@ WGPU_IMPORT
 					WGPUStatus status;
 
 					WGPUAdapterInfo adapterInfo = WGPU_ADAPTER_INFO_INIT;
-					status = wgpuAdapterGetInfo(m_adapter, &adapterInfo);
+					status = wgpuDeviceGetAdapterInfo(m_device, &adapterInfo);
 
 					if (WGPUStatus_Success == status)
 					{
@@ -1407,6 +1541,8 @@ WGPU_IMPORT
 							, s_adapterType[bx::min<uint32_t>(adapterInfo.adapterType, BX_COUNTOF(s_adapterType)-1)]
 							);
 
+						m_backendType = adapterInfo.backendType;
+
 						g_caps.vendorId = bx::narrowCast<uint16_t>(adapterInfo.vendorID);
 						g_caps.deviceId = bx::narrowCast<uint16_t>(adapterInfo.deviceID);
 					}
@@ -1414,7 +1550,7 @@ WGPU_IMPORT
 					BX_TRACE("");
 
 					m_limits = WGPU_LIMITS_INIT;
-					status = wgpuAdapterGetLimits(m_adapter, &m_limits);
+					status = wgpuDeviceGetLimits(m_device, &m_limits);
 
 					if (WGPUStatus_Success == status)
 					{
@@ -1474,6 +1610,7 @@ WGPU_IMPORT
 							| BGFX_CAPS_RENDERER_MULTITHREADED
 							| BGFX_CAPS_SWAP_CHAIN
 							| BGFX_CAPS_TEXTURE_CUBE_ARRAY
+							| BGFX_CAPS_TRANSPARENT_BACKBUFFER
 							| (isFeatureSupported(WGPUFeatureName_ShaderF16) ? BGFX_CAPS_SHADER_F16 : 0)
 							;
 
@@ -1515,6 +1652,11 @@ WGPU_IMPORT
 					{
 						m_backBuffer.create(UINT16_MAX, m_mainSwapChain);
 
+						if (!m_backBuffer.m_swapChain.m_premultipliedAlpha)
+						{
+							g_caps.supported &= ~BGFX_CAPS_TRANSPARENT_BACKBUFFER;
+						}
+
 						m_windows[0] = BGFX_INVALID_HANDLE;
 						m_numWindows++;
 
@@ -1531,6 +1673,7 @@ WGPU_IMPORT
 				}
 			}
 
+			g_internalData.context = m_device;
 			return true;
 
 		error:
@@ -1778,6 +1921,8 @@ WGPU_IMPORT
 			uint32_t stencilOffset;
 			uint32_t stencilPitch;
 			uint32_t texelSize;
+			char* filePath;
+			TextureFormat::Enum format;
 		};
 
 		static void interleaveDepthStencil(const ReadTexture& _readTexture, const void* _src)
@@ -1853,45 +1998,103 @@ WGPU_IMPORT
 				}
 
 				WGPU_CHECK(wgpuBufferUnmap(readTexture.buffer) );
+
+				if (NULL != readTexture.filePath)
+				{
+					g_callback->screenShot(
+						  readTexture.filePath
+						, readTexture.width
+						, readTexture.height
+						, readTexture.dataPitch
+						, readTexture.format
+						, readTexture.data
+						, readTexture.dataPitch*readTexture.height
+						, false
+						);
+				}
 			}
 
 			wgpuRelease(readTexture.buffer);
 
-			*(bool*)(_userdata2) = true;
-		}
-
-		struct ReadBuffer
-		{
-			WGPUBuffer buffer;
-			uint32_t size;
-			void* data;
-		};
-
-		static void readBufferCb(WGPUMapAsyncStatus _status, WGPUStringView _message, void* _userdata1, void* _userdata2)
-		{
-			ReadBuffer& readBuffer = *(ReadBuffer*)_userdata1;
-
-			if (WGPUMapAsyncStatus_Success != _status)
+			if (NULL != readTexture.filePath)
 			{
-				BX_TRACE("readBuffer: map failed %d.", _status);
-				trace(_message);
+				bx::freePtr(readTexture.data);
+				bx::freePtr(readTexture.filePath);
+			}
+
+			if (NULL == _userdata2)
+			{
+				bx::deletePtr(&readTexture);
 			}
 			else
 			{
-				const void* result = (const void*)WGPU_CHECK(wgpuBufferGetConstMappedRange(
-					  readBuffer.buffer
-					, 0
-					, readBuffer.size
-					) );
-
-				bx::memCopy(readBuffer.data, result, readBuffer.size);
-
-				WGPU_CHECK(wgpuBufferUnmap(readBuffer.buffer) );
+				*(bool*)(_userdata2) = true;
 			}
+		}
 
-			wgpuRelease(readBuffer.buffer);
+		void mapRead(const ReadTexture& _readTexture)
+		{
+			if constexpr (!BX_ENABLED(BX_PLATFORM_EMSCRIPTEN) )
+			{
+				ReadTexture readTexture = _readTexture;
+				s_done = false;
 
-			*(bool*)(_userdata2) = true;
+				WGPU_CHECK(wgpuBufferMapAsync(
+					  readTexture.buffer
+					, WGPUMapMode_Read
+					, 0
+					, readTexture.size
+					, {
+						.nextInChain = NULL,
+						.mode        = WGPUCallbackMode_AllowProcessEvents,
+						.callback    = readTextureCb,
+						.userdata1   = &readTexture,
+						.userdata2   = &s_done,
+					}) );
+
+				while (!s_done)
+				{
+					wgpuInstanceProcessEvents(m_instance);
+				}
+			}
+			else if (m_timedWaitAny)
+			{
+				ReadTexture readTexture = _readTexture;
+
+				WGPUFutureWaitInfo fwi =
+				{
+					.future = wgpuBufferMapAsync(
+						  readTexture.buffer
+						, WGPUMapMode_Read
+						, 0
+						, readTexture.size
+						, {
+							.nextInChain = NULL,
+							.mode        = WGPUCallbackMode_WaitAnyOnly,
+							.callback    = readTextureCb,
+							.userdata1   = &readTexture,
+							.userdata2   = &s_done,
+						}),
+					.completed = false,
+				};
+
+				waitForFuture(fwi);
+			}
+			else
+			{
+				WGPU_CHECK(wgpuBufferMapAsync(
+					  _readTexture.buffer
+					, WGPUMapMode_Read
+					, 0
+					, _readTexture.size
+					, {
+						.nextInChain = NULL,
+						.mode        = WGPUCallbackMode_AllowSpontaneous,
+						.callback    = readTextureCb,
+						.userdata1   = BX_NEW_PTR(g_allocatorBlk, ReadTexture)(_readTexture),
+						.userdata2   = NULL,
+					}) );
+			}
 		}
 
 		void readTexture(TextureHandle _handle, void* _data, uint16_t _layer, uint8_t _mip) override
@@ -1904,8 +2107,8 @@ WGPU_IMPORT
 			const uint32_t blockWidth  = bx::max<uint32_t>(1, blockInfo.blockWidth);
 			const uint32_t blockHeight = bx::max<uint32_t>(1, blockInfo.blockHeight);
 
-			const uint32_t srcWidth  = bx::alignUp(bx::max<uint32_t>(1, texture.m_width  >> _mip), blockWidth);
-			const uint32_t srcHeight = bx::alignUp(bx::max<uint32_t>(1, texture.m_height >> _mip), blockHeight);
+			const uint32_t srcWidth  = bx::strideAlign(bx::max<uint32_t>(1, texture.m_width  >> _mip), blockWidth);
+			const uint32_t srcHeight = bx::strideAlign(bx::max<uint32_t>(1, texture.m_height >> _mip), blockHeight);
 
 			const uint32_t numRows  = srcHeight/blockHeight;
 			const uint32_t dstPitch = (srcWidth/blockWidth)*blockInfo.blockSize;
@@ -1939,8 +2142,6 @@ WGPU_IMPORT
 			};
 
 			WGPUBuffer readTextureBuffer = WGPU_CHECK(wgpuDeviceCreateBuffer(m_device, &readTextureBufferDesc) );
-
-			s_done = false;
 
 			m_cmd.copyTextureToBuffer(
 				{
@@ -2007,8 +2208,7 @@ WGPU_IMPORT
 			m_cmd.kick();
 			m_cmd.wait();
 
-			ReadTexture readTexture =
-			{
+			mapRead({
 				.buffer        = readTextureBuffer,
 				.size          = copySize,
 				.data          = _data,
@@ -2019,25 +2219,9 @@ WGPU_IMPORT
 				.stencilOffset = stencilOffset,
 				.stencilPitch  = stencilPitch,
 				.texelSize     = blockInfo.blockSize,
-			};
-
-			WGPU_CHECK(wgpuBufferMapAsync(
-				  readTextureBuffer
-				, WGPUMapMode_Read
-				, 0
-				, copySize
-				, {
-					.nextInChain = NULL,
-					.mode        = WGPUCallbackMode_AllowProcessEvents,
-					.callback    = readTextureCb,
-					.userdata1   = &readTexture,
-					.userdata2   = &s_done,
-				}) );
-
-			while (!s_done)
-			{
-				wgpuInstanceProcessEvents(m_instance);
-			}
+				.filePath      = NULL,
+				.format        = TextureFormat::Count,
+			});
 		}
 
 		BufferWGPU& getBuffer(Handle _handle)
@@ -2068,36 +2252,24 @@ WGPU_IMPORT
 
 			WGPUBuffer readBufferDst = WGPU_CHECK(wgpuDeviceCreateBuffer(m_device, &readBufferDesc) );
 
-			s_done = false;
-
 			m_cmd.copyBufferToBuffer(buffer.m_buffer, _offset, readBufferDst, 0, _size);
 
 			m_cmd.kick();
 
-			ReadBuffer readBuffer =
-			{
-				.buffer = readBufferDst,
-				.size   = _size,
-				.data   = _data,
-			};
-
-			WGPU_CHECK(wgpuBufferMapAsync(
-				  readBufferDst
-				, WGPUMapMode_Read
-				, 0
-				, _size
-				, {
-					.nextInChain = NULL,
-					.mode        = WGPUCallbackMode_AllowProcessEvents,
-					.callback    = readBufferCb,
-					.userdata1   = &readBuffer,
-					.userdata2   = &s_done,
-				}) );
-
-			while (!s_done)
-			{
-				wgpuInstanceProcessEvents(m_instance);
-			}
+			mapRead({
+				.buffer        = readBufferDst,
+				.size          = _size,
+				.data          = _data,
+				.dataPitch     = _size,
+				.pitch         = _size,
+				.height        = 1,
+				.width         = _size,
+				.stencilOffset = 0,
+				.stencilPitch  = 0,
+				.texelSize     = 1,
+				.filePath      = NULL,
+				.format        = TextureFormat::Count,
+			});
 		}
 
 		void resizeTexture(TextureHandle _handle, uint16_t _width, uint16_t _height, uint8_t _numMips, uint16_t _numLayers) override
@@ -2241,9 +2413,9 @@ WGPU_IMPORT
 
 			WGPUBuffer readTextureBuffer = WGPU_CHECK(wgpuDeviceCreateBuffer(m_device, &readTextureBufferDesc) );
 
-			void* data = bx::alloc(g_allocator, dstPitch*height);
-
-			s_done = false;
+			const uint32_t filePathLen = bx::strLen(_filePath) + 1;
+			char* filePath = (char*)bx::allocPtr(g_allocatorBlk, filePathLen);
+			bx::strCopy(filePath, filePathLen, _filePath);
 
 			m_cmd.copyTextureToBuffer(
 				{
@@ -2276,11 +2448,10 @@ WGPU_IMPORT
 			m_cmd.kick();
 			m_cmd.wait();
 
-			ReadTexture readTexture =
-			{
+			mapRead({
 				.buffer        = readTextureBuffer,
 				.size          = copySize,
-				.data          = data,
+				.data          = bx::allocPtr(g_allocatorBlk, dstPitch*height),
 				.dataPitch     = dstPitch,
 				.pitch         = srcPitch,
 				.height        = height,
@@ -2288,38 +2459,9 @@ WGPU_IMPORT
 				.stencilOffset = 0,
 				.stencilPitch  = 0,
 				.texelSize     = uint32_t(bpp/8),
-			};
-
-			WGPU_CHECK(wgpuBufferMapAsync(
-				  readTextureBuffer
-				, WGPUMapMode_Read
-				, 0
-				, copySize
-				, {
-					.nextInChain = NULL,
-					.mode        = WGPUCallbackMode_AllowProcessEvents,
-					.callback    = readTextureCb,
-					.userdata1   = &readTexture,
-					.userdata2   = &s_done,
-				}) );
-
-			while (!s_done)
-			{
-				wgpuInstanceProcessEvents(m_instance);
-			}
-
-			g_callback->screenShot(
-				  _filePath
-				, width
-				, height
-				, dstPitch
-				, format
-				, data
-				, dstPitch*height
-				, false
-				);
-
-			bx::free(g_allocator, data);
+				.filePath      = filePath,
+				.format        = format,
+			});
 		}
 
 		void invalidateOcclusionQuery(OcclusionQueryHandle _handle) override
@@ -2987,25 +3129,25 @@ WGPU_IMPORT
 			wgpuRelease(depthView);
 		}
 
-		bool clearIntegerColor(WGPUCommandEncoder _commandEncoder, const FrameBufferWGPU& _fb, const Rect& _rect, const Clear& _clear, const float _palette[][4])
+		uint8_t clearIntegerColor(WGPUCommandEncoder _commandEncoder, const FrameBufferWGPU& _fb, const Rect& _rect, const Clear& _clear, const float _palette[][4])
 		{
 			if (0 == (_clear.m_flags & BGFX_CLEAR_COLOR)
 			||  1 <  _fb.m_msaaCount)
 			{
-				return false;
+				return 0;
 			}
 
-			bool integer = false;
+			uint8_t integerMask = 0;
 
 			for (uint32_t ii = 0; ii < _fb.m_numColorAttachments; ++ii)
 			{
 				const TextureWGPU& texture = m_textures[_fb.m_texture[ii].idx];
-				integer |= isIntegerFormat(TextureFormat::Enum(texture.m_textureFormat) );
+				integerMask |= isIntegerFormat(TextureFormat::Enum(texture.m_textureFormat) ) ? uint8_t(1<<ii) : 0;
 			}
 
-			if (!integer)
+			if (0 == integerMask)
 			{
-				return false;
+				return 0;
 			}
 
 			const uint8_t skipMask = _clear.getColorSkipMask(_fb.m_numColorAttachments);
@@ -3033,7 +3175,7 @@ WGPU_IMPORT
 				const uint32_t pitch     = bx::alignUp(_rect.m_width*texelSize, 256);
 				const uint32_t size      = bx::alignUp(pitch*(_rect.m_height-1) + _rect.m_width*texelSize, 4);
 
-				uint8_t* data = (uint8_t*)bx::alloc(g_allocator, size);
+				uint8_t* data = (uint8_t*)bx::allocPtr(g_allocatorBlk, size);
 
 				for (uint32_t yy = 0; yy < _rect.m_height; ++yy)
 				{
@@ -3056,7 +3198,7 @@ WGPU_IMPORT
 
 				WGPUBuffer buffer = WGPU_CHECK(wgpuDeviceCreateBuffer(m_device, &bufferDesc) );
 				m_cmd.writeBuffer(buffer, 0, data, size);
-				bx::free(g_allocator, data);
+				bx::freePtr(data);
 
 				const WGPUTexelCopyBufferInfo source =
 				{
@@ -3083,10 +3225,10 @@ WGPU_IMPORT
 				wgpuBufferRelease(buffer);
 			}
 
-			return true;
+			return integerMask;
 		}
 
-		void clearQuad(WGPURenderPassEncoder _renderPassEncoder, FrameBufferHandle _fbh, uint32_t _msaaCount, const ClearQuad& _clearQuad, const Rect& _rect, const Clear& _clear, const float _palette[][4])
+		void clearQuad(WGPURenderPassEncoder _renderPassEncoder, FrameBufferHandle _fbh, uint32_t _msaaCount, const ClearQuad& _clearQuad, const Rect& _rect, const Clear& _clear, const float _palette[][4], uint8_t _mrtFormatMask = UINT8_MAX)
 		{
 			BX_UNUSED(_clearQuad, _rect, _clear, _palette);
 
@@ -3145,6 +3287,7 @@ WGPU_IMPORT
 				, 0.0f
 				, UINT32_MAX
 				, uint8_t(~_clear.getColorSkipMask(numMrt) )
+				, _mrtFormatMask
 				);
 
 			const ProgramWGPU& program = m_program[_clearQuad.m_program[numMrt-1].idx];
@@ -3222,9 +3365,9 @@ WGPU_IMPORT
 
 		void invalidateBindGroupCache()
 		{
-			for (BindGroupMap::iterator it = m_bindGroupMap.begin(), end = m_bindGroupMap.end(); it != end; ++it)
+			for (BindGroupMap::Iterator it = m_bindGroupMap.begin(), end = m_bindGroupMap.end(); it != end; ++it)
 			{
-				release(it->second);
+				release(it.getValue() );
 			}
 
 			m_bindGroupMap.clear();
@@ -3244,6 +3387,7 @@ WGPU_IMPORT
 			{
 				m_maxAnisotropy = maxAnisotropy;
 				m_samplerStateCache.invalidate();
+				invalidateBindGroupCache();
 			}
 
 			if (!m_backBuffer.isSwapChain() )
@@ -3572,6 +3716,12 @@ WGPU_IMPORT
 							sampleType = WGPUTextureSampleType_Uint;
 						}
 
+						if (shaderBind.multisampled
+						&&  WGPUTextureSampleType_Float == sampleType)
+						{
+							sampleType = WGPUTextureSampleType_UnfilterableFloat;
+						}
+
 						WGPUSamplerBindingType samplerBindingType = WGPUSamplerBindingType_Filtering;
 						switch (sampleType)
 						{
@@ -3655,7 +3805,7 @@ WGPU_IMPORT
 
 			ComputePipeline* computePipeline = m_computePipelineCache.find(hash);
 
-			if (BX_LIKELY(NULL != computePipeline) )
+			if (NULL != computePipeline) [[likely]]
 			{
 				return computePipeline;
 			}
@@ -3774,6 +3924,7 @@ WGPU_IMPORT
 			, float _biasClamp = 0.0f
 			, uint32_t _sampleMask = UINT32_MAX
 			, uint8_t _mrtMask = UINT8_MAX
+			, uint8_t _mrtFormatMask = UINT8_MAX
 			)
 		{
 			const ProgramWGPU& program = m_program[_program.idx];
@@ -3879,11 +4030,12 @@ WGPU_IMPORT
 			murmur.add(_biasClamp);
 			murmur.add(_sampleMask);
 			murmur.add(_mrtMask);
+			murmur.add(_mrtFormatMask);
 			const uint32_t hash = murmur.end();
 
 			RenderPipeline* renderPipeline = m_renderPipelineCache.find(hash);
 
-			if (BX_LIKELY(NULL != renderPipeline) )
+			if (NULL != renderPipeline) [[likely]]
 			{
 				return renderPipeline;
 			}
@@ -3898,13 +4050,6 @@ WGPU_IMPORT
 
 				uint16_t attrMask[Attrib::Count];
 				bx::memCopy(attrMask, program.m_vsh->m_attrMask, sizeof(attrMask) );
-
-				uint32_t maxShaderLocation = 0;
-
-				for (uint32_t attr = 0; attr < Attrib::Count; ++attr)
-				{
-					maxShaderLocation = bx::max(maxShaderLocation, program.m_vsh->m_attrRemap[attr]);
-				}
 
 				if (UINT32_MAX != _streamMask)
 				{
@@ -3957,18 +4102,49 @@ WGPU_IMPORT
 					}
 				}
 
+				const uint32_t numFallback = 0 < numStreams ? BX_COUNTOF(program.m_vsh->m_instanceLocation) : 0;
+
+				for (uint32_t ii = _numInstanceData; ii < numFallback; ++ii)
+				{
+					const uint8_t location = program.m_vsh->m_instanceLocation[ii];
+
+					if (UINT8_MAX == location)
+					{
+						continue;
+					}
+
+					*elem =
+					{
+						.nextInChain    = NULL,
+						.format         = WGPUVertexFormat_Unorm8x4,
+						.offset         = 0,
+						.shaderLocation = location,
+					};
+
+					++elem;
+					++vertexBufferLayout[numStreams-1].attributeCount;
+				}
+
 				if (0 < _numInstanceData)
 				{
-					maxShaderLocation += 0 < numStreams;
+					const uint32_t numInstanceData = bx::min<uint32_t>(_numInstanceData, BX_COUNTOF(program.m_vsh->m_instanceLocation) );
+					uint32_t numInstanceAttribs = 0;
 
-					for (uint32_t ii = 0; ii < _numInstanceData; ++ii)
+					for (uint32_t ii = 0; ii < numInstanceData; ++ii)
 					{
-						elem[ii] =
+						const uint8_t location = program.m_vsh->m_instanceLocation[ii];
+
+						if (UINT8_MAX == location)
+						{
+							continue;
+						}
+
+						elem[numInstanceAttribs++] =
 						{
 							.nextInChain = 0,
 							.format      = WGPUVertexFormat_Float32x4,
 							.offset      = ii*16ull,
-							.shaderLocation = maxShaderLocation+ii,
+							.shaderLocation = location,
 						};
 					}
 
@@ -3977,7 +4153,7 @@ WGPU_IMPORT
 						.nextInChain    = NULL,
 						.stepMode       = WGPUVertexStepMode_Instance,
 						.arrayStride    = _numInstanceData*16ull,
-						.attributeCount = _numInstanceData,
+						.attributeCount = numInstanceAttribs,
 						.attributes     = elem,
 					};
 
@@ -4027,7 +4203,7 @@ WGPU_IMPORT
 			const bool hasFragmentShader = NULL != program.m_fsh;
 			const bool bgra8Storage = hasBgra8Storage(entries, entryCount);
 
-			const uint32_t targetCount = hasFragmentShader ? setColorTargetState(blendState, colorTragetState, fb, _state, _rgba, _mrtMask) : 0;
+			const uint32_t targetCount = hasFragmentShader ? setColorTargetState(blendState, colorTragetState, fb, _state, _rgba, _mrtMask & program.m_fsh->m_outputMask, _mrtFormatMask) : 0;
 
 			if (NULL != depthStencilTextureView)
 			{
@@ -4174,6 +4350,7 @@ WGPU_IMPORT
 							const WGPUTextureViewDimension viewDimension = _isCompute
 								&& Binding::Image == bind.m_type
 								&& UINT16_MAX != bind.m_numLayers
+								&& WGPUTextureViewDimension_3D != texture.m_viewDimension
 								? WGPUTextureViewDimension_2DArray
 								: shaderBind.viewDimension
 								;
@@ -4277,7 +4454,7 @@ WGPU_IMPORT
 			}
 		}
 
-		uint32_t setColorTargetState(WGPUBlendState* _outBlendState, WGPUColorTargetState* _outColorTargetState, const FrameBufferWGPU& _fb, uint64_t _state, uint32_t _rgba = 0, uint8_t _mrtMask = UINT8_MAX)
+		uint32_t setColorTargetState(WGPUBlendState* _outBlendState, WGPUColorTargetState* _outColorTargetState, const FrameBufferWGPU& _fb, uint64_t _state, uint32_t _rgba = 0, uint8_t _mrtMask = UINT8_MAX, uint8_t _mrtFormatMask = UINT8_MAX)
 		{
 			if (0 == _fb.m_numColorAttachments
 			&&  !_fb.isSwapChain() )
@@ -4291,7 +4468,7 @@ WGPU_IMPORT
 
 			if (blendEnabled)
 			{
-//				constexpr uint32_t kBlendOne = (BGFX_STATE_BLEND_ONE & BGFX_STATE_BLEND_MASK) >> BGFX_STATE_BLEND_SHIFT;
+				constexpr uint32_t kBlendOne = (BGFX_STATE_BLEND_ONE & BGFX_STATE_BLEND_MASK) >> BGFX_STATE_BLEND_SHIFT;
 
 				const uint32_t blend    = uint32_t( (_state & BGFX_STATE_BLEND_MASK         ) >> BGFX_STATE_BLEND_SHIFT);
 				const uint32_t equation = uint32_t( (_state & BGFX_STATE_BLEND_EQUATION_MASK) >> BGFX_STATE_BLEND_EQUATION_SHIFT);
@@ -4302,10 +4479,10 @@ WGPU_IMPORT
 				const bool equRGBIsMinOrMax = 3 <= equRGB;
 				const bool equAIsMinOrMax   = 3 <= equA;
 
-				const uint32_t srcRGB = equRGBIsMinOrMax ? 0 : (blend      ) & 0xf;
-				const uint32_t dstRGB = equRGBIsMinOrMax ? 0 : (blend >>  4) & 0xf;
-				const uint32_t srcA   = equAIsMinOrMax   ? 0 : (blend >>  8) & 0xf;
-				const uint32_t dstA   = equAIsMinOrMax   ? 0 : (blend >> 12) & 0xf;
+				const uint32_t srcRGB = equRGBIsMinOrMax ? kBlendOne : (blend      ) & 0xf;
+				const uint32_t dstRGB = equRGBIsMinOrMax ? kBlendOne : (blend >>  4) & 0xf;
+				const uint32_t srcA   = equAIsMinOrMax   ? kBlendOne : (blend >>  8) & 0xf;
+				const uint32_t dstA   = equAIsMinOrMax   ? kBlendOne : (blend >> 12) & 0xf;
 
 				_outBlendState[0] =
 				{
@@ -4328,9 +4505,12 @@ WGPU_IMPORT
 			{
 				for (uint32_t ii = 1, rgba = _rgba; ii < BGFX_CONFIG_MAX_FRAME_BUFFER_ATTACHMENTS; ++ii, rgba >>= 11)
 				{
-					const uint32_t src      = (rgba     ) & 0xf;
-					const uint32_t dst      = (rgba >> 4) & 0xf;
+					constexpr uint32_t kBlendOne = (BGFX_STATE_BLEND_ONE & BGFX_STATE_BLEND_MASK) >> BGFX_STATE_BLEND_SHIFT;
+
 					const uint32_t equation = (rgba >> 8) & 0x7;
+					const bool     minOrMax = 3 <= equation;
+					const uint32_t src      = minOrMax ? kBlendOne : (rgba     ) & 0xf;
+					const uint32_t dst      = minOrMax ? kBlendOne : (rgba >> 4) & 0xf;
 
 					_outBlendState[ii] =
 					{
@@ -4367,7 +4547,27 @@ WGPU_IMPORT
 					: _fb.m_colorFormat[ii]
 					;
 
-				const WGPUBlendState* blend = independentBlendEnable && 0 != ii
+				if (0 == (_mrtFormatMask & (1<<ii) ) )
+				{
+					_outColorTargetState[ii] =
+					{
+						.nextInChain = NULL,
+						.format      = WGPUTextureFormat_Undefined,
+						.blend       = NULL,
+						.writeMask   = WGPUColorWriteMask_None,
+					};
+
+					continue;
+				}
+
+				const bool integer = true
+					&& !isSwapChain
+					&& isIntegerFormat(TextureFormat::Enum(m_textures[_fb.m_texture[ii].idx].m_textureFormat) )
+					;
+
+				const WGPUBlendState* blend = integer
+					? NULL
+					: independentBlendEnable && 0 != ii
 					? (WGPUBlendFactor_Undefined != _outBlendState[ii].color.srcFactor ? &_outBlendState[ii] : NULL)
 					: blendState
 					;
@@ -4389,12 +4589,16 @@ WGPU_IMPORT
 
 		bool hasStencil(TextureFormat::Enum _format)
 		{
-			return 0 < bimg::getBlockInfo(bimg::TextureFormat::Enum(_format) ).stencilBits;
+			return bimg::isDepth(bimg::TextureFormat::Enum(_format) )
+				&& 0 < bimg::getBlockInfo(bimg::TextureFormat::Enum(_format) ).stencilBits
+				;
 		}
 
 		bool hasDepth(TextureFormat::Enum _format)
 		{
-			return 0 < bimg::getBlockInfo(bimg::TextureFormat::Enum(_format) ).depthBits;
+			return bimg::isDepth(bimg::TextureFormat::Enum(_format) )
+				&& 0 < bimg::getBlockInfo(bimg::TextureFormat::Enum(_format) ).depthBits
+				;
 		}
 
 		void addAttachmentState(bx::HashMurmur3& _murmur, const FrameBufferWGPU& _fb) const
@@ -4484,6 +4688,10 @@ WGPU_IMPORT
 
 		bx::FixedString256 m_webgpuInfo;
 		WGPULimits         m_limits;
+		WGPUBackendType    m_backendType;
+		WGPUCallbackMode   m_callbackMode;
+		bool               m_timedWaitAny;
+		uint32_t           m_diagnostics;
 
 		uint32_t         m_maxFrameLatency;
 		CommandQueueWGPU m_cmd;
@@ -4510,8 +4718,10 @@ WGPU_IMPORT
 		StateCacheT<WGPUTextureView>         m_textureViewStateCache;
 		StateCacheT<WGPUSampler>             m_samplerStateCache;
 
-		typedef stl::unordered_map<uint32_t, BindGroup> BindGroupMap;
-		BindGroupMap m_bindGroupMap;
+		static constexpr uint32_t kBindGroupBlockCapacity = 256;
+
+		using BindGroupMap = bx::BlockHashMapT<uint32_t, BindGroup, kBindGroupBlockCapacity>;
+		BindGroupMap m_bindGroupMap{g_allocatorHandle};
 
 		Matrix4 m_predefinedUniforms[PredefinedUniform::Count];
 
@@ -4534,10 +4744,10 @@ WGPU_IMPORT
 	RendererContextI* rendererCreate(const Init& _init)
 	{
 		BX_UNUSED(_init);
-		s_renderWGPU = BX_NEW(g_allocator, RendererContextWGPU);
+		s_renderWGPU = BX_NEW_PTR(g_allocatorBlk, RendererContextWGPU);
 		if (!s_renderWGPU->init(_init) )
 		{
-			bx::deleteObject(g_allocator, s_renderWGPU);
+			bx::deletePtr(s_renderWGPU);
 			s_renderWGPU = NULL;
 		}
 		return s_renderWGPU;
@@ -4546,7 +4756,7 @@ WGPU_IMPORT
 	void rendererDestroy()
 	{
 		s_renderWGPU->shutdown();
-		bx::deleteObject(g_allocator, s_renderWGPU);
+		bx::deletePtr(s_renderWGPU);
 		s_renderWGPU = NULL;
 	}
 
@@ -4608,13 +4818,13 @@ WGPU_IMPORT
 		};
 
 		_chunk.buffer = WGPU_CHECK(wgpuDeviceCreateBuffer(s_renderWGPU->m_device, &bufferDesc) );
-		_chunk.data   = (uint8_t*)bx::alloc(g_allocator, m_chunkSize);
+		_chunk.data   = (uint8_t*)bx::allocPtr(g_allocatorBlk, m_chunkSize);
 	}
 
 	void ChunkedScratchBufferWGPU::destroyChunk(ChunkWGPU& _chunk)
 	{
 		wgpuRelease(_chunk.buffer);
-		bx::free(g_allocator, _chunk.data);
+		bx::freePtr(_chunk.data);
 	}
 
 	void ChunkedScratchBufferWGPU::flushChunk(ChunkWGPU& _chunk, uint32_t _size)
@@ -4637,11 +4847,11 @@ WGPU_IMPORT
 			return;
 		}
 
-		uint8_t* temp = (uint8_t*)bx::alloc(g_allocator, alignedSize);
+		uint8_t* temp = (uint8_t*)bx::allocPtr(g_allocatorBlk, alignedSize);
 		bx::memCopy(temp, _data, _size);
 		bx::memSet(&temp[_size], 0, alignedSize - _size);
 		s_renderWGPU->m_cmd.writeBuffer(_buffer, _offset, temp, alignedSize);
-		bx::free(g_allocator, temp);
+		bx::freePtr(temp);
 	}
 
 	void BufferWGPU::create(uint32_t _size, void* _data, uint16_t _flags, bool _vertex, uint32_t _stride)
@@ -4694,6 +4904,77 @@ WGPU_IMPORT
 	{
 		BufferWGPU::create(_size, _data, _flags, true);
 		m_layoutHandle = _layoutHandle;
+	}
+
+	static uint8_t getLocationMask(const bx::StringView& _str)
+	{
+		uint8_t mask = 0;
+
+		for (bx::StringView location = bx::strFind(_str, "@location(")
+			; !location.isEmpty()
+			; location = bx::strFind(bx::StringView(location.getTerm(), _str.getTerm() ), "@location(")
+			)
+		{
+			const bx::StringView index = bx::strLTrimSpace(bx::StringView(location.getTerm(), _str.getTerm() ) );
+
+			uint32_t idx = 0;
+
+			for (const char* ptr = index.getPtr(); ptr != index.getTerm() && bx::isNumeric(*ptr); ++ptr)
+			{
+				idx = idx*10 + uint32_t(*ptr - '0');
+			}
+
+			mask |= idx < 8 ? uint8_t(1<<idx) : 0;
+		}
+
+		return mask;
+	}
+
+	static uint8_t getFragmentOutputMask(const bx::StringView& _code)
+	{
+		const bx::StringView fragment = bx::strFind(_code, "@fragment");
+
+		if (fragment.isEmpty() )
+		{
+			return UINT8_MAX;
+		}
+
+		const bx::StringView params = bx::strFindBlock(bx::StringView(fragment.getTerm(), _code.getTerm() ), '(', ')');
+
+		if (params.isEmpty() )
+		{
+			return UINT8_MAX;
+		}
+
+		const bx::StringView ret    = bx::strLTrimSpace(bx::StringView(params.getTerm(), _code.getTerm() ) );
+		const bx::StringView output = bx::strLTrimSpace(bx::strTrimPrefix(ret, "->") );
+
+		if (output.getPtr() == ret.getPtr() )
+		{
+			return 0;
+		}
+
+		if (0 == bx::strCmp(output, "@", 1) )
+		{
+			return getLocationMask(bx::StringView(output.getPtr(), bx::strFind(output, '{').getPtr() ) );
+		}
+
+		const bx::StringView type = bx::strIdentifier(output);
+
+		for (bx::StringView decl = bx::strFind(_code, "struct ")
+			; !decl.isEmpty()
+			; decl = bx::strFind(bx::StringView(decl.getTerm(), _code.getTerm() ), "struct ")
+			)
+		{
+			const bx::StringView name = bx::strIdentifier(bx::strLTrimSpace(bx::StringView(decl.getTerm(), _code.getTerm() ) ) );
+
+			if (0 == bx::strCmp(name, type) )
+			{
+				return getLocationMask(bx::strFindBlock(bx::StringView(name.getTerm(), _code.getTerm() ), '{', '}') );
+			}
+		}
+
+		return UINT8_MAX;
 	}
 
 	void ShaderWGPU::create(const Memory* _mem)
@@ -4760,8 +5041,7 @@ WGPU_IMPORT
 				uint8_t type = 0;
 				bx::read(&reader, type, &err);
 
-				uint8_t num;
-				bx::read(&reader, num, &err);
+				const uint16_t num = readUniformNum(&reader, magic, &err);
 
 				uint16_t regIndex;
 				bx::read(&reader, regIndex, &err);
@@ -4962,6 +5242,10 @@ WGPU_IMPORT
 
 		bx::read(&reader, m_numAttrs, &err);
 
+		bx::memSet(m_instanceLocation, UINT8_MAX, sizeof(m_instanceLocation) );
+
+		uint8_t numInstanceData = 0;
+
 		for (uint8_t ii = 0; ii < m_numAttrs; ++ii)
 		{
 			uint16_t id;
@@ -4974,6 +5258,21 @@ WGPU_IMPORT
 				m_attrMask[attr]  = UINT16_MAX;
 				m_attrRemap[attr] = ii;
 			}
+			else
+			{
+				const uint8_t idx  = idToInstanceData(id);
+				const uint8_t inst = UINT8_MAX != idx
+					? idx
+					: numInstanceData
+					;
+
+				if (inst < BX_COUNTOF(m_instanceLocation) )
+				{
+					m_instanceLocation[inst] = ii;
+				}
+
+				++numInstanceData;
+			}
 		}
 
 		bx::HashMurmur3 murmur;
@@ -4984,10 +5283,16 @@ WGPU_IMPORT
 		murmur.add(m_numAttrs);
 		murmur.add(m_attrMask,  m_numAttrs);
 		murmur.add(m_attrRemap, m_numAttrs);
+		murmur.add(m_instanceLocation, sizeof(m_instanceLocation) );
 		m_hash = murmur.end();
 
 		bx::read(&reader, m_size, &err);
 		bx::read(&reader, m_blockSize, &err);
+
+		m_outputMask = fragment && 0 != (kFragDataValid & hashOut)
+			? getFragDataMask(hashOut)
+			: getFragmentOutputMask(bx::StringView( (const char*)m_code->data, m_code->size) )
+			;
 
 		if (bx::strFind(bx::StringView( (const char*)m_code->data, m_code->size), "rgba8unorm").isEmpty() )
 		{
@@ -5029,7 +5334,7 @@ WGPU_IMPORT
 		{
 			const bx::StringView code( (const char*)m_code->data, m_code->size);
 
-			bx::MemoryBlock mb(g_allocator);
+			bx::MemoryBlock mb(g_allocatorHandle);
 			bx::MemoryWriter writer(&mb);
 			bx::Error err;
 
@@ -5128,13 +5433,19 @@ WGPU_IMPORT
 				ShaderBinding& shaderBind = m_shaderBinding[stage];
 				shaderBind.clear();
 
-				if (isValid(m_vsh->m_shaderBinding[stage].uniformHandle) )
+				const bool vertex   = isValid(m_vsh->m_shaderBinding[stage].uniformHandle);
+				const bool fragment = isValid(m_fsh->m_shaderBinding[stage].uniformHandle);
+
+				if (vertex)
 				{
 					shaderBind = m_vsh->m_shaderBinding[stage];
-					shaderBind.shaderStage = WGPUShaderStage_Vertex;
+					shaderBind.shaderStage = fragment
+						? WGPUShaderStage_Vertex | WGPUShaderStage_Fragment
+						: WGPUShaderStage_Vertex
+						;
 					numBindings += getNumBindGroupEntries(shaderBind);
 				}
-				else if (NULL != m_fsh && isValid(m_fsh->m_shaderBinding[stage].uniformHandle) )
+				else if (fragment)
 				{
 					shaderBind = m_fsh->m_shaderBinding[stage];
 					shaderBind.shaderStage = WGPUShaderStage_Fragment;
@@ -5157,9 +5468,8 @@ WGPU_IMPORT
 	static bool canGenerateMips(TextureFormat::Enum _format)
 	{
 		return true
+			&& isMipGenFormat(_format)
 			&& 0 != (g_caps.formats[_format] & BGFX_CAPS_FORMAT_TEXTURE_IMAGE_WRITE)
-			&& !bimg::isDepth(bimg::TextureFormat::Enum(_format) )
-			&& !bimg::isCompressed(bimg::TextureFormat::Enum(_format) )
 			;
 	}
 
@@ -5170,7 +5480,7 @@ WGPU_IMPORT
 
 	static float* depthToFloat(const uint8_t* _src, uint32_t _width, uint32_t _height, uint32_t _srcPitch, TextureFormat::Enum _format)
 	{
-		float* dst = (float*)bx::alloc(g_allocator, _width*_height*sizeof(float) );
+		float* dst = (float*)bx::allocPtr(g_allocatorBlk, _width*_height*sizeof(float) );
 
 		for (uint32_t yy = 0; yy < _height; ++yy)
 		{
@@ -5369,7 +5679,13 @@ WGPU_IMPORT
 			{
 				textureDesc.usage           = 0
 					| WGPUTextureUsage_RenderAttachment
-					| (bimg::isDepth(bimg::TextureFormat::Enum(m_textureFormat) ) ? WGPUTextureUsage_TextureBinding : 0)
+					| (false
+						|| bimg::isDepth(bimg::TextureFormat::Enum(m_textureFormat) )
+						|| 0 != (m_flags&BGFX_TEXTURE_MSAA_SAMPLE)
+						? WGPUTextureUsage_TextureBinding
+						: 0
+						)
+					| (0 != (m_flags&BGFX_TEXTURE_MSAA_SAMPLE) ? WGPUTextureUsage_CopySrc|WGPUTextureUsage_CopyDst : 0)
 					;
 				textureDesc.mipLevelCount   = 1;
 				textureDesc.sampleCount     = m_msaaCount;
@@ -5412,7 +5728,7 @@ WGPU_IMPORT
 						{
 							float* depth = depthToFloat(mip.m_data, mip.m_width, mip.m_height, mip.m_width*mip.m_bpp/8, TextureFormat::Enum(m_requestedFormat) );
 							s_renderWGPU->writeDepth(*this, lod, side, 0, 0, mip.m_width, mip.m_height, depth);
-							bx::free(g_allocator, depth);
+							bx::freePtr(depth);
 						}
 						else if (convert)
 						{
@@ -5421,7 +5737,7 @@ WGPU_IMPORT
 							const uint32_t height      = bx::max<uint32_t>(m_height >> lod, 1);
 							const uint32_t size        = bytesPerRow*mip.m_height*mip.m_depth;
 
-							uint8_t* temp = (uint8_t*)bx::alloc(g_allocator, size);
+							uint8_t* temp = (uint8_t*)bx::allocPtr(g_allocatorBlk, size);
 
 							imageDecodeToBgra8(
 								  temp
@@ -5449,7 +5765,7 @@ WGPU_IMPORT
 									.depthOrArrayLayers = mip.m_depth,
 								});
 
-							bx::free(g_allocator, temp);
+							bx::freePtr(temp);
 						}
 						else if (compressed)
 						{
@@ -5597,7 +5913,7 @@ WGPU_IMPORT
 
 		if (bimg::isCompressed(bimg::TextureFormat::Enum(m_textureFormat) ) )
 		{
-			const uint32_t alignedWidth = bx::max<uint32_t>(blockInfo.blockWidth, bx::alignUp(_rect.m_width, blockInfo.blockWidth) );
+			const uint32_t alignedWidth = bx::max<uint32_t>(blockInfo.blockWidth, bx::strideAlign(_rect.m_width, blockInfo.blockWidth) );
 			rectPitch = (alignedWidth / blockInfo.blockWidth) * blockInfo.blockSize;
 		}
 
@@ -5612,16 +5928,16 @@ WGPU_IMPORT
 		if (convert)
 		{
 			bytesPerRow = rectPitch;
-			temp = (uint8_t*)bx::alloc(g_allocator, slicePitch*bx::max<uint32_t>(1, _depth) );
+			temp = (uint8_t*)bx::allocPtr(g_allocatorBlk, slicePitch*bx::max<uint32_t>(1, _depth) );
 			imageDecodeToBgra8(temp, srcData, _rect.m_width, _rect.m_height, bx::max<uint32_t>(1, _depth), rectPitch, slicePitch, bimg::TextureFormat::Enum(m_requestedFormat) );
 			srcData = temp;
 		}
 
-		const uint32_t mipWidth  = bx::alignUp(bx::max(1u, m_width  >> _mip), blockInfo.blockWidth);
-		const uint32_t mipHeight = bx::alignUp(bx::max(1u, m_height >> _mip), blockInfo.blockHeight);
+		const uint32_t mipWidth  = bx::strideAlign(bx::max(1u, m_width  >> _mip), blockInfo.blockWidth);
+		const uint32_t mipHeight = bx::strideAlign(bx::max(1u, m_height >> _mip), blockInfo.blockHeight);
 
-		const uint32_t rectWidth  = bx::alignUp<uint32_t>(_rect.m_width,  blockInfo.blockWidth);
-		const uint32_t rectHeight = bx::alignUp<uint32_t>(_rect.m_height, blockInfo.blockHeight);
+		const uint32_t rectWidth  = bx::strideAlign(_rect.m_width,  blockInfo.blockWidth);
+		const uint32_t rectHeight = bx::strideAlign(_rect.m_height, blockInfo.blockHeight);
 
 		const uint32_t width   = bx::min<uint32_t>(rectWidth,  mipWidth  - bx::min<uint32_t>(_rect.m_x, mipWidth ) );
 		const uint32_t height  = bx::min<uint32_t>(rectHeight, mipHeight - bx::min<uint32_t>(_rect.m_y, mipHeight) );
@@ -5634,11 +5950,11 @@ WGPU_IMPORT
 		{
 			float* depthData = depthToFloat(srcData, width, height, bytesPerRow, TextureFormat::Enum(m_requestedFormat) );
 			s_renderWGPU->writeDepth(*this, _mip, originZ, _rect.m_x, _rect.m_y, width, height, depthData);
-			bx::free(g_allocator, depthData);
+			bx::freePtr(depthData);
 
 			if (NULL != temp)
 			{
-				bx::free(g_allocator, temp);
+				bx::freePtr(temp);
 			}
 
 			return;
@@ -5671,7 +5987,7 @@ WGPU_IMPORT
 
 		if (NULL != temp)
 		{
-			bx::free(g_allocator, temp);
+			bx::freePtr(temp);
 		}
 	}
 
@@ -5683,7 +5999,13 @@ WGPU_IMPORT
 			) & (BGFX_SAMPLER_BITS_MASK | BGFX_SAMPLER_BORDER_COLOR_MASK | BGFX_SAMPLER_COMPARE_MASK)
 			;
 
-		if (WGPUTextureSampleType_UnfilterableFloat == s_textureFormat[m_textureFormat].m_samplerType
+		const WGPUTextureSampleType sampleType = s_textureFormat[m_textureFormat].m_samplerType;
+
+		if ( (false
+			|| WGPUTextureSampleType_UnfilterableFloat == sampleType
+			|| WGPUTextureSampleType_Uint              == sampleType
+			|| WGPUTextureSampleType_Sint              == sampleType
+			)
 		&&  0 == (samplerFlags & BGFX_SAMPLER_COMPARE_MASK) )
 		{
 			samplerFlags &= ~(BGFX_SAMPLER_MIN_MASK |BGFX_SAMPLER_MAG_MASK |BGFX_SAMPLER_MIP_MASK);
@@ -5700,9 +6022,10 @@ WGPU_IMPORT
 
 		WGPUSampler sampler = s_renderWGPU->m_samplerStateCache.find(key);
 
-		const bool disableAniso = true
-			&& (BGFX_SAMPLER_MIN_POINT == (samplerFlags&BGFX_SAMPLER_MIN_POINT) )
-			&& (BGFX_SAMPLER_MAG_POINT == (samplerFlags&BGFX_SAMPLER_MAG_POINT) )
+		const bool disableAniso = false
+			|| (BGFX_SAMPLER_MIN_POINT == (samplerFlags&BGFX_SAMPLER_MIN_MASK) )
+			|| (BGFX_SAMPLER_MAG_POINT == (samplerFlags&BGFX_SAMPLER_MAG_MASK) )
+			|| (BGFX_SAMPLER_MIP_POINT == (samplerFlags&BGFX_SAMPLER_MIP_MASK) )
 			;
 
 		if (NULL == sampler)
@@ -5796,12 +6119,16 @@ WGPU_IMPORT
 				}
 			}
 
-			if (WGPUTextureViewDimension_2D == tvd)
+			if (WGPUTextureViewDimension_2D == tvd
+			||  WGPUTextureViewDimension_3D == tvd)
 			{
 				arrayLayerCount = 1;
 			}
 
-			uint32_t baseArrayLayer = _baseArrayLayer;
+			uint32_t baseArrayLayer = WGPUTextureViewDimension_3D == tvd
+				? 0
+				: _baseArrayLayer
+				;
 
 			if (WGPUTextureViewDimension_Cube      == tvd
 			||  WGPUTextureViewDimension_CubeArray == tvd)
@@ -5962,6 +6289,23 @@ WGPU_IMPORT
 
 		m_readable = 0 != (surfaceCaps.usages & WGPUTextureUsage_CopySrc);
 
+		m_premultipliedAlpha = false;
+
+		const bool hwndIgnoresAlpha = false
+			|| WGPUBackendType_D3D11 == s_renderWGPU->m_backendType
+			|| WGPUBackendType_D3D12 == s_renderWGPU->m_backendType
+			;
+
+		for (uint32_t ii = 0; ii < surfaceCaps.alphaModeCount && !hwndIgnoresAlpha; ++ii)
+		{
+			m_premultipliedAlpha |= WGPUCompositeAlphaMode_Premultiplied == surfaceCaps.alphaModes[ii];
+		}
+
+		const bool transparent = true
+			&& m_premultipliedAlpha
+			&& 0 != (m_desc.flags & BGFX_SWAP_CHAIN_TRANSPARENT_BACKBUFFER)
+			;
+
 		m_viewFormat = 0 != (m_desc.flags & BGFX_SWAP_CHAIN_SRGB_BACKBUFFER)
 			? srgbFormat(format)
 			: format
@@ -5972,14 +6316,18 @@ WGPU_IMPORT
 			.nextInChain     = NULL,
 			.device          = s_renderWGPU->m_device,
 			.format          = format,
-			.usage           = WGPUTextureUsage_RenderAttachment
+			.usage           = 0
+				| WGPUTextureUsage_RenderAttachment
 				| (m_readable ? WGPUTextureUsage_CopySrc : 0)
 				,
 			.width           = m_desc.width,
 			.height          = m_desc.height,
 			.viewFormatCount = format != m_viewFormat ? 1u : 0u,
 			.viewFormats     = format != m_viewFormat ? &m_viewFormat : NULL,
-			.alphaMode       = WGPUCompositeAlphaMode_Auto,
+			.alphaMode       = transparent
+				? WGPUCompositeAlphaMode_Premultiplied
+				: WGPUCompositeAlphaMode_Auto
+				,
 			.presentMode     = WGPUPresentMode_Fifo,
 		};
 
@@ -6486,17 +6834,21 @@ WGPU_IMPORT
 				const Attachment& at = m_attachment[ii];
 				const TextureWGPU& texture = s_renderWGPU->m_textures[at.handle.idx];
 				const WGPUTextureFormat viewFormat = texture.getViewFormat(at.flags, BGFX_ATTACHMENT_SRGB);
+				const bool is3D = TextureWGPU::Texture3D == texture.m_type;
 
 				WGPUTextureViewDescriptor textureViewDesc =
 				{
 					.nextInChain     = NULL,
 					.label           = WGPU_STRING_VIEW_INIT,
 					.format          = viewFormat,
-					.dimension       = at.numLayers > 1 ? WGPUTextureViewDimension_2DArray : WGPUTextureViewDimension_2D,
+					.dimension       = is3D
+						? WGPUTextureViewDimension_3D
+						: at.numLayers > 1 ? WGPUTextureViewDimension_2DArray : WGPUTextureViewDimension_2D
+						,
 					.baseMipLevel    = at.mip,
 					.mipLevelCount   = 1,
-					.baseArrayLayer  = at.layer,
-					.arrayLayerCount = at.numLayers,
+					.baseArrayLayer  = is3D ? 0u : uint32_t(at.layer),
+					.arrayLayerCount = is3D ? 1u : uint32_t(at.numLayers),
 					.aspect          = WGPUTextureAspect_All,
 					.usage           = WGPUTextureUsage_RenderAttachment,
 				};
@@ -6531,6 +6883,7 @@ WGPU_IMPORT
 
 					m_textureView[m_numColorAttachments] = attachmentView;
 					m_resolveView[m_numColorAttachments] = resolveView;
+					m_depthSlice[m_numColorAttachments]  = is3D ? at.layer : WGPU_DEPTH_SLICE_UNDEFINED;
 					m_colorFormat[m_numColorAttachments] = viewFormat;
 					m_texture[m_numColorAttachments] = at.handle;
 					m_numColorAttachments++;
@@ -6596,6 +6949,7 @@ WGPU_IMPORT
 
 	void CommandQueueWGPU::shutdown()
 	{
+		wait();
 		wgpuRelease(m_queue);
 	}
 
@@ -6608,7 +6962,11 @@ WGPU_IMPORT
 	{
 //		BX_ASSERT(WGPUQueueWorkDoneStatus_Success == _status, "%d", _status);
 		BX_UNUSED(_status, _message, _userdata1, _userdata2);
-		s_renderWGPU->m_cmd.m_counter--;
+
+		if (NULL != s_renderWGPU)
+		{
+			s_renderWGPU->m_cmd.m_counter--;
+		}
 	}
 
 	WGPUCommandEncoder CommandQueueWGPU::alloc()
@@ -6637,7 +6995,7 @@ WGPU_IMPORT
 			  m_queue
 			, {
 				.nextInChain = NULL,
-				.mode        = WGPUCallbackMode_AllowProcessEvents,
+				.mode        = s_renderWGPU->m_callbackMode,
 				.callback    = queueWorkDoneCb,
 				.userdata1   = (void*)uintptr_t(m_counter),
 				.userdata2   = NULL,
@@ -6649,6 +7007,11 @@ WGPU_IMPORT
 	#if !BX_PLATFORM_EMSCRIPTEN
 		WGPU_CHECK(wgpuInstanceProcessEvents(s_renderWGPU->m_instance) );
 	#endif // !BX_PLATFORM_EMSCRIPTEN
+
+		if (0 != (s_renderWGPU->m_diagnostics & BGFX_DIAGNOSTIC_SERIALIZE) )
+		{
+			wait();
+		}
 
 		m_commandEncoder = WGPU_CHECK(wgpuDeviceCreateCommandEncoder(s_renderWGPU->m_device, NULL) );
 	}
@@ -6724,7 +7087,7 @@ WGPU_IMPORT
 	void TimerQueryWGPU::create(uint32_t _num)
 	{
 		m_numQueries = bx::min(_num, kMaxQueries);
-		m_query      = (Query*)bx::alloc(g_allocator, sizeof(Query)*m_numQueries);
+		m_query      = (Query*)bx::allocPtr(g_allocatorBlk, sizeof(Query)*m_numQueries);
 		bgfx::resize(m_control, m_numQueries);
 
 		WGPUDevice device = s_renderWGPU->m_device;
@@ -6734,7 +7097,7 @@ WGPU_IMPORT
 			.nextInChain = NULL,
 			.label       = toWGPUStringView("TimerQuery"),
 			.type        = WGPUQueryType_Timestamp,
-			.count       = m_numQueries*2,
+			.count       = m_numQueries*2 + 1,
 		};
 
 		m_querySet = WGPU_CHECK(wgpuDeviceCreateQuerySet(device, &querySetDesc) );
@@ -6774,7 +7137,7 @@ WGPU_IMPORT
 		wgpuDestroy(m_resolve);
 		wgpuDestroy(m_readback);
 
-		bx::free(g_allocator, m_query);
+		bx::freePtr(m_query);
 		m_query      = NULL;
 		m_numQueries = 0;
 	}
@@ -6802,7 +7165,7 @@ WGPU_IMPORT
 			.nextInChain               = NULL,
 			.querySet                  = m_querySet,
 			.beginningOfPassWriteIndex = _index,
-			.endOfPassWriteIndex       = WGPU_QUERY_SET_INDEX_UNDEFINED,
+			.endOfPassWriteIndex       = m_numQueries*2,
 		};
 
 		const WGPUComputePassDescriptor computePassDesc =
@@ -6910,7 +7273,7 @@ WGPU_IMPORT
 			, size_t(getBufferSize() )
 			, {
 				.nextInChain = NULL,
-				.mode        = WGPUCallbackMode_AllowProcessEvents,
+				.mode        = s_renderWGPU->m_callbackMode,
 				.callback    = readTimestampResultsCb,
 				.userdata1   = this,
 				.userdata2   = NULL,
@@ -7026,7 +7389,8 @@ WGPU_IMPORT
 
 	void OcclusionQueryWGPU::resolve()
 	{
-		if (0 < m_control.getNumUsed() )
+		if (!m_mapPending
+		&&  0 < m_control.getNumUsed() )
 		{
 			WGPUCommandEncoder commandEncoder = s_renderWGPU->m_cmd.m_commandEncoder;
 
@@ -7049,6 +7413,9 @@ WGPU_IMPORT
 				, 0
 				, kOcclusionQueryBufferSize
 				) );
+
+			m_numResolved = m_control.getNumUsed();
+			m_resolved    = true;
 		}
 	}
 
@@ -7061,9 +7428,13 @@ WGPU_IMPORT
 
 	void OcclusionQueryWGPU::readResultsAsync(Frame* _frame)
 	{
-		if (0 < m_control.getNumUsed() )
+		if (m_resolved
+		&&  !m_mapPending)
 		{
 			constexpr uint64_t kOcclusionQueryBufferSize = BGFX_CONFIG_MAX_OCCLUSION_QUERIES * sizeof(uint64_t);
+
+			m_resolved   = false;
+			m_mapPending = true;
 
 			WGPU_CHECK(wgpuBufferMapAsync(
 				  m_readback
@@ -7072,7 +7443,7 @@ WGPU_IMPORT
 				, kOcclusionQueryBufferSize
 				, {
 					.nextInChain = NULL,
-					.mode        = WGPUCallbackMode_AllowProcessEvents,
+					.mode        = s_renderWGPU->m_callbackMode,
 					.callback    = readQueryResultsCb,
 					.userdata1   = this,
 					.userdata2   = _frame,
@@ -7084,24 +7455,30 @@ WGPU_IMPORT
 	{
 		constexpr uint64_t kOcclusionQueryBufferSize = BGFX_CONFIG_MAX_OCCLUSION_QUERIES * sizeof(uint64_t);
 
-		const uint64_t* result = (const uint64_t*)WGPU_CHECK(wgpuBufferGetConstMappedRange(
+		const uint64_t* result = (const uint64_t*)wgpuBufferGetConstMappedRange(
 			  m_readback
 			, 0
 			, kOcclusionQueryBufferSize
-			) );
+			);
 
-		while (0 < m_control.getNumUsed() )
+		if (NULL != result)
 		{
-			OcclusionQueryHandle handle = m_handle[m_control.m_read];
-			if (isValid(handle) )
+			for (; 0 < m_numResolved && 0 < m_control.getNumUsed(); --m_numResolved)
 			{
-				_frame->m_occlusion[handle.idx] = int32_t(result[handle.idx]);
+				OcclusionQueryHandle handle = m_handle[m_control.m_read];
+				if (isValid(handle) )
+				{
+					_frame->m_occlusion[handle.idx] = int32_t(result[handle.idx]);
+				}
+
+				m_control.consume(1);
 			}
 
-			m_control.consume(1);
+			WGPU_CHECK(wgpuBufferUnmap(m_readback) );
 		}
 
-		WGPU_CHECK(wgpuBufferUnmap(m_readback) );
+		m_numResolved = 0;
+		m_mapPending  = false;
 	}
 
 	void OcclusionQueryWGPU::invalidate(OcclusionQueryHandle _handle)
@@ -7191,7 +7568,7 @@ WGPU_IMPORT
 
 			const WGPUExtent3D copySize =
 			{
-				.width              = bx::alignUp<uint32_t>(_blit.m_width, blockWidth),
+				.width              = bx::strideAlign(_blit.m_width, blockWidth),
 				.height             = copyRows*blockHeight,
 				.depthOrArrayLayers = copyDepth,
 			};
@@ -7235,6 +7612,81 @@ WGPU_IMPORT
 			const TextureWGPU& src = m_textures[blit.m_src.idx];
 			const TextureWGPU& dst = m_textures[blit.m_dst.idx];
 
+			const bool     is3D  = TextureWGPU::Texture3D == src.m_type;
+			const uint32_t depth = bx::max<uint32_t>(1, blit.m_depth);
+
+			if (blit.m_src.idx == blit.m_dst.idx
+			&&  blit.m_srcMip  == blit.m_dstMip
+			&&  (is3D || (blit.m_srcZ < blit.m_dstZ + depth && blit.m_dstZ < blit.m_srcZ + depth) )
+			&&  NULL == src.m_textureMsaa
+			&&  !bimg::isDepth(bimg::TextureFormat::Enum(src.m_textureFormat) ) )
+			{
+				const bimg::ImageBlockInfo& blockInfo = bimg::getBlockInfo(bimg::TextureFormat::Enum(src.m_textureFormat) );
+
+				const WGPUTextureDescriptor tempDesc =
+				{
+					.nextInChain     = NULL,
+					.label           = toWGPUStringView("blit temp"),
+					.usage           = WGPUTextureUsage_CopySrc | WGPUTextureUsage_CopyDst,
+					.dimension       = is3D ? WGPUTextureDimension_3D : WGPUTextureDimension_2D,
+					.size            =
+					{
+						.width              = bx::alignUp(uint32_t(blit.m_width),  uint32_t(blockInfo.blockWidth) ),
+						.height             = bx::alignUp(uint32_t(blit.m_height), uint32_t(blockInfo.blockHeight) ),
+						.depthOrArrayLayers = depth,
+					},
+					.format          = src.m_fmt,
+					.mipLevelCount   = 1,
+					.sampleCount     = 1,
+					.viewFormatCount = 0,
+					.viewFormats     = NULL,
+				};
+
+				WGPUTexture temp = WGPU_CHECK(wgpuDeviceCreateTexture(m_device, &tempDesc) );
+
+				const WGPUExtent3D copySize =
+				{
+					.width              = blit.m_width,
+					.height             = blit.m_height,
+					.depthOrArrayLayers = depth,
+				};
+
+				m_cmd.copyTextureToTexture(
+					{
+						.texture  = src.m_texture,
+						.mipLevel = blit.m_srcMip,
+						.origin   = { .x = blit.m_srcX, .y = blit.m_srcY, .z = blit.m_srcZ },
+						.aspect   = WGPUTextureAspect_All,
+					},
+					{
+						.texture  = temp,
+						.mipLevel = 0,
+						.origin   = { .x = 0, .y = 0, .z = 0 },
+						.aspect   = WGPUTextureAspect_All,
+					},
+					copySize
+					);
+
+				m_cmd.copyTextureToTexture(
+					{
+						.texture  = temp,
+						.mipLevel = 0,
+						.origin   = { .x = 0, .y = 0, .z = 0 },
+						.aspect   = WGPUTextureAspect_All,
+					},
+					{
+						.texture  = dst.m_texture,
+						.mipLevel = blit.m_dstMip,
+						.origin   = { .x = blit.m_dstX, .y = blit.m_dstY, .z = blit.m_dstZ },
+						.aspect   = WGPUTextureAspect_All,
+					},
+					copySize
+					);
+
+				wgpuRelease(temp);
+				continue;
+			}
+
 			s_renderWGPU->m_cmd.copyTextureToTexture(
 				{
 					.texture  = src.m_texture,
@@ -7264,6 +7716,32 @@ WGPU_IMPORT
 					.depthOrArrayLayers = bx::max<uint32_t>(1, blit.m_depth),
 				}
 				);
+
+			if (NULL != src.m_textureMsaa
+			&&  NULL != dst.m_textureMsaa
+			&&  src.m_msaaCount == dst.m_msaaCount
+			&&  0 != (src.m_flags & dst.m_flags & BGFX_TEXTURE_MSAA_SAMPLE) )
+			{
+				s_renderWGPU->m_cmd.copyTextureToTexture(
+					{
+						.texture  = src.m_textureMsaa,
+						.mipLevel = 0,
+						.origin   = { .x = 0, .y = 0, .z = blit.m_srcZ },
+						.aspect   = WGPUTextureAspect_All,
+					},
+					{
+						.texture  = dst.m_textureMsaa,
+						.mipLevel = 0,
+						.origin   = { .x = 0, .y = 0, .z = blit.m_dstZ },
+						.aspect   = WGPUTextureAspect_All,
+					},
+					{
+						.width              = blit.m_width,
+						.height             = blit.m_height,
+						.depthOrArrayLayers = bx::max<uint32_t>(1, blit.m_depth),
+					}
+					);
+			}
 		}
 	}
 
@@ -7340,18 +7818,10 @@ WGPU_IMPORT
 
 			const uint32_t nonPowerOfTwo = (srcWidth & 1) | ( (srcHeight & 1) << 1);
 
-			uint8_t additionalMips = 0;
-			{
-				const uint32_t v = 0
-					| (dstWidth  == 1 ? dstHeight : dstWidth)
-					| (dstHeight == 1 ? dstWidth : dstHeight)
-					;
-
-				if (0 != v)
-				{
-					additionalMips = bx::countTrailingZeros(v);
-				}
-			}
+			const uint8_t additionalMips = 0 != dstWidth && 0 != dstHeight
+				? uint8_t(bx::countTrailingZeros(dstWidth | dstHeight) )
+				: 0
+				;
 
 			uint8_t numMips = 1 + bx::min<uint8_t>(additionalMips, 3);
 
@@ -7589,22 +8059,32 @@ WGPU_IMPORT
 
 		uint32_t frameQueryIdx = UINT32_MAX;
 
-		frameQueryIdx = m_gpuTimer.begin(BGFX_CONFIG_MAX_VIEWS, _render->m_frameNum);
+		frameQueryIdx = m_gpuTimer.begin(kTimerResultFrame, _render->m_frameNum);
 
 		if (0 < _render->m_iboffset)
 		{
 			BGFX_PROFILER_SCOPE("bgfx/Update transient index buffer", kColorResource);
 
-			TransientIndexBuffer* ib = _render->m_transientIb;
-			m_indexBuffers[ib->handle.idx].update(0, _render->m_iboffset, ib->data);
+			for (const TransientBufferChunk& chunk : _render->m_transientIb.m_chunks)
+			{
+				if (0 < chunk.m_offset)
+				{
+					m_indexBuffers[chunk.m_handle].update(0, chunk.m_offset, chunk.m_data);
+				}
+			}
 		}
 
 		if (0 < _render->m_vboffset)
 		{
 			BGFX_PROFILER_SCOPE("bgfx/Update transient vertex buffer", kColorResource);
 
-			TransientVertexBuffer* vb = _render->m_transientVb;
-			m_vertexBuffers[vb->handle.idx].update(0, _render->m_vboffset, vb->data);
+			for (const TransientBufferChunk& chunk : _render->m_transientVb.m_chunks)
+			{
+				if (0 < chunk.m_offset)
+				{
+					m_vertexBuffers[chunk.m_handle].update(0, chunk.m_offset, chunk.m_data);
+				}
+			}
 		}
 
 		_render->sort();
@@ -7625,6 +8105,7 @@ WGPU_IMPORT
 
 		ProgramHandle currentProgram = BGFX_INVALID_HANDLE;
 		bool hasPredefined = false;
+		ChunkedScratchBufferOffset currentSbo = { .buffer = NULL, .offsets = { 0, 0 } };
 		SortKey key;
 		uint16_t view = UINT16_MAX;
 		const View* renderView = &_render->view(0);
@@ -7785,9 +8266,19 @@ WGPU_IMPORT
 						renderPassEncoder = NULL;
 					}
 
-					if (item > 1)
+					if (viewChanged)
 					{
-						profiler.end();
+						if (item > 1)
+						{
+							profiler.end();
+						}
+
+						profiler.blit(this, bs, view);
+						profiler.begin(view, ViewStatsType::Draw);
+					}
+					else
+					{
+						profiler.setType(ViewStatsType::Draw);
 					}
 
 					submitUniformCache(ucs, view);
@@ -7796,8 +8287,6 @@ WGPU_IMPORT
 					BGFX_WGPU_PROFILER_END();
 					formatViewName(viewName, _render, view, " ");
 					BGFX_WGPU_PROFILER_BEGIN(view, kColorView);
-
-					profiler.begin(view);
 
 					FrameBufferWGPU& fb = getFrameBuffer(fbh);
 
@@ -7879,7 +8368,7 @@ WGPU_IMPORT
 						{
 							.nextInChain   = NULL,
 							.view          = colorTextureView,
-							.depthSlice    = WGPU_DEPTH_SLICE_UNDEFINED,
+							.depthSlice    = isSwapChain ? WGPU_DEPTH_SLICE_UNDEFINED : fb.m_depthSlice[ii],
 							.resolveTarget = resolveTextureView,
 							.loadOp        = true
 								&& clearWhole
@@ -7892,28 +8381,21 @@ WGPU_IMPORT
 							.clearValue    = {},
 						};
 
-						if (0 != (BGFX_CLEAR_COLOR_USE_PALETTE & clr.m_flags) )
+						const bool integer = true
+							&& !isSwapChain
+							&& isIntegerFormat(TextureFormat::Enum(m_textures[fb.m_texture[ii].idx].m_textureFormat) )
+							;
+
+						float rgba[4];
+						getClearColor(rgba, clr, _render->m_colorPalette, ii, integer);
+
+						colorAttachment[ii].clearValue =
 						{
-							uint8_t index = (uint8_t)bx::min(BGFX_CONFIG_MAX_COLOR_PALETTE-1, clr.m_index[ii]);
-							const float* rgba = _render->m_colorPalette[index];
-							colorAttachment[ii].clearValue =
-							{
-								.r = rgba[0],
-								.g = rgba[1],
-								.b = rgba[2],
-								.a = rgba[3],
-							};
-						}
-						else
-						{
-							colorAttachment[ii].clearValue =
-							{
-								.r = clr.m_index[0] * 1.0/255.0,
-								.g = clr.m_index[1] * 1.0/255.0,
-								.b = clr.m_index[2] * 1.0/255.0,
-								.a = clr.m_index[3] * 1.0/255.0,
-							};
-						}
+							.r = rgba[0],
+							.g = rgba[1],
+							.b = rgba[2],
+							.a = rgba[3],
+						};
 					}
 
 					const bool stencilRw = hasStencil(TextureFormat::Enum(fb.m_formatDepthStencil) ) && !fb.m_readOnlyStencil;
@@ -7957,12 +8439,71 @@ WGPU_IMPORT
 					{
 						WGPUCommandEncoder cmdEncoder = m_cmd.alloc();
 
-						const bool integerCleared = true
+						const uint8_t integerMask = true
 							&& !clearWhole
 							&&  needClear
 							&& !isSwapChain
-							&&  clearIntegerColor(cmdEncoder, fb, clippedRect, clr, _render->m_colorPalette)
+							? clearIntegerColor(cmdEncoder, fb, clippedRect, clr, _render->m_colorPalette)
+							: 0
 							;
+						const bool integerCleared = 0 != integerMask;
+
+						const uint8_t colorMask = uint8_t( (1<<numColorAttachments)-1);
+						const bool clearRest = true
+							&& integerCleared
+							&& (false
+								|| (0 != (BGFX_CLEAR_COLOR & clr.m_flags) && 0 != (colorMask & ~integerMask & ~colorSkipMask) )
+								|| (depthRw   && 0 != (BGFX_CLEAR_DEPTH   & clr.m_flags) )
+								|| (stencilRw && 0 != (BGFX_CLEAR_STENCIL & clr.m_flags) )
+								)
+							;
+
+						if (clearRest)
+						{
+							WGPURenderPassColorAttachment clearColorAttachment[BGFX_CONFIG_MAX_FRAME_BUFFER_ATTACHMENTS];
+
+							for (uint32_t ii = 0; ii < numColorAttachments; ++ii)
+							{
+								clearColorAttachment[ii] = colorAttachment[ii];
+
+								if (0 != (integerMask & (1<<ii) ) )
+								{
+									clearColorAttachment[ii].view          = NULL;
+									clearColorAttachment[ii].depthSlice    = WGPU_DEPTH_SLICE_UNDEFINED;
+									clearColorAttachment[ii].resolveTarget = NULL;
+									clearColorAttachment[ii].loadOp        = WGPULoadOp_Undefined;
+									clearColorAttachment[ii].storeOp       = WGPUStoreOp_Undefined;
+								}
+							}
+
+							const WGPURenderPassDescriptor clearRenderPassDesc =
+							{
+								.nextInChain            = NULL,
+								.label                  = toWGPUStringView(viewName),
+								.colorAttachmentCount   = numColorAttachments,
+								.colorAttachments       = clearColorAttachment,
+								.depthStencilAttachment = renderPassDesc.depthStencilAttachment,
+								.occlusionQuerySet      = NULL,
+								.timestampWrites        = NULL,
+							};
+
+							WGPURenderPassEncoder clearPassEncoder = WGPU_CHECK(wgpuCommandEncoderBeginRenderPass(cmdEncoder, &clearRenderPassDesc) );
+
+							wgpuRenderPassEncoderSetViewport(
+								  clearPassEncoder
+								, float(viewRect.m_x)
+								, float(viewRect.m_y)
+								, float(viewRect.m_width)
+								, float(viewRect.m_height)
+								, 0.0f
+								, 1.0f
+								);
+
+							clearQuad(clearPassEncoder, fbh, msaaCount, _clearQuad, clippedRect, clr, _render->m_colorPalette, uint8_t(~integerMask) );
+
+							WGPU_CHECK(wgpuRenderPassEncoderEnd(clearPassEncoder) );
+							wgpuRelease(clearPassEncoder);
+						}
 
 						renderPassEncoder = WGPU_CHECK(wgpuCommandEncoderBeginRenderPass(cmdEncoder, &renderPassDesc) );
 						currentPipeline   = NULL;
@@ -8031,6 +8572,14 @@ WGPU_IMPORT
 
 						if (viewChanged)
 						{
+							if (item > 1)
+							{
+								profiler.end();
+							}
+
+							profiler.blit(this, bs, view);
+							profiler.begin(view, ViewStatsType::Compute);
+
 							submitUniformCache(ucs, view);
 							submitBlit(bs, view);
 						}
@@ -8065,14 +8614,13 @@ WGPU_IMPORT
 						}
 					}
 
-					ChunkedScratchBufferOffset sbo;
 					const uint32_t vsSize = program.m_vsh->m_size;
 
 					if (constantsChanged
 					||  hasPredefined)
 					{
 						viewState.setPredefined<4>(this, view, *renderView, program, _render, compute);
-						m_uniformScratchBuffer.write(sbo, m_vsScratch, vsSize);
+						m_uniformScratchBuffer.write(currentSbo, m_vsScratch, vsSize);
 					}
 
 					if (programChanged)
@@ -8085,20 +8633,20 @@ WGPU_IMPORT
 					bx::HashMurmur3 murmur;
 					murmur.begin(0x434f4d50);
 					murmur.add(renderBind.m_bind, sizeof(renderBind.m_bind) );
-					murmur.add(sbo.buffer);
+					murmur.add(currentSbo.buffer);
 					murmur.add(vsSize);
 					murmur.add(uintptr_t(bindGroupLayout) );
 					const uint32_t bindHash = murmur.end();
 
-					BindGroupMap::iterator it = m_bindGroupMap.find(bindHash);
-					if (it == m_bindGroupMap.end() )
+					const BindGroup* bindGroupCached = m_bindGroupMap.find(bindHash);
+					if (NULL == bindGroupCached)
 					{
-						const BindGroup bindGroup = createBindGroup(bindGroupLayout, program, renderBind, sbo, true);
-						it = m_bindGroupMap.insert(stl::make_pair(bindHash, bindGroup) ).first;
+						const BindGroup bindGroup = createBindGroup(bindGroupLayout, program, renderBind, currentSbo, true);
+						m_bindGroupMap.add(bindHash, bindGroup);
+						bindGroupCached = m_bindGroupMap.find(bindHash);
 					}
-					const BindGroup* bindGroupCached = &it->second;
 
-					WGPU_CHECK(wgpuComputePassEncoderSetBindGroup(computePassEncoder, 0, bindGroupCached->bindGroup, bindGroupCached->numOffsets, sbo.offsets) );
+					WGPU_CHECK(wgpuComputePassEncoderSetBindGroup(computePassEncoder, 0, bindGroupCached->bindGroup, bindGroupCached->numOffsets, currentSbo.offsets) );
 
 					if (isValid(compute.m_indirectBuffer) )
 					{
@@ -8309,14 +8857,13 @@ WGPU_IMPORT
 					murmur.add(uintptr_t(bindGroupLayout) );
 					const uint32_t bindHash = murmur.end();
 
-					BindGroupMap::iterator bindIt = m_bindGroupMap.find(bindHash);
-					if (bindIt == m_bindGroupMap.end() )
+					bindGroupCached = m_bindGroupMap.find(bindHash);
+					if (NULL == bindGroupCached)
 					{
 						const BindGroup bind = createBindGroup(bindGroupLayout, program, renderBind, sbo, false);
-						bindIt = m_bindGroupMap.insert(stl::make_pair(bindHash, bind) ).first;
+						m_bindGroupMap.add(bindHash, bind);
+						bindGroupCached = m_bindGroupMap.find(bindHash);
 					}
-
-					bindGroupCached = &bindIt->second;
 
 					bindState.valid     = true;
 					bindState.program   = key.m_program.idx;
@@ -8660,6 +9207,7 @@ WGPU_IMPORT
 				lastFb.resolve(m_cmd.m_commandEncoder);
 			}
 
+			profiler.blit(this, bs, BGFX_CONFIG_MAX_VIEWS);
 			submitBlit(bs, BGFX_CONFIG_MAX_VIEWS);
 
 			m_occlusionQuery.resolve();
@@ -8697,7 +9245,7 @@ WGPU_IMPORT
 		{
 			m_gpuTimer.end(frameQueryIdx);
 
-			const TimerQueryWGPU::Result& result = m_gpuTimer.m_result[BGFX_CONFIG_MAX_VIEWS];
+			const TimerQueryWGPU::Result& result = m_gpuTimer.m_result[kTimerResultFrame];
 			double toGpuMs = 1000.0 / double(m_gpuTimer.m_frequency);
 			elapsedGpuMs   = (result.m_end - result.m_begin) * toGpuMs;
 			maxGpuElapsed  = elapsedGpuMs > maxGpuElapsed ? elapsedGpuMs : maxGpuElapsed;
@@ -8711,7 +9259,7 @@ WGPU_IMPORT
 
 		const int64_t timerFreq = bx::getHPFrequency();
 
-		const TimerQueryWGPU::Result& result = m_gpuTimer.m_result[BGFX_CONFIG_MAX_VIEWS];
+		const TimerQueryWGPU::Result& result = m_gpuTimer.m_result[kTimerResultFrame];
 
 		Stats& perfStats = _render->m_perfStats;
 		perfStats.cpuTimeBegin  = timeBegin;

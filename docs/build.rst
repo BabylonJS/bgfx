@@ -107,7 +107,7 @@ Configuration is ``<platform>-<debug/release>[32/64]``. For example:
 
 ::
 
-    linux-release64, wasm-debug, wasm-release, osx-debug, osx-release, android-arm64-release, etc.
+    linux-gcc-release64, wasm-debug, wasm-release, osx-arm64-debug, osx-arm64-release, android-arm64-release, etc.
 
 
 General (Directly with GENie)
@@ -153,10 +153,10 @@ For gmake projects, specify compile using:
 
 ::
 
-    make config=<config> -C .build/projects/<platform>-gmake
+    make config=<config> -C .build/projects/gmake-<gcc>
 
 Where ``<config>`` is something like ``release64``, ``debug64`` (or equivalent 32 bit), and
-``<platform>`` is the platform you chose.
+``<gcc>`` is the value passed to ``--gcc=`` (e.g. ``linux-gcc``).
 
 Windows
 ~~~~~~~
@@ -182,16 +182,18 @@ For the Xcode command line:
 
 ::
 
-    make osx-release
+    make osx-arm64-release
     cd examples/runtime
-    ../../.build/osx64_clang/bin/examples.app/Contents/MacOS/examplesRelease
+    ../../.build/osx-arm64/bin/examples.app/Contents/MacOS/examplesRelease
+
+On an Intel Mac, use ``make osx-x64-release`` and ``.build/osx-x64/bin`` instead.
 
 Or for Xcode IDE:
 
 ::
 
     ../bx/tools/bin/darwin/genie --with-combined-examples --xcode=osx xcode9
-    open .build/projects/xcode9-osx/bgfx.xcworkspace
+    open .build/projects/xcode9/bgfx.xcworkspace
 
 Due to the `inability <https://github.com/bkaradzic/genie/blob/master/docs/scripting-reference.md#debugdirpath>`__
 to set working directory for an Xcode project from `GENie <https://github.com/bkaradzic/genie#genie---project-generator-tool>`__
@@ -207,7 +209,7 @@ Linux
 
 ::
 
-    make linux-release64
+    make linux-gcc-release64
 
 Android
 ~~~~~~~
@@ -239,7 +241,7 @@ Libraries are in ``.build/ios-arm64/bin``. To use them in your own Xcode project
 3. Add ``bgfx/include``, ``bimg/include`` and ``bx/include`` to *Header Search Paths*.
 4. Pass a ``CAMetalLayer``, or an ``MTKView``, as ``bgfx::PlatformData::nwh``.
 
-Or build ``src/amalgamated.mm`` directly in your project instead of linking the libraries
+Or build ``src/amalgamated.cpp`` directly in your project instead of linking the libraries
 (see `Amalgamated Build <#amalgamated-build>`_).
 
 For the Xcode IDE:
@@ -277,9 +279,7 @@ Amalgamated Build
 For ease of integration with other build systems, the bgfx library can be built
 with a single .cpp file. It's only necessary to build
 `src/amalgamated.cpp <https://github.com/bkaradzic/bgfx/blob/master/src/amalgamated.cpp>`__
-(for macOS/iOS/iPadOS/tvOS use
-`src/amalgamated.mm <https://github.com/bkaradzic/bgfx/blob/master/src/amalgamated.mm>`__
-instead) inside a different build system.
+inside a different build system.
 
 Tools
 -----

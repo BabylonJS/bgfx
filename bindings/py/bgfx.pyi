@@ -490,6 +490,16 @@ class ViewMode(enum.IntEnum):
 	DepthDescending = 3
 	Count = 4
 
+# View stats type.
+class ViewStatsType(enum.IntEnum):
+	# Blits submitted to the view.
+	Blit = 0
+	# Compute dispatches submitted to the view.
+	Compute = 1
+	# Draw calls submitted to the view.
+	Draw = 2
+	Count = 3
+
 # Shading Rate.
 class ShadingRate(enum.IntEnum):
 	# 1x1
@@ -1007,6 +1017,25 @@ class DebugFlags(enum.IntFlag):
 	# Enable profiler. This causes per-view statistics to be collected, available through `bgfx::Stats::ViewStats`. This is unrelated to the profiler functions in `bgfx::CallbackI`.
 	Profiler = 0x10
 
+class DiagnosticFlags(enum.IntFlag):
+	# No diagnostics.
+	None_ = 0x0
+	# Report informational debug layer messages, not only warnings and errors.
+	# Requires `Init::debug`.
+	Verbose = 0x1
+	# Enable GPU-based validation (D3D12 GPU-based validation, Vulkan GPU-assisted
+	# validation). Requires `Init::debug`.
+	GpuValidation = 0x2
+	# Enable queue synchronization validation (D3D12 synchronized command queue
+	# validation, Vulkan synchronization validation). Requires `Init::debug`.
+	SyncValidation = 0x4
+	# Wait for the GPU to finish each submitted command buffer before recording
+	# the next one.
+	Serialize = 0x8
+	# Check that the type of every fragment shader output a draw call writes matches
+	# the frame buffer attachment it's written to. Requires `Init::debug`.
+	DrawValidation = 0x10
+
 class SwapChainMsaaFlags(enum.IntFlag):
 	# Enable 2x MSAA.
 	X2 = 0x10
@@ -1205,14 +1234,16 @@ class PciIdFlags(enum.IntFlag):
 	Amd = 0x1002
 	# Apple adapter.
 	Apple = 0x106b
-	# Intel adapter.
-	Intel = 0x8086
-	# NVIDIA adapter.
-	Nvidia = 0x10de
-	# Microsoft adapter.
-	Microsoft = 0x1414
 	# ARM adapter.
 	Arm = 0x13b5
+	# Google adapter.
+	Google = 0x1ae0
+	# Intel adapter.
+	Intel = 0x8086
+	# Microsoft adapter.
+	Microsoft = 0x1414
+	# NVIDIA adapter.
+	Nvidia = 0x10de
 
 class CubeMapFlags(enum.IntFlag):
 	# Cubemap +x.
@@ -1295,10 +1326,10 @@ class CapsLimits(ctypes.Structure):
 	maxEncoders: int
 	# Minimum resource command buffer size.
 	minResourceCbSize: int
-	# Maximum transient vertex buffer size.
-	maxTransientVbSize: int
-	# Maximum transient index buffer size.
-	maxTransientIbSize: int
+	# Minimum transient vertex buffer size, it grows on demand.
+	minTransientVbSize: int
+	# Minimum transient index buffer size, it grows on demand.
+	minTransientIbSize: int
 	# Mimimum uniform buffer size.
 	minUniformBufferSize: int
 	# Minimum view and frame uniform cache size.
@@ -1451,10 +1482,10 @@ class InitLimits(ctypes.Structure):
 	minViews: int
 	# Minimum resource command buffer size.
 	minResourceCbSize: int
-	# Maximum transient vertex buffer size.
-	maxTransientVbSize: int
-	# Maximum transient index buffer size.
-	maxTransientIbSize: int
+	# Minimum transient vertex buffer size, it grows on demand.
+	minTransientVbSize: int
+	# Minimum transient index buffer size, it grows on demand.
+	minTransientIbSize: int
 	# Mimimum uniform buffer size.
 	minUniformBufferSize: int
 	# Minimum view and frame uniform cache size. This is a reservation,
@@ -1467,6 +1498,9 @@ class Init(ctypes.Structure):
 	# a default rendering backend will be selected appropriate to the platform.
 	# See: `bgfx::RendererType`
 	type: int
+	# Select native API a layered rendering backend (WebGPU) runs on. When
+	# set to RendererType::Count implementation's default will be selected.
+	backendType: int
 	# Vendor PCI ID. If set to `BGFX_PCI_ID_NONE`, discrete and integrated
 	# GPUs will be prioritised.
 	#   - `BGFX_PCI_ID_NONE` - Autoselect adapter.
@@ -1484,6 +1518,8 @@ class Init(ctypes.Structure):
 	capabilities: int
 	# Enable device for debugging.
 	debug: bool
+	# Diagnostic flags. See: `BGFX_DIAGNOSTIC_*`.
+	diagnostics: int
 	# Enable device for profiling.
 	profile: bool
 	# Enable fallback to next available renderer.
@@ -1736,6 +1772,8 @@ class ViewStats(ctypes.Structure):
 	name: bytes
 	# View id.
 	view: int
+	# View stats type.
+	type: int
 	# CPU (submit) begin time.
 	cpuTimeBegin: int
 	# CPU (submit) end time.
@@ -1853,8 +1891,9 @@ class Stats(ctypes.Structure):
 	textWidth: int
 	# Debug text height in characters.
 	textHeight: int
-	# Number of view stats.
-	numViews: int
+	# Number of view stats. View has one for each type of work
+	# submitted to it. See: `bgfx::ViewStatsType`
+	numViewStats: int
 	# Array of View stats.
 	viewStats: _Pointer[ViewStats]
 	# Number of encoders used during frame.
@@ -3102,6 +3141,10 @@ def bgfx_encoder_discard(_this: Optional[Union[Encoder, _Pointer[Encoder], ctype
 # 
 # @attention Destination texture must be created with `BGFX_TEXTURE_BLIT_DST` flag.
 # 
+# @attention A depth texture, or one created with `BGFX_TEXTURE_MSAA_SAMPLE`, can only
+#   be blitted whole: both sides start at the origin of mips of the same size, and
+#   the copy covers the whole mip.
+# 
 def bgfx_encoder_blit(_this: Optional[Union[Encoder, _Pointer[Encoder], ctypes.Array]], _id: int, _dst: Optional[Union[TextureRegion, _Pointer[TextureRegion], ctypes.Array]], _src: Optional[Union[TextureRegion, _Pointer[TextureRegion], ctypes.Array]], /) -> None: ...
 
 # Blit buffer region between two buffers.
@@ -3468,6 +3511,10 @@ def bgfx_discard(_flags: int, /) -> None: ...
 #   draw commands are executed after blit and compute commands.
 # 
 # @attention Destination texture must be created with `BGFX_TEXTURE_BLIT_DST` flag.
+# 
+# @attention A depth texture, or one created with `BGFX_TEXTURE_MSAA_SAMPLE`, can only
+#   be blitted whole: both sides start at the origin of mips of the same size, and
+#   the copy covers the whole mip.
 # 
 def bgfx_blit(_id: int, _dst: Optional[Union[TextureRegion, _Pointer[TextureRegion], ctypes.Array]], _src: Optional[Union[TextureRegion, _Pointer[TextureRegion], ctypes.Array]], /) -> None: ...
 

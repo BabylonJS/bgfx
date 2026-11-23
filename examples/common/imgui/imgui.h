@@ -11,6 +11,8 @@
 #include <dear-imgui/imgui.h>
 #include <iconfontheaders/icons_kenney.h>
 #include <iconfontheaders/icons_font_awesome.h>
+#include <iconfontheaders/icons_font_awesome_7_brands.h>
+#include <iconfontheaders/icons_codicons.h>
 
 #define IMGUI_MBUT_LEFT   0x01
 #define IMGUI_MBUT_RIGHT  0x02
@@ -33,6 +35,10 @@ void imguiDestroy();
 
 void imguiBeginFrame(int32_t _mx, int32_t _my, uint8_t _button, int32_t _scroll, uint16_t _width, uint16_t _height, int _inputChar = -1, bgfx::ViewId _view = UINT16_MAX);
 void imguiEndFrame();
+
+void imguiSetSwapChainFlags(uint32_t _flags);
+
+bgfx::FrameBufferHandle imguiGetFrameBuffer(const ImGuiViewport* _viewport);
 
 struct ImguiOutput
 {

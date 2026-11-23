@@ -617,6 +617,45 @@ public static class bgfx
 	}
 	
 	[AllowDuplicates]
+	public enum DiagnosticFlags : uint32
+	{
+		/// <summary>
+		/// No diagnostics.
+		/// </summary>
+		None                   = 0x00000000,
+	
+		/// <summary>
+		/// Report informational debug layer messages, not only warnings and errors.
+		/// Requires `Init::debug`.
+		/// </summary>
+		Verbose                = 0x00000001,
+	
+		/// <summary>
+		/// Enable GPU-based validation (D3D12 GPU-based validation, Vulkan GPU-assisted
+		/// validation). Requires `Init::debug`.
+		/// </summary>
+		GpuValidation          = 0x00000002,
+	
+		/// <summary>
+		/// Enable queue synchronization validation (D3D12 synchronized command queue
+		/// validation, Vulkan synchronization validation). Requires `Init::debug`.
+		/// </summary>
+		SyncValidation         = 0x00000004,
+	
+		/// <summary>
+		/// Wait for the GPU to finish each submitted command buffer before recording
+		/// the next one.
+		/// </summary>
+		Serialize              = 0x00000008,
+	
+		/// <summary>
+		/// Check that the type of every fragment shader output a draw call writes matches
+		/// the frame buffer attachment it's written to. Requires `Init::debug`.
+		/// </summary>
+		DrawValidation         = 0x00000010,
+	}
+	
+	[AllowDuplicates]
 	public enum BufferFlags : uint16
 	{
 		None                   = 0x0000,
@@ -1437,14 +1476,19 @@ public static class bgfx
 		Apple                  = 0x106b,
 	
 		/// <summary>
+		/// ARM adapter.
+		/// </summary>
+		Arm                    = 0x13b5,
+	
+		/// <summary>
+		/// Google adapter.
+		/// </summary>
+		Google                 = 0x1ae0,
+	
+		/// <summary>
 		/// Intel adapter.
 		/// </summary>
 		Intel                  = 0x8086,
-	
-		/// <summary>
-		/// NVIDIA adapter.
-		/// </summary>
-		Nvidia                 = 0x10de,
 	
 		/// <summary>
 		/// Microsoft adapter.
@@ -1452,9 +1496,9 @@ public static class bgfx
 		Microsoft              = 0x1414,
 	
 		/// <summary>
-		/// ARM adapter.
+		/// NVIDIA adapter.
 		/// </summary>
-		Arm                    = 0x13b5,
+		Nvidia                 = 0x10de,
 	}
 	
 	[AllowDuplicates]
@@ -2565,6 +2609,27 @@ public static class bgfx
 	}
 	
 	[AllowDuplicates]
+	public enum ViewStatsType : uint32
+	{
+		/// <summary>
+		/// Blits submitted to the view.
+		/// </summary>
+		Blit,
+	
+		/// <summary>
+		/// Compute dispatches submitted to the view.
+		/// </summary>
+		Compute,
+	
+		/// <summary>
+		/// Draw calls submitted to the view.
+		/// </summary>
+		Draw,
+	
+		Count
+	}
+	
+	[AllowDuplicates]
 	public enum ShadingRate : uint32
 	{
 		/// <summary>
@@ -2684,8 +2749,8 @@ public static class bgfx
 			public uint32 maxOcclusionQueries;
 			public uint32 maxEncoders;
 			public uint32 minResourceCbSize;
-			public uint32 maxTransientVbSize;
-			public uint32 maxTransientIbSize;
+			public uint32 minTransientVbSize;
+			public uint32 minTransientIbSize;
 			public uint32 minUniformBufferSize;
 			public uint32 minUniformCacheSize;
 			public uint32 blitRowPitchAlign;
@@ -2746,17 +2811,19 @@ public static class bgfx
 			public uint32 numDrawCallPeakFrames;
 			public uint32 minViews;
 			public uint32 minResourceCbSize;
-			public uint32 maxTransientVbSize;
-			public uint32 maxTransientIbSize;
+			public uint32 minTransientVbSize;
+			public uint32 minTransientIbSize;
 			public uint32 minUniformBufferSize;
 			public uint32 minUniformCacheSize;
 		}
 	
 		public RendererType type;
+		public RendererType backendType;
 		public uint16 vendorId;
 		public uint16 deviceId;
 		public uint64 capabilities;
 		public uint8 debug;
+		public uint32 diagnostics;
 		public uint8 profile;
 		public uint8 fallback;
 		public uint8 videoDecode;
@@ -2904,6 +2971,7 @@ public static class bgfx
 	{
 		public char8[256] name;
 		public ViewId view;
+		public ViewStatsType type;
 		public int64 cpuTimeBegin;
 		public int64 cpuTimeEnd;
 		public int64 gpuTimeBegin;
@@ -2966,7 +3034,7 @@ public static class bgfx
 		public uint16 height;
 		public uint16 textWidth;
 		public uint16 textHeight;
-		public uint16 numViews;
+		public uint16 numViewStats;
 		public ViewStats* viewStats;
 		public uint8 numEncoders;
 		public EncoderStats* encoderStats;
@@ -5247,6 +5315,10 @@ public static class bgfx
 	/// 
 	/// @attention Destination texture must be created with `BGFX_TEXTURE_BLIT_DST` flag.
 	/// 
+	/// @attention A depth texture, or one created with `BGFX_TEXTURE_MSAA_SAMPLE`, can only
+	///   be blitted whole: both sides start at the origin of mips of the same size, and
+	///   the copy covers the whole mip.
+	/// 
 	/// </summary>
 	///
 	/// <param name="_id">View id.</param>
@@ -5996,6 +6068,10 @@ public static class bgfx
 	///   draw commands are executed after blit and compute commands.
 	/// 
 	/// @attention Destination texture must be created with `BGFX_TEXTURE_BLIT_DST` flag.
+	/// 
+	/// @attention A depth texture, or one created with `BGFX_TEXTURE_MSAA_SAMPLE`, can only
+	///   be blitted whole: both sides start at the origin of mips of the same size, and
+	///   the copy covers the whole mip.
 	/// 
 	/// </summary>
 	///

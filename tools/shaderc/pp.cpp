@@ -6,18 +6,16 @@
 #include "pp.h"
 
 #include <bx/allocator.h>
+#include <bx/array.h>
 #include <bx/filepath.h>
+#include <bx/hash.h>
 #include <bx/scanner.h>
 #include <bx/sort.h>
-
-#include <tinystl/vector.h>
 
 namespace shaderc
 {
 	namespace
 	{
-		namespace stl = tinystl;
-
 		static constexpr uint32_t kArenaBlockSize  = 64<<10;
 		static constexpr uint32_t kMaxIncludeDepth = 200;
 
@@ -43,20 +41,35 @@ namespace shaderc
 
 		struct Token
 		{
-			bx::StringView  lexeme;
-			SourceLocation  location;
+			const char*     ptr;
 			const HideNode* hide;
+			uint32_t        len;
+			uint32_t        line;
+			uint32_t        fileId;
 			Kind            kind;
 			bool            spaceBefore;
+
+			bx::StringView lexeme() const
+			{
+				return bx::StringView(ptr, int32_t(len) );
+			}
+
+			void setLexeme(const bx::StringView& _lexeme)
+			{
+				ptr = _lexeme.getPtr();
+				len = uint32_t(_lexeme.getLength() );
+			}
 		};
 
 		Token makeToken(Kind _kind, const bx::StringView& _lexeme)
 		{
 			return
 			{
-				.lexeme      = _lexeme,
-				.location    = SourceLocation(),
+				.ptr         = _lexeme.getPtr(),
 				.hide        = NULL,
+				.len         = uint32_t(_lexeme.getLength() ),
+				.line        = 0,
+				.fileId      = 0,
 				.kind        = _kind,
 				.spaceBefore = false,
 			};
@@ -66,7 +79,7 @@ namespace shaderc
 		{
 			return true
 				&& Kind::Punct == _token.kind
-				&& isEqual(_token.lexeme, _lexeme)
+				&& isEqual(_token.lexeme(), _lexeme)
 				;
 		}
 
@@ -74,7 +87,7 @@ namespace shaderc
 		{
 			return true
 				&& Kind::Identifier == _token.kind
-				&& isEqual(_token.lexeme, _lexeme)
+				&& isEqual(_token.lexeme(), _lexeme)
 				;
 		}
 
@@ -226,33 +239,89 @@ namespace shaderc
 			Block*          m_head;
 		};
 
-		static const bx::StringLiteral s_puncts[] =
+		static constexpr bx::StringLiteral s_puncts[] =
 		{
-			"<<=",
-			">>=",
-			"...",
-			"##",
-			"<<",
-			">>",
-			"<=",
-			">=",
-			"==",
 			"!=",
-			"&&",
-			"||",
-			"->",
-			"++",
-			"--",
-			"+=",
-			"-=",
-			"*=",
-			"/=",
+			"##",
 			"%=",
+			"&&",
 			"&=",
-			"|=",
-			"^=",
+			"*=",
+			"++",
+			"+=",
+			"--",
+			"-=",
+			"->",
+			"...",
+			"/=",
 			"::",
+			"<<",
+			"<<=",
+			"<=",
+			"==",
+			">=",
+			">>",
+			">>=",
+			"^=",
+			"|=",
+			"||",
 		};
+
+		static constexpr uint32_t kMaxPunctLength = 3;
+
+		constexpr bool punctLessFn(const bx::StringLiteral& _lhs, const bx::StringLiteral& _rhs)
+		{
+			return 0 > bx::strCmp(_lhs, _rhs);
+		}
+		static_assert(bx::isSorted(s_puncts, BX_COUNTOF(s_puncts), punctLessFn), "s_puncts must be sorted!");
+
+		int32_t punctCmpFn(const void* _lhs, const void* _rhs)
+		{
+			return bx::strCmp(*(const bx::StringView*)_lhs, *(const bx::StringLiteral*)_rhs);
+		}
+
+		bool isPunct(const bx::StringView& _lexeme)
+		{
+			return 0 <= bx::binarySearch( (const void*)&_lexeme, s_puncts, BX_COUNTOF(s_puncts), sizeof(bx::StringLiteral), punctCmpFn);
+		}
+
+		constexpr bool isPunctTail(char _ch)
+		{
+			return false
+				|| '-' == _ch
+				|| '=' == _ch
+				|| '.' == _ch
+				|| '&' == _ch
+				|| '+' == _ch
+				|| '|' == _ch
+				|| '<' == _ch
+				|| '>' == _ch
+				|| ':' == _ch
+				|| '#' == _ch
+				;
+		}
+
+		constexpr bool isPunctTailOfAll(const bx::StringLiteral* _puncts, uint32_t _num)
+		{
+			for (uint32_t ii = 0; ii < _num; ++ii)
+			{
+				if (!isPunctTail(_puncts[ii].getCPtr()[1])
+				||  kMaxPunctLength < uint32_t(_puncts[ii].getLength() ) )
+				{
+					return false;
+				}
+			}
+
+			return true;
+		}
+		static_assert(isPunctTailOfAll(s_puncts, BX_COUNTOF(s_puncts) ), "isPunctTail and kMaxPunctLength must match s_puncts!");
+
+		bool isCommentText(char _ch)
+		{
+			return '/' != _ch
+				&& '*' != _ch
+				;
+		}
 
 		bool isNumberPart(char _ch)
 		{
@@ -298,15 +367,13 @@ namespace shaderc
 
 					const uint32_t line = m_scanner.getLine();
 
-					const bx::StringView newLine = m_scanner.accept('\n');
+					const char ch = peek();
 
-					if (!newLine.isEmpty() )
+					if ('\n' == ch)
 					{
-						emit(Kind::Newline, newLine, spaceBefore, line);
+						emit(Kind::Newline, m_scanner.accept('\n'), spaceBefore, line);
 						continue;
 					}
-
-					const char ch = peek();
 
 					if (bx::isIdentStart(ch) )
 					{
@@ -354,7 +421,7 @@ namespace shaderc
 		private:
 			char peek(int32_t _offset = 0) const
 			{
-				const char* ptr = m_scanner.getCursor().getPtr() + _offset;
+				const char* ptr = m_scanner.getTail().getPtr() + _offset;
 
 				return ptr < m_input.getTerm() ? *ptr : '\0';
 			}
@@ -365,14 +432,17 @@ namespace shaderc
 
 				for (;;)
 				{
-					if (!m_scanner.acceptWhile(bx::isSpaceHoriz).isEmpty() )
+					const char ch = peek();
+
+					if (bx::isSpaceHoriz(ch)
+					&&  !m_scanner.acceptWhile(bx::isSpaceHoriz).isEmpty() )
 					{
 						space = true;
 						continue;
 					}
 
-					if (skipLineContinuation()
-					||  skipComment() )
+					if ( ('\\' == ch && skipLineContinuation() )
+					||   ('/'  == ch && skipComment() ) )
 					{
 						space = true;
 						continue;
@@ -439,6 +509,7 @@ namespace shaderc
 					}
 
 					m_scanner.accept();
+					m_scanner.acceptWhile(isCommentText);
 				}
 
 				m_unterminatedComment = m_unterminatedComment || 0 != depth;
@@ -448,6 +519,11 @@ namespace shaderc
 
 			bool spliceJoins(bool (*_isPart)(char) )
 			{
+				if ('\\' != peek() )
+				{
+					return false;
+				}
+
 				const bx::StringView cursor = m_scanner.getCursor();
 
 				if (!skipLineContinuation() )
@@ -491,9 +567,11 @@ namespace shaderc
 
 				m_tokens[m_num++] =
 				{
-					.lexeme      = _lexeme,
-					.location    = SourceLocation(bx::StringView(), _line),
+					.ptr         = _lexeme.getPtr(),
 					.hide        = NULL,
+					.len         = uint32_t(_lexeme.getLength() ),
+					.line        = _line,
+					.fileId      = 0,
 					.kind        = _kind,
 					.spaceBefore = _spaceBefore,
 				};
@@ -533,12 +611,24 @@ namespace shaderc
 			bx::StringView acceptQuoted(char _quote)
 			{
 				const bx::StringView cursor = m_scanner.getCursor();
+				bx::StringView spliced;
+				bx::StringView piece = cursor;
 
 				m_scanner.accept(_quote);
 
 				while (!m_scanner.isDone()
 				&&     m_scanner.peek('\n').isEmpty() )
 				{
+					const bx::StringView before = m_scanner.getCursor();
+
+					if (skipLineContinuation() )
+					{
+						const bx::StringView parts[] = { spliced, bx::StringView(piece.getPtr(), before.getPtr() ) };
+						spliced = m_arena.concat(parts, BX_COUNTOF(parts) );
+						piece   = m_scanner.getCursor();
+						continue;
+					}
+
 					if (!m_scanner.accept('\\').isEmpty() )
 					{
 						m_scanner.accept();
@@ -553,18 +643,29 @@ namespace shaderc
 					m_scanner.accept();
 				}
 
-				return m_scanner.between(cursor);
+				if (spliced.isEmpty() )
+				{
+					return m_scanner.between(cursor);
+				}
+
+				const bx::StringView parts[] = { spliced, m_scanner.between(piece) };
+				return m_arena.concat(parts, BX_COUNTOF(parts) );
 			}
 
 			bx::StringView acceptPunct()
 			{
-				for (uint32_t ii = 0; ii < BX_COUNTOF(s_puncts); ++ii)
+				if (isPunctTail(peek(1) ) )
 				{
-					const bx::StringView punct = m_scanner.accept(s_puncts[ii]);
+					const bx::StringView tail = m_scanner.getTail();
 
-					if (!punct.isEmpty() )
+					for (uint32_t len = bx::min(kMaxPunctLength, uint32_t(tail.getLength() ) ); 1 < len; --len)
 					{
-						return punct;
+						const bx::StringView punct(tail.getPtr(), int32_t(len) );
+
+						if (isPunct(punct) )
+						{
+							return m_scanner.accept(punct);
+						}
 					}
 				}
 
@@ -583,11 +684,22 @@ namespace shaderc
 		struct Macro
 		{
 			bx::StringView              name;
-			stl::vector<bx::StringView> params;
+			bx::ArrayT<bx::StringView>  params;
 			const Token*                body;
 			uint32_t                    bodyNum;
+			uint32_t                    hash;
+			uint32_t                    next;
 			bool                        isFunction;
 			bool                        isVariadic;
+			bx::StringView              vaName;
+		};
+
+		struct File
+		{
+			bx::StringView name;
+			bx::StringView path;
+			uint32_t       hash;
+			uint32_t       next;
 		};
 
 		struct Frame
@@ -598,6 +710,7 @@ namespace shaderc
 			uint32_t       num;
 			uint32_t       pos;
 			int32_t        lineDelta;
+			uint32_t       fileId;
 			bool           isInclude;
 		};
 
@@ -633,7 +746,7 @@ namespace shaderc
 				);
 
 		public:
-			Worklist(const stl::vector<Token>& _tokens)
+			Worklist(const bx::ArrayT<Token>& _tokens)
 				: m_tokens(_tokens)
 				, m_head(0)
 			{
@@ -641,7 +754,7 @@ namespace shaderc
 
 			bool isEmpty() const
 			{
-				return m_head >= m_tokens.size();
+				return m_head >= m_tokens.getCount();
 			}
 
 			const Token& getFront() const
@@ -654,9 +767,9 @@ namespace shaderc
 				++m_head;
 			}
 
-			void prepend(const stl::vector<Token>& _tokens)
+			void prepend(const bx::ArrayT<Token>& _tokens)
 			{
-				const uint32_t num = uint32_t(_tokens.size() );
+				const uint32_t num = _tokens.getCount();
 
 				if (0 == num)
 				{
@@ -675,37 +788,37 @@ namespace shaderc
 					return;
 				}
 
-				stl::vector<Token> tmp;
-				tmp.reserve(num + m_tokens.size() - m_head);
+				bx::ArrayT<Token> tmp;
+				tmp.setCapacity(num + m_tokens.getCount() - m_head);
 
 				for (uint32_t ii = 0; ii < num; ++ii)
 				{
-					tmp.push_back(_tokens[ii]);
+					tmp.add(_tokens[ii]);
 				}
 
-				const uint32_t numTokens = uint32_t(m_tokens.size() );
+				const uint32_t numTokens = m_tokens.getCount();
 
 				for (uint32_t ii = m_head; ii < numTokens; ++ii)
 				{
-					tmp.push_back(m_tokens[ii]);
+					tmp.add(m_tokens[ii]);
 				}
 
-				m_tokens.swap(tmp);
+				m_tokens = bx::move(tmp);
 				m_head = 0;
 			}
 
 			const Token* begin() const
 			{
-				return m_tokens.data() + m_head;
+				return m_tokens.getPtr() + m_head;
 			}
 
 			const Token* end() const
 			{
-				return m_tokens.data() + m_tokens.size();
+				return m_tokens.getPtr() + m_tokens.getCount();
 			}
 
 		private:
-			stl::vector<Token> m_tokens;
+			bx::ArrayT<Token>  m_tokens;
 			uint32_t           m_head;
 		};
 
@@ -817,38 +930,79 @@ namespace shaderc
 			, m_out(NULL)
 			, m_includeDepth(0)
 			, m_outLocation(bx::StringView(), 1)
+			, m_outFileId(0)
 			, m_emitLine(false)
 			, m_inCondition(false)
 			, m_ok(true)
 		{
+			bx::memSet(m_macroBuckets, 0xff, sizeof(m_macroBuckets) );
+			clearFiles();
 		}
 
-		void syncLine(const SourceLocation& _location)
+		void clearFiles()
+		{
+			bx::memSet(m_fileBuckets, 0xff, sizeof(m_fileBuckets) );
+			m_files.clear();
+			fileIdOf(bx::StringView() );
+		}
+
+		uint32_t fileIdOf(const bx::StringView& _name)
+		{
+			const uint32_t hash   = macroHash(_name);
+			const uint32_t bucket = hash % kFileBuckets;
+
+			for (uint32_t ii = m_fileBuckets[bucket]; UINT32_MAX != ii; ii = m_files[ii].next)
+			{
+				if (true
+				&&  hash == m_files[ii].hash
+				&&  isEqual(m_files[ii].name, _name) )
+				{
+					return ii;
+				}
+			}
+
+			const uint32_t id = m_files.getCount();
+
+			const bx::FilePath filePath(_name);
+
+			m_files.add({
+				.name = _name,
+				.path = m_arena.intern(pathOf(filePath) ),
+				.hash = hash,
+				.next = m_fileBuckets[bucket],
+			});
+
+			m_fileBuckets[bucket] = id;
+
+			return id;
+		}
+
+		void syncLine(const Token& _token)
 		{
 			if (!m_emitLine
-			||  0 == _location.line)
+			||  0 == _token.line)
 			{
 				return;
 			}
 
-			if (_location.line == m_outLocation.line
-			&&  isEqual(_location.file, m_outLocation.file) )
+			if (_token.line   == m_outLocation.line
+			&&  _token.fileId == m_outFileId)
 			{
 				return;
 			}
 
-			const bx::FilePath filePath(_location.file);
-			const bx::StringView file = pathOf(filePath);
+			const bx::StringView file = m_files[_token.fileId].path;
 
 			char tmp[bx::kMaxFilePath + 64];
 			const int32_t total = bx::snprintf(tmp, BX_COUNTOF(tmp), "#line %u \"%.*s\"\n"
-				, _location.line
+				, _token.line
 				, file.getLength()
 				, file.getPtr()
 				);
 			append(bx::StringView(tmp, bx::min(total, int32_t(BX_COUNTOF(tmp) ) - 1) ) );
 
-			m_outLocation = _location;
+			m_outLocation = SourceLocation(m_files[_token.fileId].name, _token.line);
+			m_outFileId   = _token.fileId;
 		}
 
 		void report(bool _isError, const bx::StringView& _message)
@@ -881,14 +1035,10 @@ namespace shaderc
 
 				if (Kind::Newline != lastToken.kind)
 				{
-					tokens[num++] =
-					{
-						.lexeme      = "\n",
-						.location    = lastToken.location,
-						.hide        = NULL,
-						.kind        = Kind::Newline,
-						.spaceBefore = false,
-					};
+					Token newline = makeToken(Kind::Newline, "\n");
+					newline.line   = lastToken.line;
+					newline.fileId = lastToken.fileId;
+					tokens[num++] = newline;
 				}
 			}
 
@@ -900,10 +1050,11 @@ namespace shaderc
 				.num          = num,
 				.pos          = 0,
 				.lineDelta    = 0,
+				.fileId       = fileIdOf(_name),
 				.isInclude    = _isInclude,
 			};
 
-			m_frames.push_back(frame);
+			m_frames.add(frame);
 
 			m_location.file = _name;
 
@@ -916,38 +1067,39 @@ namespace shaderc
 
 		bool next(Token& _outToken)
 		{
-			if (!m_pending.empty() )
+			if (!m_pending.isEmpty() )
 			{
-				_outToken = m_pending.back();
-				m_pending.pop_back();
+				_outToken = m_pending[m_pending.getCount()-1];
+				m_pending.remove(bx::kLast);
 
 				return true;
 			}
 
-			while (!m_frames.empty() )
+			while (!m_frames.isEmpty() )
 			{
-				Frame& frame = m_frames.back();
+				Frame& frame = m_frames[m_frames.getCount()-1];
 
 				if (frame.pos < frame.num)
 				{
 					_outToken = frame.tokens[frame.pos++];
-					m_location = SourceLocation(frameName(frame), uint32_t(int32_t(_outToken.location.line) + frame.lineDelta) );
-					_outToken.location = m_location;
+					_outToken.line   = uint32_t(int32_t(_outToken.line) + frame.lineDelta);
+					_outToken.fileId = frame.fileId;
+					m_location = SourceLocation(m_files[frame.fileId].name, _outToken.line);
 
 					return true;
 				}
 
 				const bool wasInclude = frame.isInclude;
-				m_frames.pop_back();
+				m_frames.remove(bx::kLast);
 
 				if (wasInclude)
 				{
 					--m_includeDepth;
 				}
 
-				if (!m_frames.empty() )
+				if (!m_frames.isEmpty() )
 				{
-					m_location.file = frameName(m_frames.back() );
+					m_location.file = frameName(m_frames[m_frames.getCount()-1] );
 				}
 			}
 
@@ -956,10 +1108,10 @@ namespace shaderc
 
 		void unget(const Token& _token)
 		{
-			m_pending.push_back(_token);
+			m_pending.add(_token);
 		}
 
-		void readLine(stl::vector<Token>& _outTokens)
+		void readLine(bx::ArrayT<Token>& _outTokens)
 		{
 			Token token;
 
@@ -970,17 +1122,17 @@ namespace shaderc
 					break;
 				}
 
-				_outTokens.push_back(token);
+				_outTokens.add(token);
 			}
 		}
 
-		bool readLineKeepNewline(stl::vector<Token>& _outTokens)
+		bool readLineKeepNewline(bx::ArrayT<Token>& _outTokens)
 		{
 			Token token;
 
 			while (next(token) )
 			{
-				_outTokens.push_back(token);
+				_outTokens.add(token);
 
 				if (Kind::Newline == token.kind)
 				{
@@ -1006,14 +1158,22 @@ namespace shaderc
 
 		bool condActive() const
 		{
-			return m_cond.empty() || m_cond.back().active;
+			return m_cond.isEmpty() || m_cond[m_cond.getCount()-1].active;
+		}
+
+		static uint32_t macroHash(const bx::StringView& _name)
+		{
+			return bx::hash<bx::HashMurmur2A>(_name);
 		}
 
 		const Macro* findMacro(const bx::StringView& _name) const
 		{
-			for (uint32_t ii = 0, num = uint32_t(m_macros.size() ); ii < num; ++ii)
+			const uint32_t hash = macroHash(_name);
+			for (uint32_t ii = m_macroBuckets[hash % kMacroBuckets]; UINT32_MAX != ii; ii = m_macros[ii].next)
 			{
-				if (isEqual(m_macros[ii].name, _name) )
+				if (true
+				&&  hash == m_macros[ii].hash
+				&&  isEqual(m_macros[ii].name, _name) )
 				{
 					return &m_macros[ii];
 				}
@@ -1022,15 +1182,29 @@ namespace shaderc
 			return NULL;
 		}
 
+		void addMacro(Macro& _macro)
+		{
+			const uint32_t bucket = _macro.hash % kMacroBuckets;
+			_macro.next = m_macroBuckets[bucket];
+			m_macroBuckets[bucket] = m_macros.getCount();
+			m_macros.add(_macro);
+		}
+
 		void removeMacro(const bx::StringView& _name)
 		{
-			for (uint32_t ii = 0, num = uint32_t(m_macros.size() ); ii < num; ++ii)
+			const Macro* macro = findMacro(_name);
+			if (NULL == macro)
 			{
-				if (isEqual(m_macros[ii].name, _name) )
-				{
-					m_macros.erase(m_macros.begin() + ii);
-					return;
-				}
+				return;
+			}
+
+			m_macros.remove(m_macros.getIndex(macro), bx::kOrdered);
+
+			bx::memSet(m_macroBuckets, 0xff, sizeof(m_macroBuckets) );
+			bx::ArrayT<Macro> macros(bx::move(m_macros) );
+			for (uint32_t ii = 0, num = macros.getCount(); ii < num; ++ii)
+			{
+				addMacro(macros[ii]);
 			}
 		}
 
@@ -1103,7 +1277,7 @@ namespace shaderc
 
 		int32_t findParam(const Macro& _macro, const bx::StringView& _name) const
 		{
-			for (uint32_t ii = 0, num = uint32_t(_macro.params.size() ); ii < num; ++ii)
+			for (uint32_t ii = 0, num = _macro.params.getCount(); ii < num; ++ii)
 			{
 				if (isEqual(_macro.params[ii], _name) )
 				{
@@ -1122,38 +1296,38 @@ namespace shaderc
 			}
 
 			if (_macro.isVariadic
-			&&  isEqual(_token.lexeme, "__VA_ARGS__") )
+			&&  isEqual(_token.lexeme(), _macro.vaName) )
 			{
 				return true;
 			}
 
-			return -1 != findParam(_macro, _token.lexeme);
+			return -1 != findParam(_macro, _token.lexeme());
 		}
 
 		void selectActual(
 			  const Macro& _macro
-			, const stl::vector<stl::vector<Token> >& _actuals
+			, const bx::ArrayT<bx::ArrayT<Token> >& _actuals
 			, const bx::StringView& _name
-			, stl::vector<Token>& _outTokens
+			, bx::ArrayT<Token>& _outTokens
 			)
 		{
 			if (_macro.isVariadic
-			&&  isEqual(_name, "__VA_ARGS__") )
+			&&  isEqual(_name, _macro.vaName) )
 			{
-				const uint32_t first = uint32_t(_macro.params.size() );
+				const uint32_t first = _macro.params.getCount();
 
-				for (uint32_t ii = first, num = uint32_t(_actuals.size() ); ii < num; ++ii)
+				for (uint32_t ii = first, num = _actuals.getCount(); ii < num; ++ii)
 				{
 					if (ii > first)
 					{
-						_outTokens.push_back(makeToken(Kind::Punct, ",") );
+						_outTokens.add(makeToken(Kind::Punct, ",") );
 					}
 
-					const stl::vector<Token>& actual = _actuals[ii];
+					const bx::ArrayT<Token>& actual = _actuals[ii];
 
-					for (uint32_t jj = 0, numArg = uint32_t(actual.size() ); jj < numArg; ++jj)
+					for (uint32_t jj = 0, numArg = actual.getCount(); jj < numArg; ++jj)
 					{
-						_outTokens.push_back(actual[jj]);
+						_outTokens.add(actual[jj]);
 					}
 				}
 
@@ -1163,28 +1337,28 @@ namespace shaderc
 			const int32_t idx = findParam(_macro, _name);
 
 			if (0 <= idx
-			&&  uint32_t(idx) < _actuals.size() )
+			&&  uint32_t(idx) < _actuals.getCount() )
 			{
 				_outTokens = _actuals[idx];
 			}
 		}
 
-		bx::StringView stringize(const stl::vector<Token>& _tokens)
+		bx::StringView stringize(const bx::ArrayT<Token>& _tokens)
 		{
-			stl::vector<char> buffer;
-			buffer.push_back('"');
+			bx::ArrayT<char> buffer;
+			buffer.add('"');
 
-			for (uint32_t ii = 0, num = uint32_t(_tokens.size() ); ii < num; ++ii)
+			for (uint32_t ii = 0, num = _tokens.getCount(); ii < num; ++ii)
 			{
 				const Token& token = _tokens[ii];
 
 				if (0 != ii
 				&&  token.spaceBefore)
 				{
-					buffer.push_back(' ');
+					buffer.add(' ');
 				}
 
-				const bx::StringView& lexeme = token.lexeme;
+				const bx::StringView lexeme = token.lexeme();
 
 				const bool escape = false
 					|| Kind::String == token.kind
@@ -1197,63 +1371,63 @@ namespace shaderc
 					&&  ('"'  == *ptr
 					||   '\\' == *ptr) )
 					{
-						buffer.push_back('\\');
+						buffer.add('\\');
 					}
 
-					buffer.push_back(*ptr);
+					buffer.add(*ptr);
 				}
 			}
 
-			buffer.push_back('"');
+			buffer.add('"');
 
-			return m_arena.intern(bx::StringView(buffer.data(), int32_t(buffer.size() ) ) );
+			return m_arena.intern(bx::StringView(buffer.getPtr(), int32_t(buffer.getCount() ) ) );
 		}
 
-		bx::StringView rebuild(const stl::vector<Token>& _tokens)
+		bx::StringView rebuild(const bx::ArrayT<Token>& _tokens)
 		{
-			stl::vector<char> buffer;
+			bx::ArrayT<char> buffer;
 
-			for (uint32_t ii = 0, num = uint32_t(_tokens.size() ); ii < num; ++ii)
+			for (uint32_t ii = 0, num = _tokens.getCount(); ii < num; ++ii)
 			{
 				const Token& token = _tokens[ii];
 
 				if (0 != ii
 				&&  token.spaceBefore)
 				{
-					buffer.push_back(' ');
+					buffer.add(' ');
 				}
 
-				const bx::StringView& lexeme = token.lexeme;
+				const bx::StringView lexeme = token.lexeme();
 
 				for (const char* ptr = lexeme.getPtr(); ptr != lexeme.getTerm(); ++ptr)
 				{
-					buffer.push_back(*ptr);
+					buffer.add(*ptr);
 				}
 			}
 
-			return m_arena.intern(bx::StringView(buffer.data(), int32_t(buffer.size() ) ) );
+			return m_arena.intern(bx::StringView(buffer.getPtr(), int32_t(buffer.getCount() ) ) );
 		}
 
-		void paste(stl::vector<Token>& _inOutTokens, const Token& _rhs)
+		void paste(bx::ArrayT<Token>& _inOutTokens, const Token& _rhs)
 		{
 			if (Kind::Placemarker == _rhs.kind)
 			{
 				return;
 			}
 
-			while (!_inOutTokens.empty()
-			&&     Kind::Placemarker == _inOutTokens.back().kind)
+			while (!_inOutTokens.isEmpty()
+			&&     Kind::Placemarker == _inOutTokens[_inOutTokens.getCount()-1].kind)
 			{
-				_inOutTokens.pop_back();
+				_inOutTokens.remove(bx::kLast);
 			}
 
-			if (_inOutTokens.empty() )
+			if (_inOutTokens.isEmpty() )
 			{
-				_inOutTokens.push_back(_rhs);
+				_inOutTokens.add(_rhs);
 				return;
 			}
 
-			Token& lhs = _inOutTokens.back();
+			Token& lhs = _inOutTokens[_inOutTokens.getCount()-1];
 
 			if (Kind::Placemarker == lhs.kind)
 			{
@@ -1261,8 +1435,8 @@ namespace shaderc
 				return;
 			}
 
-			const bx::StringView glued = m_arena.concat(lhs.lexeme, _rhs.lexeme);
-			lhs.lexeme = glued;
+			const bx::StringView glued = m_arena.concat(lhs.lexeme(), _rhs.lexeme());
+			lhs.setLexeme(glued);
 			lhs.kind   = classify(glued);
 		}
 
@@ -1271,7 +1445,7 @@ namespace shaderc
 			for (uint32_t ii = 0; ii < _num; ++ii)
 			{
 				if (Kind::Identifier == _body[ii].kind
-				&&  isEqual(_body[ii].lexeme, "__VA_OPT__") )
+				&&  isEqual(_body[ii].lexeme(), "__VA_OPT__") )
 				{
 					return true;
 				}
@@ -1280,18 +1454,18 @@ namespace shaderc
 			return false;
 		}
 
-		void expandVaOpt(const Token* _body, uint32_t _num, bool _keep, stl::vector<Token>& _outTokens)
+		void expandVaOpt(const Token* _body, uint32_t _num, bool _keep, bx::ArrayT<Token>& _outTokens)
 		{
 			for (uint32_t ii = 0; ii < _num; )
 			{
 				const Token& token = _body[ii];
 
 				if (Kind::Identifier != token.kind
-				||  !isEqual(token.lexeme, "__VA_OPT__")
+				||  !isEqual(token.lexeme(), "__VA_OPT__")
 				||  ii + 1 >= _num
 				||  !isPunct(_body[ii+1], "(") )
 				{
-					_outTokens.push_back(token);
+					_outTokens.add(token);
 					++ii;
 					continue;
 				}
@@ -1311,24 +1485,24 @@ namespace shaderc
 				if (_keep
 				&&  last > first)
 				{
-					stl::vector<Token> inner;
+					bx::ArrayT<Token> inner;
 					expandVaOpt(_body + first, last - first, _keep, inner);
 
-					if (!inner.empty() )
+					if (!inner.isEmpty() )
 					{
 						inner[0].spaceBefore = token.spaceBefore;
 					}
 
-					for (uint32_t kk = 0, numInner = uint32_t(inner.size() ); kk < numInner; ++kk)
+					for (uint32_t kk = 0, numInner = inner.getCount(); kk < numInner; ++kk)
 					{
-						_outTokens.push_back(inner[kk]);
+						_outTokens.add(inner[kk]);
 					}
 				}
 				else
 				{
 					Token placemarker = makeToken(Kind::Placemarker, bx::StringView() );
 					placemarker.spaceBefore = token.spaceBefore;
-					_outTokens.push_back(placemarker);
+					_outTokens.add(placemarker);
 				}
 
 				ii = jj;
@@ -1337,30 +1511,30 @@ namespace shaderc
 
 		void subst(
 			  const Macro& _macro
-			, const stl::vector<stl::vector<Token> >& _actuals
+			, const bx::ArrayT<bx::ArrayT<Token> >& _actuals
 			, const HideNode* _hide
-			, const SourceLocation& _location
-			, stl::vector<Token>& _outTokens
+			, const Token& _at
+			, bx::ArrayT<Token>& _outTokens
 			)
 		{
 			const Token* body = _macro.body;
 			uint32_t     num  = _macro.bodyNum;
 
-			stl::vector<Token> vaOptBody;
+			bx::ArrayT<Token> vaOptBody;
 
 			if (_macro.isVariadic
 			&&  hasVaOpt(body, num) )
 			{
-				stl::vector<Token> va;
-				selectActual(_macro, _actuals, "__VA_ARGS__", va);
+				bx::ArrayT<Token> va;
+				selectActual(_macro, _actuals, _macro.vaName, va);
 
-				expandVaOpt(body, num, !va.empty(), vaOptBody);
+				expandVaOpt(body, num, !va.isEmpty(), vaOptBody);
 
-				body = vaOptBody.data();
-				num  = uint32_t(vaOptBody.size() );
+				body = vaOptBody.getPtr();
+				num  = vaOptBody.getCount();
 			}
 
-			stl::vector<Token> result;
+			bx::ArrayT<Token> result;
 
 			for (uint32_t ii = 0; ii < num; )
 			{
@@ -1371,16 +1545,16 @@ namespace shaderc
 				&&  isPunct(body[ii+1], "##")
 				&&  isParam(_macro, body[ii+2]) )
 				{
-					stl::vector<Token> arg;
-					selectActual(_macro, _actuals, body[ii+2].lexeme, arg);
+					bx::ArrayT<Token> arg;
+					selectActual(_macro, _actuals, body[ii+2].lexeme(), arg);
 
-					if (!arg.empty() )
+					if (!arg.isEmpty() )
 					{
-						result.push_back(token);
+						result.add(token);
 
-						for (uint32_t jj = 0, numArg = uint32_t(arg.size() ); jj < numArg; ++jj)
+						for (uint32_t jj = 0, numArg = arg.getCount(); jj < numArg; ++jj)
 						{
-							result.push_back(arg[jj]);
+							result.add(arg[jj]);
 						}
 					}
 
@@ -1392,10 +1566,10 @@ namespace shaderc
 				&&  ii + 1 < num
 				&&  isParam(_macro, body[ii+1]) )
 				{
-					stl::vector<Token> arg;
-					selectActual(_macro, _actuals, body[ii+1].lexeme, arg);
+					bx::ArrayT<Token> arg;
+					selectActual(_macro, _actuals, body[ii+1].lexeme(), arg);
 
-					result.push_back(makeToken(Kind::String, stringize(arg) ) );
+					result.add(makeToken(Kind::String, stringize(arg) ) );
 
 					ii += 2;
 					continue;
@@ -1412,10 +1586,10 @@ namespace shaderc
 					}
 					else
 					{
-						stl::vector<Token> arg;
-						selectActual(_macro, _actuals, rhs.lexeme, arg);
+						bx::ArrayT<Token> arg;
+						selectActual(_macro, _actuals, rhs.lexeme(), arg);
 
-						if (arg.empty() )
+						if (arg.isEmpty() )
 						{
 							paste(result, makeToken(Kind::Placemarker, bx::StringView() ) );
 						}
@@ -1423,9 +1597,9 @@ namespace shaderc
 						{
 							paste(result, arg[0]);
 
-							for (uint32_t jj = 1, numArg = uint32_t(arg.size() ); jj < numArg; ++jj)
+							for (uint32_t jj = 1, numArg = arg.getCount(); jj < numArg; ++jj)
 							{
-								result.push_back(arg[jj]);
+								result.add(arg[jj]);
 							}
 						}
 					}
@@ -1438,18 +1612,18 @@ namespace shaderc
 				&&  ii + 1 < num
 				&&  isPunct(body[ii+1], "##") )
 				{
-					stl::vector<Token> arg;
-					selectActual(_macro, _actuals, token.lexeme, arg);
+					bx::ArrayT<Token> arg;
+					selectActual(_macro, _actuals, token.lexeme(), arg);
 
-					if (arg.empty() )
+					if (arg.isEmpty() )
 					{
-						result.push_back(makeToken(Kind::Placemarker, bx::StringView() ) );
+						result.add(makeToken(Kind::Placemarker, bx::StringView() ) );
 					}
 					else
 					{
-						for (uint32_t jj = 0, numArg = uint32_t(arg.size() ); jj < numArg; ++jj)
+						for (uint32_t jj = 0, numArg = arg.getCount(); jj < numArg; ++jj)
 						{
-							result.push_back(arg[jj]);
+							result.add(arg[jj]);
 						}
 					}
 
@@ -1459,31 +1633,31 @@ namespace shaderc
 
 				if (isParam(_macro, token) )
 				{
-					stl::vector<Token> arg;
-					selectActual(_macro, _actuals, token.lexeme, arg);
+					bx::ArrayT<Token> arg;
+					selectActual(_macro, _actuals, token.lexeme(), arg);
 
-					stl::vector<Token> expanded;
+					bx::ArrayT<Token> expanded;
 					expand(arg, expanded);
 
-					if (!expanded.empty() )
+					if (!expanded.isEmpty() )
 					{
 						expanded[0].spaceBefore = token.spaceBefore;
 					}
 
-					for (uint32_t jj = 0, numArg = uint32_t(expanded.size() ); jj < numArg; ++jj)
+					for (uint32_t jj = 0, numArg = expanded.getCount(); jj < numArg; ++jj)
 					{
-						result.push_back(expanded[jj]);
+						result.add(expanded[jj]);
 					}
 
 					++ii;
 					continue;
 				}
 
-				result.push_back(token);
+				result.add(token);
 				++ii;
 			}
 
-			for (uint32_t ii = 0, num2 = uint32_t(result.size() ); ii < num2; ++ii)
+			for (uint32_t ii = 0, num2 = result.getCount(); ii < num2; ++ii)
 			{
 				Token& token = result[ii];
 
@@ -1493,8 +1667,9 @@ namespace shaderc
 				}
 
 				token.hide = hideUnion(token.hide, _hide);
-				token.location = _location;
-				_outTokens.push_back(token);
+				token.line   = _at.line;
+				token.fileId = _at.fileId;
+				_outTokens.add(token);
 			}
 		}
 
@@ -1516,7 +1691,7 @@ namespace shaderc
 
 		bool collectArgs(
 			  Worklist& _work
-			, stl::vector<stl::vector<Token> >& _outActuals
+			, bx::ArrayT<bx::ArrayT<Token> >& _outActuals
 			, const HideNode*& _outCloseHide
 			, uint32_t& _outSwallowedNewlines
 			)
@@ -1539,7 +1714,7 @@ namespace shaderc
 
 			_work.popFront();
 
-			stl::vector<Token> current;
+			bx::ArrayT<Token> current;
 			int32_t depth = 0;
 			bool any = false;
 
@@ -1562,7 +1737,7 @@ namespace shaderc
 				if (isPunct(token, "(") )
 				{
 					++depth;
-					current.push_back(token);
+					current.add(token);
 					continue;
 				}
 
@@ -1573,36 +1748,36 @@ namespace shaderc
 						_outCloseHide = token.hide;
 
 						if (any
-						||  !current.empty() )
+						||  !current.isEmpty() )
 						{
-							_outActuals.push_back(current);
+							_outActuals.add(current);
 						}
 
 						return true;
 					}
 
 					--depth;
-					current.push_back(token);
+					current.add(token);
 					continue;
 				}
 
 				if (isPunct(token, ",")
 				&&  0 == depth)
 				{
-					_outActuals.push_back(current);
+					_outActuals.add(current);
 					current.clear();
 					any = true;
 					continue;
 				}
 
-				current.push_back(token);
+				current.add(token);
 			}
 		}
 
-		bool checkArity(const Macro& _macro, const stl::vector<stl::vector<Token> >& _actuals)
+		bool checkArity(const Macro& _macro, const bx::ArrayT<bx::ArrayT<Token> >& _actuals)
 		{
-			const uint32_t num    = uint32_t(_actuals.size() );
-			const uint32_t params = uint32_t(_macro.params.size() );
+			const uint32_t num    = _actuals.getCount();
+			const uint32_t params = _macro.params.getCount();
 
 			const uint32_t given = 0 == num && 1 == params ? 1 : num;
 
@@ -1622,7 +1797,7 @@ namespace shaderc
 			return true;
 		}
 
-		void expand(const stl::vector<Token>& _tokens, stl::vector<Token>& _outTokens)
+		void expand(const bx::ArrayT<Token>& _tokens, bx::ArrayT<Token>& _outTokens)
 		{
 			Worklist work(_tokens);
 
@@ -1635,39 +1810,39 @@ namespace shaderc
 				{
 					if (Kind::Placemarker != token.kind)
 					{
-						_outTokens.push_back(token);
+						_outTokens.add(token);
 					}
 
 					continue;
 				}
 
-				if (hideContains(token.hide, token.lexeme) )
+				if (hideContains(token.hide, token.lexeme()) )
 				{
-					_outTokens.push_back(token);
+					_outTokens.add(token);
 					continue;
 				}
 
 				if (m_inCondition
-				&&  isEqual(token.lexeme, "defined") )
+				&&  isEqual(token.lexeme(), "defined") )
 				{
-					_outTokens.push_back(token);
+					_outTokens.add(token);
 					copyDefinedOperand(work, _outTokens);
 					continue;
 				}
 
-				if (isEqual(token.lexeme, "__LINE__") )
+				if (isEqual(token.lexeme(), "__LINE__") )
 				{
 					char tmp[16];
-					const int32_t len = bx::toString(tmp, BX_COUNTOF(tmp), token.location.line);
+					const int32_t len = bx::toString(tmp, BX_COUNTOF(tmp), token.line);
 
 					Token line = makeToken(Kind::Number, m_arena.intern(bx::StringView(tmp, len) ) );
 					line.spaceBefore = token.spaceBefore;
 
-					_outTokens.push_back(line);
+					_outTokens.add(line);
 					continue;
 				}
 
-				if (isEqual(token.lexeme, "__FILE__") )
+				if (isEqual(token.lexeme(), "__FILE__") )
 				{
 					const bx::FilePath filePath(m_location.file);
 					const bx::StringView parts[] = { "\"", pathOf(filePath), "\"" };
@@ -1676,11 +1851,11 @@ namespace shaderc
 					Token file = makeToken(Kind::String, quoted);
 					file.spaceBefore = token.spaceBefore;
 
-					_outTokens.push_back(file);
+					_outTokens.add(file);
 					continue;
 				}
 
-				if (isEqual(token.lexeme, "__COUNTER__") )
+				if (isEqual(token.lexeme(), "__COUNTER__") )
 				{
 					char tmp[16];
 					const int32_t len = bx::toString(tmp, BX_COUNTOF(tmp), m_counter++);
@@ -1688,27 +1863,27 @@ namespace shaderc
 					Token count = makeToken(Kind::Number, m_arena.intern(bx::StringView(tmp, len) ) );
 					count.spaceBefore = token.spaceBefore;
 
-					_outTokens.push_back(count);
+					_outTokens.add(count);
 					continue;
 				}
 
-				const Macro* macro = findMacro(token.lexeme);
+				const Macro* macro = findMacro(token.lexeme());
 
 				if (NULL == macro)
 				{
-					_outTokens.push_back(token);
+					_outTokens.add(token);
 					continue;
 				}
 
 				if (!macro->isFunction)
 				{
-					const HideNode* hide = hideAdd(token.hide, token.lexeme);
+					const HideNode* hide = hideAdd(token.hide, token.lexeme());
 
-					const stl::vector<stl::vector<Token> > noActuals;
-					stl::vector<Token> replacement;
-					subst(*macro, noActuals, hide, token.location, replacement);
+					const bx::ArrayT<bx::ArrayT<Token> > noActuals;
+					bx::ArrayT<Token> replacement;
+					subst(*macro, noActuals, hide, token, replacement);
 
-					if (!replacement.empty() )
+					if (!replacement.isEmpty() )
 					{
 						replacement[0].spaceBefore = token.spaceBefore;
 					}
@@ -1719,40 +1894,40 @@ namespace shaderc
 
 				if (!frontIsOpenParen(work) )
 				{
-					_outTokens.push_back(token);
+					_outTokens.add(token);
 					continue;
 				}
 
-				stl::vector<stl::vector<Token> > actuals;
+				bx::ArrayT<bx::ArrayT<Token> > actuals;
 				const HideNode* closeHide = NULL;
 				uint32_t swallowedNewlines = 0;
 
 				if (!collectArgs(work, actuals, closeHide, swallowedNewlines) )
 				{
 					error("Unterminated macro invocation");
-					_outTokens.push_back(token);
+					_outTokens.add(token);
 					continue;
 				}
 
 				if (!checkArity(*macro, actuals) )
 				{
-					_outTokens.push_back(token);
+					_outTokens.add(token);
 					continue;
 				}
 
-				const HideNode* hide = hideAdd(hideIntersect(token.hide, closeHide), token.lexeme);
+				const HideNode* hide = hideAdd(hideIntersect(token.hide, closeHide), token.lexeme());
 
-				stl::vector<Token> replacement;
-				subst(*macro, actuals, hide, token.location, replacement);
+				bx::ArrayT<Token> replacement;
+				subst(*macro, actuals, hide, token, replacement);
 
-				if (!replacement.empty() )
+				if (!replacement.isEmpty() )
 				{
 					replacement[0].spaceBefore = token.spaceBefore;
 				}
 
 				for (uint32_t ii = 0; ii < swallowedNewlines; ++ii)
 				{
-					replacement.push_back(makeToken(Kind::Newline, "\n") );
+					replacement.add(makeToken(Kind::Newline, "\n") );
 				}
 
 				work.prepend(replacement);
@@ -1761,14 +1936,14 @@ namespace shaderc
 
 		static bool needSpace(const Token& _lhs, const Token& _rhs)
 		{
-			if (_lhs.lexeme.isEmpty()
-			||  _rhs.lexeme.isEmpty() )
+			if (_lhs.lexeme().isEmpty()
+			||  _rhs.lexeme().isEmpty() )
 			{
 				return false;
 			}
 
-			return bx::isIdentChar(_lhs.lexeme.getTerm()[-1])
-				&& bx::isIdentChar(*_rhs.lexeme.getPtr() )
+			return bx::isIdentChar(_lhs.lexeme().getTerm()[-1])
+				&& bx::isIdentChar(*_rhs.lexeme().getPtr() )
 				;
 		}
 
@@ -1782,12 +1957,12 @@ namespace shaderc
 			bx::write(m_out, _ch, &m_err);
 		}
 
-		void emit(const stl::vector<Token>& _tokens, bool _atLineStart = true)
+		void emit(const bx::ArrayT<Token>& _tokens, bool _atLineStart = true)
 		{
 			bool atLineStart = _atLineStart;
 			const Token* prev = NULL;
 
-			for (uint32_t ii = 0, num = uint32_t(_tokens.size() ); ii < num; ++ii)
+			for (uint32_t ii = 0, num = _tokens.getCount(); ii < num; ++ii)
 			{
 				const Token& token = _tokens[ii];
 
@@ -1807,7 +1982,7 @@ namespace shaderc
 
 				if (atLineStart)
 				{
-					syncLine(token.location);
+					syncLine(token);
 				}
 				else if (NULL != prev
 				&&  (token.spaceBefore || needSpace(*prev, token) ) )
@@ -1815,7 +1990,7 @@ namespace shaderc
 					append(' ');
 				}
 
-				append(token.lexeme);
+				append(token.lexeme());
 
 				atLineStart = false;
 				prev        = &token;
@@ -1836,7 +2011,7 @@ namespace shaderc
 				bool    isUnsigned;
 			};
 
-			Eval(PreprocessorImpl& _impl, const stl::vector<Token>& _tokens)
+			Eval(PreprocessorImpl& _impl, const bx::ArrayT<Token>& _tokens)
 				: m_impl(_impl)
 				, m_tokens(_tokens)
 				, m_pos(0)
@@ -1900,7 +2075,7 @@ namespace shaderc
 
 			const Token* peek() const
 			{
-				return m_pos < m_tokens.size() ? &m_tokens[m_pos] : NULL;
+				return m_pos < m_tokens.getCount() ? &m_tokens[m_pos] : NULL;
 			}
 
 			bool peekPunct(const bx::StringView& _lexeme) const
@@ -1975,13 +2150,13 @@ namespace shaderc
 				if (Kind::Number == token->kind)
 				{
 					advance();
-					return parseIntLiteral(token->lexeme);
+					return parseIntLiteral(token->lexeme() );
 				}
 
 				if (Kind::Char == token->kind)
 				{
 					advance();
-					return makeValue(parseCharLiteral(token->lexeme), false);
+					return makeValue(parseCharLiteral(token->lexeme() ), false);
 				}
 
 				advance();
@@ -2008,7 +2183,7 @@ namespace shaderc
 						break;
 					}
 
-					const Op op = findOp(token->lexeme);
+					const Op op = findOp(token->lexeme() );
 
 					if (Op::Count == op
 					||  getOpInfo(op).precedence < _minPrec)
@@ -2269,20 +2444,20 @@ namespace shaderc
 			}
 
 			PreprocessorImpl&         m_impl;
-			const stl::vector<Token>& m_tokens;
+			const bx::ArrayT<Token>& m_tokens;
 			uint32_t                  m_pos;
 			bool                      m_evaluated;
 		};
 
-		void reduceDefined(const stl::vector<Token>& _tokens, stl::vector<Token>& _outTokens)
+		void reduceDefined(const bx::ArrayT<Token>& _tokens, bx::ArrayT<Token>& _outTokens)
 		{
-			for (uint32_t ii = 0, num = uint32_t(_tokens.size() ); ii < num; )
+			for (uint32_t ii = 0, num = _tokens.getCount(); ii < num; )
 			{
 				const Token& token = _tokens[ii];
 
 				if (!isIdent(token, "defined") )
 				{
-					_outTokens.push_back(token);
+					_outTokens.add(token);
 					++ii;
 					continue;
 				}
@@ -2302,7 +2477,7 @@ namespace shaderc
 				if (jj < num
 				&&  Kind::Identifier == _tokens[jj].kind)
 				{
-					name = _tokens[jj].lexeme;
+					name = _tokens[jj].lexeme();
 					++jj;
 				}
 				else
@@ -2326,12 +2501,12 @@ namespace shaderc
 				Token result = makeToken(Kind::Number, isDefined(name) ? "1" : "0");
 				result.spaceBefore = token.spaceBefore;
 
-				_outTokens.push_back(result);
+				_outTokens.add(result);
 				ii = jj;
 			}
 		}
 
-		void copyDefinedOperand(Worklist& _work, stl::vector<Token>& _outTokens)
+		void copyDefinedOperand(Worklist& _work, bx::ArrayT<Token>& _outTokens)
 		{
 			if (_work.isEmpty() )
 			{
@@ -2343,7 +2518,7 @@ namespace shaderc
 			if (isPunct(token, "(") )
 			{
 				_work.popFront();
-				_outTokens.push_back(token);
+				_outTokens.add(token);
 
 				if (_work.isEmpty() )
 				{
@@ -2356,24 +2531,24 @@ namespace shaderc
 			if (Kind::Identifier == token.kind)
 			{
 				_work.popFront();
-				_outTokens.push_back(token);
+				_outTokens.add(token);
 			}
 		}
 
-		bool evalCondition(const stl::vector<Token>& _args)
+		bool evalCondition(const bx::ArrayT<Token>& _args)
 		{
-			stl::vector<Token> reduced;
+			bx::ArrayT<Token> reduced;
 			reduceDefined(_args, reduced);
 
 			const bool oldInCondition = m_inCondition;
 			m_inCondition = true;
 
-			stl::vector<Token> expanded;
+			bx::ArrayT<Token> expanded;
 			expand(reduced, expanded);
 
 			m_inCondition = oldInCondition;
 
-			stl::vector<Token> settled;
+			bx::ArrayT<Token> settled;
 			reduceDefined(expanded, settled);
 
 			Eval eval(*this, settled);
@@ -2394,12 +2569,12 @@ namespace shaderc
 				.seenElse = false,
 			};
 
-			m_cond.push_back(cond);
+			m_cond.add(cond);
 		}
 
-		void parseDefine(const stl::vector<Token>& _args)
+		void parseDefine(const bx::ArrayT<Token>& _args)
 		{
-			if (_args.empty()
+			if (_args.isEmpty()
 			||  Kind::Identifier != _args[0].kind)
 			{
 				error("Macro name missing");
@@ -2408,15 +2583,18 @@ namespace shaderc
 
 			Macro macro =
 			{
-				.name       = _args[0].lexeme,
+				.name       = _args[0].lexeme(),
 				.params     = {},
 				.body       = NULL,
 				.bodyNum    = 0,
+				.hash       = 0,
+				.next       = UINT32_MAX,
 				.isFunction = false,
 				.isVariadic = false,
+				.vaName     = "__VA_ARGS__",
 			};
 
-			const uint32_t num = uint32_t(_args.size() );
+			const uint32_t num = _args.getCount();
 			uint32_t ii = 1;
 
 			if (ii < num
@@ -2446,6 +2624,15 @@ namespace shaderc
 
 					if (isPunct(token, "...") )
 					{
+						if (!expectParam
+						&&  0 < ii
+						&&  Kind::Identifier == _args[ii - 1].kind
+						&&  !macro.params.isEmpty() )
+						{
+							macro.vaName = macro.params[macro.params.getCount() - 1];
+							macro.params.remove(bx::kLast);
+						}
+
 						macro.isVariadic = true;
 						expectParam = false;
 						continue;
@@ -2454,13 +2641,13 @@ namespace shaderc
 					if (Kind::Identifier == token.kind
 					&&  expectParam)
 					{
-						if (-1 != findParam(macro, token.lexeme) )
+						if (-1 != findParam(macro, token.lexeme()) )
 						{
 							error("Duplicate macro parameter");
 							return;
 						}
 
-						macro.params.push_back(token.lexeme);
+						macro.params.add(token.lexeme());
 						expectParam = false;
 						continue;
 					}
@@ -2501,8 +2688,8 @@ namespace shaderc
 
 						if (jj + 1 >= bodyNum
 						||  Kind::Identifier != body[jj + 1].kind
-						||  (-1 == findParam(macro, body[jj + 1].lexeme)
-						&&   !(macro.isVariadic && isEqual(body[jj + 1].lexeme, "__VA_ARGS__") ) ) )
+						||  (-1 == findParam(macro, body[jj + 1].lexeme())
+						&&   !(macro.isVariadic && isEqual(body[jj + 1].lexeme(), macro.vaName) ) ) )
 						{
 							error("'#' must be followed by a macro parameter");
 							return;
@@ -2513,7 +2700,7 @@ namespace shaderc
 				for (uint32_t jj = 0; jj < bodyNum; ++jj)
 				{
 					if (Kind::Identifier != body[jj].kind
-					||  !isEqual(body[jj].lexeme, "__VA_OPT__") )
+					||  !isEqual(body[jj].lexeme(), "__VA_OPT__") )
 					{
 						continue;
 					}
@@ -2551,33 +2738,34 @@ namespace shaderc
 			}
 
 			removeMacro(macro.name);
-			m_macros.push_back(macro);
+			macro.hash = macroHash(macro.name);
+			addMacro(macro);
 		}
 
-		void parseUndef(const stl::vector<Token>& _args)
+		void parseUndef(const bx::ArrayT<Token>& _args)
 		{
-			if (_args.empty()
+			if (_args.isEmpty()
 			||  Kind::Identifier != _args[0].kind)
 			{
 				error("Macro name missing");
 				return;
 			}
 
-			removeMacro(_args[0].lexeme);
+			removeMacro(_args[0].lexeme());
 		}
 
-		void parseLine(const stl::vector<Token>& _args, const Token& _directive)
+		void parseLine(const bx::ArrayT<Token>& _args, const Token& _directive)
 		{
-			if (m_frames.empty()
-			||  !isEqual(frameName(m_frames.back() ), _directive.location.file) )
+			if (m_frames.isEmpty()
+			||  !(m_frames[m_frames.getCount()-1].fileId == _directive.fileId) )
 			{
 				return;
 			}
 
-			stl::vector<Token> expanded;
-			const stl::vector<Token>* args = &_args;
+			bx::ArrayT<Token> expanded;
+			const bx::ArrayT<Token>* args = &_args;
 
-			if (!_args.empty()
+			if (!_args.isEmpty()
 			&&  Kind::Number != _args[0].kind)
 			{
 				expand(_args, expanded);
@@ -2586,20 +2774,20 @@ namespace shaderc
 
 			int32_t line;
 
-			if (args->empty()
+			if (args->isEmpty()
 			||  Kind::Number != (*args)[0].kind
-			||  !fromString(&line, (*args)[0].lexeme)
+			||  !fromString(&line, (*args)[0].lexeme())
 			||  0 > line)
 			{
 				error("#line expects a decimal line number");
 				return;
 			}
 
-			Frame& frame = m_frames.back();
+			Frame& frame = m_frames[m_frames.getCount()-1];
 
-			frame.lineDelta += line - int32_t(_directive.location.line) - 1;
+			frame.lineDelta += line - int32_t(_directive.line) - 1;
 
-			if (1 < args->size() )
+			if (1 < args->getCount() )
 			{
 				const Token& name = (*args)[1];
 
@@ -2610,14 +2798,15 @@ namespace shaderc
 				}
 
 				frame.presumedName = m_arena.intern(
-					  bx::StringView(name.lexeme.getPtr() + 1, name.lexeme.getTerm() - 1)
+					  bx::StringView(name.lexeme().getPtr() + 1, name.lexeme().getTerm() - 1)
 					);
+				frame.fileId = fileIdOf(frame.presumedName);
 			}
 		}
 
 		bool isPragmaOnce(const bx::StringView& _name) const
 		{
-			for (uint32_t ii = 0, num = uint32_t(m_pragmaOnce.size() ); ii < num; ++ii)
+			for (uint32_t ii = 0, num = m_pragmaOnce.getCount(); ii < num; ++ii)
 			{
 				if (isEqual(m_pragmaOnce[ii], _name) )
 				{
@@ -2630,22 +2819,22 @@ namespace shaderc
 
 		void markPragmaOnce()
 		{
-			if (m_frames.empty() )
+			if (m_frames.isEmpty() )
 			{
 				return;
 			}
 
-			const bx::StringView& name = m_frames.back().name;
+			const bx::StringView& name = m_frames[m_frames.getCount()-1].name;
 
 			if (!isPragmaOnce(name) )
 			{
-				m_pragmaOnce.push_back(m_arena.intern(name) );
+				m_pragmaOnce.add(m_arena.intern(name) );
 			}
 		}
 
-		void doInclude(const stl::vector<Token>& _args)
+		void doInclude(const bx::ArrayT<Token>& _args)
 		{
-			if (_args.empty() )
+			if (_args.isEmpty() )
 			{
 				error("Invalid #include");
 				return;
@@ -2656,7 +2845,7 @@ namespace shaderc
 
 			if (Kind::String == _args[0].kind)
 			{
-				const bx::StringView lexeme = _args[0].lexeme;
+				const bx::StringView lexeme = _args[0].lexeme();
 
 				if (2 <= lexeme.getLength() )
 				{
@@ -2667,26 +2856,26 @@ namespace shaderc
 			{
 				isSystem = true;
 
-				stl::vector<Token> parts;
+				bx::ArrayT<Token> parts;
 
-				for (uint32_t ii = 1, num = uint32_t(_args.size() ); ii < num; ++ii)
+				for (uint32_t ii = 1, num = _args.getCount(); ii < num; ++ii)
 				{
 					if (isPunct(_args[ii], ">") )
 					{
 						break;
 					}
 
-					parts.push_back(_args[ii]);
+					parts.add(_args[ii]);
 				}
 
 				name = rebuild(parts);
 			}
 			else
 			{
-				stl::vector<Token> expanded;
+				bx::ArrayT<Token> expanded;
 				expand(_args, expanded);
 
-				if (!expanded.empty()
+				if (!expanded.isEmpty()
 				&&  (Kind::String == expanded[0].kind || isPunct(expanded[0], "<") ) )
 				{
 					doInclude(expanded);
@@ -2742,18 +2931,18 @@ namespace shaderc
 			pushFrame(arenaName, arenaSource, true);
 		}
 
-		void handleDirective(const stl::vector<Token>& _line)
+		void handleDirective(const bx::ArrayT<Token>& _line)
 		{
-			if (_line.empty()
+			if (_line.isEmpty()
 			||  Kind::Identifier != _line[0].kind)
 			{
 				return;
 			}
 
-			const bx::StringView directive = _line[0].lexeme;
+			const bx::StringView directive = _line[0].lexeme();
 
-			stl::vector<Token> args;
-			args.assign(_line.data() + 1, _line.data() + _line.size() );
+			bx::ArrayT<Token> args;
+			args.set(bx::ArrayViewT<Token>(_line.getPtr() + 1, _line.getPtr() + _line.getCount() ) );
 
 			if (isEqual(directive, "if") )
 			{
@@ -2764,9 +2953,9 @@ namespace shaderc
 			if (isEqual(directive, "ifdef")
 			||  isEqual(directive, "ifndef") )
 			{
-				bool value = !args.empty()
+				bool value = !args.isEmpty()
 					&& Kind::Identifier == args[0].kind
-					&& isDefined(args[0].lexeme)
+					&& isDefined(args[0].lexeme())
 					;
 
 				if (isEqual(directive, "ifndef") )
@@ -2782,13 +2971,13 @@ namespace shaderc
 			||  isEqual(directive, "elifdef")
 			||  isEqual(directive, "elifndef") )
 			{
-				if (m_cond.empty() )
+				if (m_cond.isEmpty() )
 				{
 					error("#elif without #if");
 					return;
 				}
 
-				Cond& cond = m_cond.back();
+				Cond& cond = m_cond[m_cond.getCount()-1];
 
 				if (cond.seenElse)
 				{
@@ -2810,9 +2999,9 @@ namespace shaderc
 					else
 					{
 						const bool defined = true
-							&& !args.empty()
+							&& !args.isEmpty()
 							&& Kind::Identifier == args[0].kind
-							&& isDefined(args[0].lexeme)
+							&& isDefined(args[0].lexeme())
 							;
 						cond.active = isEqual(directive, "elifdef") ? defined : !defined;
 					}
@@ -2825,13 +3014,13 @@ namespace shaderc
 
 			if (isEqual(directive, "else") )
 			{
-				if (m_cond.empty() )
+				if (m_cond.isEmpty() )
 				{
 					error("#else without #if");
 					return;
 				}
 
-				Cond& cond = m_cond.back();
+				Cond& cond = m_cond[m_cond.getCount()-1];
 
 				if (cond.seenElse)
 				{
@@ -2848,13 +3037,13 @@ namespace shaderc
 
 			if (isEqual(directive, "endif") )
 			{
-				if (m_cond.empty() )
+				if (m_cond.isEmpty() )
 				{
 					error("#endif without #if");
 					return;
 				}
 
-				m_cond.pop_back();
+				m_cond.remove(bx::kLast);
 				return;
 			}
 
@@ -2885,18 +3074,18 @@ namespace shaderc
 			}
 			else if (isEqual(directive, "pragma") )
 			{
-				if (!args.empty()
+				if (!args.isEmpty()
 				&&  isIdent(args[0], "once") )
 				{
 					markPragmaOnce();
 					return;
 				}
 
-				syncLine(_line[0].location);
+				syncLine(_line[0]);
 
 				append("#pragma");
 
-				if (!args.empty() )
+				if (!args.isEmpty() )
 				{
 					append(' ');
 				}
@@ -2931,11 +3120,15 @@ namespace shaderc
 			m_inCondition = false;
 			m_counter     = 0;
 			m_outLocation.file.clear();
+			m_outFileId = 0;
 			m_pragmaOnce.clear();
 
 			pushFrame(m_arena.intern(_name), m_arena.intern(_source), false);
 
 			Token token;
+			bx::ArrayT<Token> directive;
+			bx::ArrayT<Token> text;
+			bx::ArrayT<Token> expanded;
 
 			while (next(token) )
 			{
@@ -2952,7 +3145,7 @@ namespace shaderc
 
 				if (isPunct(token, "#") )
 				{
-					stl::vector<Token> directive;
+					directive.clear();
 					readLine(directive);
 					handleDirective(directive);
 
@@ -2965,8 +3158,8 @@ namespace shaderc
 					continue;
 				}
 
-				stl::vector<Token> text;
-				text.push_back(token);
+				text.clear();
+				text.add(token);
 
 				bool more = readLineKeepNewline(text);
 
@@ -2981,7 +3174,7 @@ namespace shaderc
 
 					if (Kind::Newline == lineStart.kind)
 					{
-						text.push_back(lineStart);
+						text.add(lineStart);
 						continue;
 					}
 
@@ -2991,22 +3184,23 @@ namespace shaderc
 						break;
 					}
 
-					text.push_back(lineStart);
+					text.add(lineStart);
 					more = readLineKeepNewline(text);
 				}
 
-				stl::vector<Token> expanded;
+				expanded.clear();
 				expand(text, expanded);
 				emit(expanded);
 			}
 
-			if (!m_cond.empty() )
+			if (!m_cond.isEmpty() )
 			{
 				error("Unterminated #if");
 			}
 
 			m_frames.clear();
 			m_arena.reset();
+			clearFiles();
 			m_out = NULL;
 
 			if (!m_err.isOk() )
@@ -3032,7 +3226,7 @@ namespace shaderc
 			{
 				if (isPunct(token, "#") )
 				{
-					stl::vector<Token> directive;
+					bx::ArrayT<Token> directive;
 					readLine(directive);
 					handleDirective(directive);
 				}
@@ -3043,17 +3237,23 @@ namespace shaderc
 
 		PreprocessorCallbackI&      m_callback;
 		Arena                       m_arena;
-		stl::vector<Macro>          m_macros;
-		stl::vector<Frame>          m_frames;
-		stl::vector<Cond>           m_cond;
-		stl::vector<Token>          m_pending;
-		stl::vector<bx::StringView> m_pragmaOnce;
+		bx::ArrayT<Macro>           m_macros;
+		static constexpr uint32_t   kMacroBuckets = 1024;
+		uint32_t                    m_macroBuckets[kMacroBuckets];
+		bx::ArrayT<Frame>           m_frames;
+		bx::ArrayT<Cond>            m_cond;
+		bx::ArrayT<Token>           m_pending;
+		bx::ArrayT<bx::StringView>  m_pragmaOnce;
 		bx::WriterI*                m_out;
 		bx::Error                   m_err;
 		SourceLocation              m_location;
 		uint32_t                    m_includeDepth;
 
 		SourceLocation              m_outLocation;
+		bx::ArrayT<File>            m_files;
+		static constexpr uint32_t   kFileBuckets = 64;
+		uint32_t                    m_fileBuckets[kFileBuckets];
+		uint32_t                    m_outFileId;
 		bool                        m_emitLine;
 
 		uint32_t                    m_counter;

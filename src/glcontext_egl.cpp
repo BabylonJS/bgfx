@@ -386,7 +386,7 @@ WL_EGL_IMPORT
 			m_colorspaceSupport = !bx::findIdentifierMatch(extensions, "EGL_KHR_gl_colorspace").isEmpty();
 			m_srgb = 0 != (_swapChain.flags & BGFX_SWAP_CHAIN_SRGB_BACKBUFFER);
 
-			if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGL) )
+			if constexpr (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGL) )
 			{
 				EGLBoolean ok = eglBindAPI(EGL_OPENGL_API);
 
@@ -692,7 +692,7 @@ WL_EGL_IMPORT
 #	else
 				if (hasEglKhrCreateContext)
 				{
-					if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGL) )
+					if constexpr (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGL) )
 					{
 						bx::write(&writer, EGLint(EGL_CONTEXT_OPENGL_PROFILE_MASK_KHR), bx::ErrorAssert{});
 						bx::write(&writer, EGLint(EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT_KHR), bx::ErrorAssert{});
@@ -781,7 +781,7 @@ WL_EGL_IMPORT
 			m_surface = eglGetCurrentSurface(EGL_DRAW);
 			m_readSurface = eglGetCurrentSurface(EGL_READ);
 
-			if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGL) )
+			if constexpr (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGL) )
 			{
 				EGLBoolean ok = eglBindAPI(EGL_OPENGL_API);
 
@@ -847,7 +847,7 @@ WL_EGL_IMPORT
 
 					if (hasEglKhrCreateContext)
 					{
-						if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGL) )
+						if constexpr (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGL) )
 						{
 							bx::write(&writer, EGLint(EGL_CONTEXT_OPENGL_PROFILE_MASK_KHR), bx::ErrorAssert{});
 							bx::write(&writer, EGLint(EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT_KHR), bx::ErrorAssert{});
@@ -1139,12 +1139,12 @@ WL_EGL_IMPORT
 
 	SwapChainGL* GlContext::createSwapChain(void* _nwh, int32_t _width, int32_t _height)
 	{
-		return BX_NEW(g_allocator, SwapChainGL)(m_display, m_config, m_context, (EGLNativeWindowType)_nwh, _width, _height);
+		return BX_NEW_PTR(g_allocatorBlk, SwapChainGL)(m_display, m_config, m_context, (EGLNativeWindowType)_nwh, _width, _height);
 	}
 
 	void GlContext::destroySwapChain(SwapChainGL* _swapChain)
 	{
-		bx::deleteObject(g_allocator, _swapChain);
+		bx::deletePtr(_swapChain);
 	}
 
 	void GlContext::swap(SwapChainGL* _swapChain, bool _vsync)
@@ -1177,6 +1177,14 @@ WL_EGL_IMPORT
 	{
 		if (m_current != _swapChain)
 		{
+			GLsync sync = NULL;
+
+			if (NULL != m_display
+			&&  NULL != glFenceSync)
+			{
+				sync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+			}
+
 			m_current = _swapChain;
 
 			if (NULL == _swapChain)
@@ -1189,6 +1197,12 @@ WL_EGL_IMPORT
 			else
 			{
 				_swapChain->makeCurrent();
+			}
+
+			if (NULL != sync)
+			{
+				GL_CHECK(glWaitSync(sync, 0, GL_TIMEOUT_IGNORED) );
+				GL_CHECK(glDeleteSync(sync) );
 			}
 		}
 	}

@@ -377,6 +377,30 @@ pub const DebugFlags_Text: DebugFlags                   = 0x00000008;
 /// Enable profiler. This causes per-view statistics to be collected, available through `bgfx::Stats::ViewStats`. This is unrelated to the profiler functions in `bgfx::CallbackI`.
 pub const DebugFlags_Profiler: DebugFlags               = 0x00000010;
 
+pub const DiagnosticFlags = u32;
+/// No diagnostics.
+pub const DiagnosticFlags_None: DiagnosticFlags                   = 0x00000000;
+
+/// Report informational debug layer messages, not only warnings and errors.
+/// Requires `Init::debug`.
+pub const DiagnosticFlags_Verbose: DiagnosticFlags                = 0x00000001;
+
+/// Enable GPU-based validation (D3D12 GPU-based validation, Vulkan GPU-assisted
+/// validation). Requires `Init::debug`.
+pub const DiagnosticFlags_GpuValidation: DiagnosticFlags          = 0x00000002;
+
+/// Enable queue synchronization validation (D3D12 synchronized command queue
+/// validation, Vulkan synchronization validation). Requires `Init::debug`.
+pub const DiagnosticFlags_SyncValidation: DiagnosticFlags         = 0x00000004;
+
+/// Wait for the GPU to finish each submitted command buffer before recording
+/// the next one.
+pub const DiagnosticFlags_Serialize: DiagnosticFlags              = 0x00000008;
+
+/// Check that the type of every fragment shader output a draw call writes matches
+/// the frame buffer attachment it's written to. Requires `Init::debug`.
+pub const DiagnosticFlags_DrawValidation: DiagnosticFlags         = 0x00000010;
+
 pub const BufferFlags = u16;
 pub const BufferFlags_None: BufferFlags                   = 0x0000;
 
@@ -882,17 +906,20 @@ pub const PciIdFlags_Amd: PciIdFlags                    = 0x1002;
 /// Apple adapter.
 pub const PciIdFlags_Apple: PciIdFlags                  = 0x106b;
 
+/// ARM adapter.
+pub const PciIdFlags_Arm: PciIdFlags                    = 0x13b5;
+
+/// Google adapter.
+pub const PciIdFlags_Google: PciIdFlags                 = 0x1ae0;
+
 /// Intel adapter.
 pub const PciIdFlags_Intel: PciIdFlags                  = 0x8086;
-
-/// NVIDIA adapter.
-pub const PciIdFlags_Nvidia: PciIdFlags                 = 0x10de;
 
 /// Microsoft adapter.
 pub const PciIdFlags_Microsoft: PciIdFlags              = 0x1414;
 
-/// ARM adapter.
-pub const PciIdFlags_Arm: PciIdFlags                    = 0x13b5;
+/// NVIDIA adapter.
+pub const PciIdFlags_Nvidia: PciIdFlags                 = 0x10de;
 
 pub const CubeMapFlags = u32;
 /// Cubemap +x.
@@ -1569,6 +1596,19 @@ pub const ViewMode = enum(c_int) {
     Count
 };
 
+pub const ViewStatsType = enum(c_int) {
+    /// Blits submitted to the view.
+    Blit,
+
+    /// Compute dispatches submitted to the view.
+    Compute,
+
+    /// Draw calls submitted to the view.
+    Draw,
+
+    Count
+};
+
 pub const ShadingRate = enum(c_int) {
     /// 1x1
     Rate1x1,
@@ -1651,8 +1691,8 @@ pub const Caps = extern struct {
         maxOcclusionQueries: u32,
         maxEncoders: u32,
         minResourceCbSize: u32,
-        maxTransientVbSize: u32,
-        maxTransientIbSize: u32,
+        minTransientVbSize: u32,
+        minTransientIbSize: u32,
         minUniformBufferSize: u32,
         minUniformCacheSize: u32,
         blitRowPitchAlign: u32,
@@ -1703,17 +1743,19 @@ pub const Init = extern struct {
         numDrawCallPeakFrames: u32,
         minViews: u32,
         minResourceCbSize: u32,
-        maxTransientVbSize: u32,
-        maxTransientIbSize: u32,
+        minTransientVbSize: u32,
+        minTransientIbSize: u32,
         minUniformBufferSize: u32,
         minUniformCacheSize: u32,
     };
 
         type: RendererType,
+        backendType: RendererType,
         vendorId: u16,
         deviceId: u16,
         capabilities: u64,
         debug: bool,
+        diagnostics: u32,
         profile: bool,
         fallback: bool,
         videoDecode: bool,
@@ -1870,6 +1912,7 @@ pub const Init = extern struct {
     pub const ViewStats = extern struct {
         name: [256]u8,
         view: ViewId,
+        type: ViewStatsType,
         cpuTimeBegin: i64,
         cpuTimeEnd: i64,
         gpuTimeBegin: i64,
@@ -1928,7 +1971,7 @@ pub const Init = extern struct {
         height: u16,
         textWidth: u16,
         textHeight: u16,
-        numViews: u16,
+        numViewStats: u16,
         viewStats: [*c]ViewStats,
         numEncoders: u8,
         encoderStats: [*c]EncoderStats,
@@ -2388,6 +2431,10 @@ pub const Init = extern struct {
         ///   draw commands are executed after blit and compute commands.
         /// 
         /// @attention Destination texture must be created with `BGFX_TEXTURE_BLIT_DST` flag.
+        /// 
+        /// @attention A depth texture, or one created with `BGFX_TEXTURE_MSAA_SAMPLE`, can only
+        ///   be blitted whole: both sides start at the origin of mips of the same size, and
+        ///   the copy covers the whole mip.
         /// 
         /// <param name="_id">View id.</param>
         /// <param name="_dst">Destination texture region.</param>
@@ -4188,6 +4235,10 @@ extern fn bgfx_encoder_discard(self: ?*Encoder, _flags: u8) void;
 /// 
 /// @attention Destination texture must be created with `BGFX_TEXTURE_BLIT_DST` flag.
 /// 
+/// @attention A depth texture, or one created with `BGFX_TEXTURE_MSAA_SAMPLE`, can only
+///   be blitted whole: both sides start at the origin of mips of the same size, and
+///   the copy covers the whole mip.
+/// 
 /// <param name="_id">View id.</param>
 /// <param name="_dst">Destination texture region.</param>
 /// <param name="_src">Source texture region.</param>
@@ -4822,6 +4873,10 @@ extern fn bgfx_discard(_flags: u8) void;
 ///   draw commands are executed after blit and compute commands.
 /// 
 /// @attention Destination texture must be created with `BGFX_TEXTURE_BLIT_DST` flag.
+/// 
+/// @attention A depth texture, or one created with `BGFX_TEXTURE_MSAA_SAMPLE`, can only
+///   be blitted whole: both sides start at the origin of mips of the same size, and
+///   the copy covers the whole mip.
 /// 
 /// <param name="_id">View id.</param>
 /// <param name="_dst">Destination texture region.</param>

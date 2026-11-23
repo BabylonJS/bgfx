@@ -305,6 +305,7 @@ GL_IMPORT______(true,  PFNGLDELETEQUERIESPROC,                     glDeleteQueri
 GL_IMPORT______(true,  PFNGLDELETERENDERBUFFERSPROC,               glDeleteRenderbuffers);
 GL_IMPORT______(true,  PFNGLDELETESAMPLERSPROC,                    glDeleteSamplers);
 GL_IMPORT______(false, PFNGLDELETESHADERPROC,                      glDeleteShader);
+GL_IMPORT______(true,  PFNGLDELETESYNCPROC,                        glDeleteSync);
 GL_IMPORT______(false, PFNGLDELETETEXTURESPROC,                    glDeleteTextures);
 GL_IMPORT______(true,  PFNGLDELETEVERTEXARRAYSPROC,                glDeleteVertexArrays);
 GL_IMPORT______(false, PFNGLDEPTHFUNCPROC,                         glDepthFunc);
@@ -327,6 +328,7 @@ GL_IMPORT______(false, PFNGLENABLEPROC,                            glEnable);
 GL_IMPORT______(true,  PFNGLENABLEIPROC,                           glEnablei);
 GL_IMPORT______(false, PFNGLENABLEVERTEXATTRIBARRAYPROC,           glEnableVertexAttribArray);
 GL_IMPORT______(true,  PFNGLENDQUERYPROC,                          glEndQuery);
+GL_IMPORT______(true,  PFNGLFENCESYNCPROC,                         glFenceSync);
 GL_IMPORT______(false, PFNGLFINISHPROC,                            glFinish);
 GL_IMPORT______(false, PFNGLFLUSHPROC,                             glFlush);
 GL_IMPORT______(true,  PFNGLFRAMEBUFFERRENDERBUFFERPROC,           glFramebufferRenderbuffer);
@@ -448,11 +450,14 @@ GL_IMPORT______(false, PFNGLUSEPROGRAMPROC,                        glUseProgram)
 GL_IMPORT______(true,  PFNGLVERTEXATTRIBDIVISORPROC,               glVertexAttribDivisor);
 GL_IMPORT______(false, PFNGLVERTEXATTRIBPOINTERPROC,               glVertexAttribPointer);
 GL_IMPORT______(true,  PFNGLVERTEXATTRIBIPOINTERPROC,              glVertexAttribIPointer);
+GL_IMPORT______(true,  PFNGLVERTEXATTRIBI4IPROC,                   glVertexAttribI4i);
+GL_IMPORT______(true,  PFNGLVERTEXATTRIBI4UIPROC,                  glVertexAttribI4ui);
 GL_IMPORT______(false, PFNGLVERTEXATTRIB1FPROC,                    glVertexAttrib1f);
 GL_IMPORT______(false, PFNGLVERTEXATTRIB2FPROC,                    glVertexAttrib2f);
 GL_IMPORT______(false, PFNGLVERTEXATTRIB3FPROC,                    glVertexAttrib3f);
 GL_IMPORT______(false, PFNGLVERTEXATTRIB4FPROC,                    glVertexAttrib4f);
 GL_IMPORT______(false, PFNGLVIEWPORTPROC,                          glViewport);
+GL_IMPORT______(true,  PFNGLWAITSYNCPROC,                          glWaitSync);
 
 #	if BGFX_CONFIG_RENDERER_OPENGL
 GL_IMPORT______(false, PFNGLCLEARDEPTHPROC,                        glClearDepth);
@@ -528,6 +533,8 @@ GL_IMPORT______(true,  PFNGLCLEARBUFFERIVPROC,                     glClearBuffer
 GL_IMPORT______(true,  PFNGLCLEARBUFFERUIVPROC,                    glClearBufferuiv);
 GL_IMPORT______(true,  PFNGLCOPYTEXSUBIMAGE3DPROC,                 glCopyTexSubImage3D);
 GL_IMPORT______(true,  PFNGLVERTEXATTRIBIPOINTERPROC,              glVertexAttribIPointer);
+GL_IMPORT______(true,  PFNGLVERTEXATTRIBI4IPROC,                   glVertexAttribI4i);
+GL_IMPORT______(true,  PFNGLVERTEXATTRIBI4UIPROC,                  glVertexAttribI4ui);
 GL_IMPORT______(true,  PFNGLGETINTERNALFORMATIVPROC,               glGetInternalformativ);
 GL_IMPORT______(true,  PFNGLGETINTERNALFORMATI64VPROC,             glGetInternalformati64v);
 GL_IMPORT______(true,  PFNGLPOLYGONOFFSETCLAMPPROC,                glPolygonOffsetClamp);
@@ -660,6 +667,10 @@ GL_IMPORT______(true,  PFNGLMULTIDRAWARRAYSINDIRECTCOUNTPROC,      glMultiDrawAr
 GL_IMPORT______(true,  PFNGLMULTIDRAWELEMENTSINDIRECTCOUNTPROC,    glMultiDrawElementsIndirectCount);
 
 GL_IMPORT______(true,  PFNGLINVALIDATEFRAMEBUFFERPROC,             glInvalidateFramebuffer);
+
+GL_IMPORT______(true,  PFNGLFENCESYNCPROC,                         glFenceSync);
+GL_IMPORT______(true,  PFNGLDELETESYNCPROC,                        glDeleteSync);
+GL_IMPORT______(true,  PFNGLWAITSYNCPROC,                          glWaitSync);
 
 #	endif // !BGFX_USE_GL_DYNAMIC_LIB
 #endif // !BGFX_CONFIG_RENDERER_OPENGL

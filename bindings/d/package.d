@@ -9,7 +9,7 @@ import bindbc.common.types: c_int64, c_uint64, va_list;
 import bindbc.bgfx.config;
 static import bgfx.impl;
 
-enum uint apiVersion = 167;
+enum uint apiVersion = 171;
 
 alias ViewID = ushort;
 
@@ -289,6 +289,36 @@ enum Debug: Debug_{
 	stats      = 0x0000_0004, ///Enable statistics display.
 	text       = 0x0000_0008, ///Enable debug text display.
 	profiler   = 0x0000_0010, ///Enable profiler. This causes per-view statistics to be collected, available through `bgfx::Stats::ViewStats`. This is unrelated to the profiler functions in `bgfx::CallbackI`.
+}
+
+alias Diagnostic_ = uint;
+enum Diagnostic: Diagnostic_{
+	none            = 0x0000_0000, ///No diagnostics.
+	/**
+	Report informational debug layer messages, not only warnings and errors.
+	Requires `Init::debug`.
+	*/
+	verbose         = 0x0000_0001,
+	/**
+	Enable GPU-based validation (D3D12 GPU-based validation, Vulkan GPU-assisted
+	validation). Requires `Init::debug`.
+	*/
+	gpuValidation   = 0x0000_0002,
+	/**
+	Enable queue synchronization validation (D3D12 synchronized command queue
+	validation, Vulkan synchronization validation). Requires `Init::debug`.
+	*/
+	syncValidation  = 0x0000_0004,
+	/**
+	Wait for the GPU to finish each submitted command buffer before recording
+	the next one.
+	*/
+	serialize       = 0x0000_0008,
+	/**
+	Check that the type of every fragment shader output a draw call writes matches
+	the frame buffer attachment it's written to. Requires `Init::debug`.
+	*/
+	drawValidation  = 0x0000_0010,
 }
 
 alias Buffer_ = ushort;
@@ -670,10 +700,11 @@ enum PCIID: PCIID_{
 	softwareRasteriser  = softwareRasterizer,
 	amd                 = 0x1002, ///AMD adapter.
 	apple               = 0x106B, ///Apple adapter.
-	intel               = 0x8086, ///Intel adapter.
-	nvidia              = 0x10DE, ///NVIDIA adapter.
-	microsoft           = 0x1414, ///Microsoft adapter.
 	arm                 = 0x13B5, ///ARM adapter.
+	google              = 0x1AE0, ///Google adapter.
+	intel               = 0x8086, ///Intel adapter.
+	microsoft           = 0x1414, ///Microsoft adapter.
+	nvidia              = 0x10DE, ///NVIDIA adapter.
 }
 
 alias CubeMap_ = ubyte;
@@ -1003,6 +1034,14 @@ enum ViewMode: bgfx.impl.ViewMode.Enum{
 	count = bgfx.impl.ViewMode.Enum.count,
 }
 
+///View stats type.
+enum ViewStatsType: bgfx.impl.ViewStatsType.Enum{
+	blit = bgfx.impl.ViewStatsType.Enum.blit,
+	compute = bgfx.impl.ViewStatsType.Enum.compute,
+	draw = bgfx.impl.ViewStatsType.Enum.draw,
+	count = bgfx.impl.ViewStatsType.Enum.count,
+}
+
 ///Shading Rate.
 enum ShadingRate: bgfx.impl.ShadingRate.Enum{
 	rate1x1 = bgfx.impl.ShadingRate.Enum.rate1x1,
@@ -1218,8 +1257,8 @@ extern(C++, "bgfx") struct Caps{
 		uint maxOcclusionQueries; ///Maximum number of occlusion query handles.
 		uint maxEncoders; ///Maximum number of encoder threads.
 		uint minResourceCBSize; ///Minimum resource command buffer size.
-		uint maxTransientVBSize; ///Maximum transient vertex buffer size.
-		uint maxTransientIBSize; ///Maximum transient index buffer size.
+		uint minTransientVBSize; ///Minimum transient vertex buffer size, it grows on demand.
+		uint minTransientIBSize; ///Minimum transient index buffer size, it grows on demand.
 		uint minUniformBufferSize; ///Mimimum uniform buffer size.
 		uint minUniformCacheSize; ///Minimum view and frame uniform cache size.
 		
@@ -1398,8 +1437,8 @@ extern(C++, "bgfx") struct Init{
 		*/
 		uint minViews;
 		uint minResourceCBSize; ///Minimum resource command buffer size.
-		uint maxTransientVBSize; ///Maximum transient vertex buffer size.
-		uint maxTransientIBSize; ///Maximum transient index buffer size.
+		uint minTransientVBSize; ///Minimum transient vertex buffer size, it grows on demand.
+		uint minTransientIBSize; ///Minimum transient index buffer size, it grows on demand.
 		uint minUniformBufferSize; ///Mimimum uniform buffer size.
 		
 		/**
@@ -1423,6 +1462,12 @@ extern(C++, "bgfx") struct Init{
 	RendererType type;
 	
 	/**
+	Select native API a layered rendering backend (WebGPU) runs on. When
+	set to RendererType::Count implementation's default will be selected.
+	*/
+	RendererType backendType;
+	
+	/**
 	Vendor PCI ID. If set to `BGFX_PCI_ID_NONE`, discrete and integrated
 	GPUs will be prioritised.
 	  - `BGFX_PCI_ID_NONE` - Autoselect adapter.
@@ -1442,6 +1487,7 @@ extern(C++, "bgfx") struct Init{
 	ushort deviceID;
 	c_uint64 capabilities; ///Capabilities initialization mask (default: UINT64_MAX).
 	bool debug_; ///Enable device for debugging.
+	uint diagnostics; ///Diagnostic flags. See: `BGFX_DIAGNOSTIC_*`.
 	bool profile; ///Enable device for profiling.
 	bool fallback; ///Enable fallback to next available renderer.
 	bool videoDecode; ///Enable video decoding.
@@ -1750,6 +1796,7 @@ extern(C++, "bgfx") struct Transform{
 extern(C++, "bgfx") struct ViewStats{
 	char[256] name; ///View name.
 	ViewID view; ///View id.
+	ViewStatsType type; ///View stats type.
 	c_int64 cpuTimeBegin; ///CPU (submit) begin time.
 	c_int64 cpuTimeEnd; ///CPU (submit) end time.
 	c_int64 gpuTimeBegin; ///GPU begin time.
@@ -1827,7 +1874,12 @@ extern(C++, "bgfx") struct Stats{
 	ushort height; ///Backbuffer height in pixels.
 	ushort textWidth; ///Debug text width in characters.
 	ushort textHeight; ///Debug text height in characters.
-	ushort numViews; ///Number of view stats.
+	
+	/**
+	Number of view stats. View has one for each type of work
+	submitted to it. See: `bgfx::ViewStatsType`
+	*/
+	ushort numViewStats;
 	ViewStats* viewStats; ///Array of View stats.
 	ubyte numEncoders; ///Number of encoders used during frame.
 	EncoderStats* encoderStats; ///Array of encoder stats.
@@ -2464,6 +2516,10 @@ extern(C++, "bgfx") struct Encoder{
 			  draw commands are executed after blit and compute commands.
 			
 			Attention: Destination texture must be created with `BGFX_TEXTURE_BLIT_DST` flag.
+			
+			Attention: A depth texture, or one created with `BGFX_TEXTURE_MSAA_SAMPLE`, can only
+			  be blitted whole: both sides start at the origin of mips of the same size, and
+			  the copy covers the whole mip.
 			
 			Params:
 				id = View id.
@@ -4610,6 +4666,10 @@ mixin(joinFnBinds((){
 		*   draw commands are executed after blit and compute commands.
 		* 
 		* Attention: Destination texture must be created with `BGFX_TEXTURE_BLIT_DST` flag.
+		* 
+		* Attention: A depth texture, or one created with `BGFX_TEXTURE_MSAA_SAMPLE`, can only
+		*   be blitted whole: both sides start at the origin of mips of the same size, and
+		*   the copy covers the whole mip.
 		* 
 		Params:
 			id = View id.

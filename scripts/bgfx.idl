@@ -1,7 +1,7 @@
 -- vim: syntax=lua
 -- bgfx interface
 
-version(167)
+version(171)
 
 typedef "bool"
 typedef "char"
@@ -220,6 +220,20 @@ flag.Debug { bits = 32, section = "Debug Flags" }
 	.Stats     --- Enable statistics display.
 	.Text      --- Enable debug text display.
 	.Profiler  --- Enable profiler. This causes per-view statistics to be collected, available through `bgfx::Stats::ViewStats`. This is unrelated to the profiler functions in `bgfx::CallbackI`.
+	()
+
+flag.Diagnostic { bits = 32, section = "Initialization and Shutdown" }
+	.None           --- No diagnostics.
+	.Verbose        --- Report informational debug layer messages, not only warnings and errors.
+	                --- Requires `Init::debug`.
+	.GpuValidation  --- Enable GPU-based validation (D3D12 GPU-based validation, Vulkan GPU-assisted
+	                --- validation). Requires `Init::debug`.
+	.SyncValidation --- Enable queue synchronization validation (D3D12 synchronized command queue
+	                --- validation, Vulkan synchronization validation). Requires `Init::debug`.
+	.Serialize      --- Wait for the GPU to finish each submitted command buffer before recording
+	                --- the next one.
+	.DrawValidation --- Check that the type of every fragment shader output a draw call writes matches
+	                --- the frame buffer attachment it's written to. Requires `Init::debug`.
 	()
 
 flag.Buffer { bits = 16, base = 8 }
@@ -501,10 +515,11 @@ flag.PciId { bits = 16, const, section = "Initialization and Shutdown" }
 	.SoftwareRasterizer  (0x0001) --- Software rasterizer.
 	.Amd                 (0x1002) --- AMD adapter.
 	.Apple               (0x106b) --- Apple adapter.
-	.Intel               (0x8086) --- Intel adapter.
-	.Nvidia              (0x10de) --- NVIDIA adapter.
-	.Microsoft           (0x1414) --- Microsoft adapter.
 	.Arm                 (0x13b5) --- ARM adapter.
+	.Google              (0x1ae0) --- Google adapter.
+	.Intel               (0x8086) --- Intel adapter.
+	.Microsoft           (0x1414) --- Microsoft adapter.
+	.Nvidia              (0x10de) --- NVIDIA adapter.
 	()
 
 flag.CubeMap { bits = 8, const }
@@ -808,6 +823,13 @@ enum.ViewMode { underscore, comment = "View modes:", section = "Views" }
 	.DepthDescending --- Sort draw call depth in descending order.
 	()
 
+--- View stats type.
+enum.ViewStatsType { comment = "View stats types:", section = "Statistics" }
+	.Blit    --- Blits submitted to the view.
+	.Compute --- Compute dispatches submitted to the view.
+	.Draw    --- Draw calls submitted to the view.
+	()
+
 --- Shading Rate.
 enum.ShadingRate { underscore, comment = "Shading rate:", section = "Views" }
 	.Rate1x1 --- 1x1
@@ -864,8 +886,8 @@ struct.Limits  { namespace = "Caps" }
 	.maxOcclusionQueries     "uint32_t" --- Maximum number of occlusion query handles.
 	.maxEncoders             "uint32_t" --- Maximum number of encoder threads.
 	.minResourceCbSize       "uint32_t" --- Minimum resource command buffer size.
-	.maxTransientVbSize      "uint32_t" --- Maximum transient vertex buffer size.
-	.maxTransientIbSize      "uint32_t" --- Maximum transient index buffer size.
+	.minTransientVbSize      "uint32_t" --- Minimum transient vertex buffer size, it grows on demand.
+	.minTransientIbSize      "uint32_t" --- Minimum transient index buffer size, it grows on demand.
 	.minUniformBufferSize    "uint32_t" --- Mimimum uniform buffer size.
 	.minUniformCacheSize     "uint32_t" --- Minimum view and frame uniform cache size.
 	.blitRowPitchAlign       "uint32_t" --- Row pitch alignment, in bytes, that buffer to texture blit copies
@@ -990,8 +1012,8 @@ struct.Limits { ctor, namespace = "Init" }
 	                                  --- `BGFX_CONFIG_DYNAMIC_FRAME_STORAGE` disabled storage for all views
 	                                  --- is allocated up front.
 	.minResourceCbSize    "uint32_t"  --- Minimum resource command buffer size.
-	.maxTransientVbSize   "uint32_t"  --- Maximum transient vertex buffer size.
-	.maxTransientIbSize   "uint32_t"  --- Maximum transient index buffer size.
+	.minTransientVbSize   "uint32_t"  --- Minimum transient vertex buffer size, it grows on demand.
+	.minTransientIbSize   "uint32_t"  --- Minimum transient index buffer size, it grows on demand.
 	.minUniformBufferSize "uint32_t"  --- Mimimum uniform buffer size.
 	.minUniformCacheSize  "uint32_t"  --- Minimum view and frame uniform cache size. This is a reservation,
 	                                  --- the cache grows on demand.
@@ -1001,6 +1023,9 @@ struct.Init { ctor, section = "Initialization and Shutdown" }
 	.type         "RendererType::Enum" --- Select rendering backend. When set to RendererType::Count
 	                                   --- a default rendering backend will be selected appropriate to the platform.
 	                                   --- See: `bgfx::RendererType`
+
+	.backendType  "RendererType::Enum" --- Select native API a layered rendering backend (WebGPU) runs on. When
+	                                   --- set to RendererType::Count implementation's default will be selected.
 
 	.vendorId     "uint16_t"           --- Vendor PCI ID. If set to `BGFX_PCI_ID_NONE`, discrete and integrated
 	                                   --- GPUs will be prioritised.
@@ -1016,6 +1041,7 @@ struct.Init { ctor, section = "Initialization and Shutdown" }
 	                                   --- matching ID.
 	.capabilities "uint64_t"           --- Capabilities initialization mask (default: UINT64_MAX).
 	.debug        "bool"               --- Enable device for debugging.
+	.diagnostics  "uint32_t"           --- Diagnostic flags. See: `BGFX_DIAGNOSTIC_*`.
 	.profile      "bool"               --- Enable device for profiling.
 	.fallback     "bool"               --- Enable fallback to next available renderer.
 	.videoDecode  "bool"               --- Enable video decoding.
@@ -1251,13 +1277,14 @@ struct.Transform
 
 --- View stats.
 struct.ViewStats { section = "Statistics" }
-	.name           "char[256]" --- View name.
-	.view           "ViewId"    --- View id.
-	.cpuTimeBegin   "int64_t"   --- CPU (submit) begin time.
-	.cpuTimeEnd     "int64_t"   --- CPU (submit) end time.
-	.gpuTimeBegin   "int64_t"   --- GPU begin time.
-	.gpuTimeEnd     "int64_t"   --- GPU end time.
-	.gpuFrameNum    "uint32_t"  --- Frame which generated gpuTimeBegin, gpuTimeEnd.
+	.name           "char[256]"           --- View name.
+	.view           "ViewId"              --- View id.
+	.type           "ViewStatsType::Enum" --- View stats type.
+	.cpuTimeBegin   "int64_t"             --- CPU (submit) begin time.
+	.cpuTimeEnd     "int64_t"             --- CPU (submit) end time.
+	.gpuTimeBegin   "int64_t"             --- GPU begin time.
+	.gpuTimeEnd     "int64_t"             --- GPU end time.
+	.gpuFrameNum    "uint32_t"            --- Frame which generated gpuTimeBegin, gpuTimeEnd.
 
 --- Encoder stats.
 struct.EncoderStats { section = "Statistics" }
@@ -1328,7 +1355,8 @@ struct.Stats { section = "Statistics" }
 	.textWidth               "uint16_t"      --- Debug text width in characters.
 	.textHeight              "uint16_t"      --- Debug text height in characters.
 
-	.numViews                "uint16_t"      --- Number of view stats.
+	.numViewStats            "uint16_t"      --- Number of view stats. View has one for each type of work
+	                                         --- submitted to it. See: `bgfx::ViewStatsType`
 	.viewStats               "ViewStats*"    --- Array of View stats.
 
 	.numEncoders             "uint8_t"       --- Number of encoders used during frame.
@@ -3295,6 +3323,10 @@ func.Encoder.discard { section = "Miscellaneous" }
 ---
 --- @attention Destination texture must be created with `BGFX_TEXTURE_BLIT_DST` flag.
 ---
+--- @attention A depth texture, or one created with `BGFX_TEXTURE_MSAA_SAMPLE`, can only
+---   be blitted whole: both sides start at the origin of mips of the same size, and
+---   the copy covers the whole mip.
+---
 func.Encoder.blit { section = "Blit" }
 	"void"
 	.id  "ViewId"                --- View id.
@@ -3965,6 +3997,10 @@ func.discard { section = "Miscellaneous" }
 ---   draw commands are executed after blit and compute commands.
 ---
 --- @attention Destination texture must be created with `BGFX_TEXTURE_BLIT_DST` flag.
+---
+--- @attention A depth texture, or one created with `BGFX_TEXTURE_MSAA_SAMPLE`, can only
+---   be blitted whole: both sides start at the origin of mips of the same size, and
+---   the copy covers the whole mip.
 ---
 func.blit { section = "Blit" }
 	"void"

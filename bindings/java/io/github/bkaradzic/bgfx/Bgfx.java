@@ -3309,6 +3309,10 @@ public final class Bgfx {
 	 *   draw commands are executed after blit and compute commands.
 	 * <p>
 	 * <strong>Attention:</strong> Destination texture must be created with {@code BGFX_TEXTURE_BLIT_DST} flag.
+	 * <p>
+	 * <strong>Attention:</strong> A depth texture, or one created with {@code BGFX_TEXTURE_MSAA_SAMPLE}, can only
+	 *   be blitted whole: both sides start at the origin of mips of the same size, and
+	 *   the copy covers the whole mip.
 	 * @param _id View id.
 	 * @param _dst Destination texture region.
 	 * @param _src Source texture region.
@@ -4183,6 +4187,49 @@ public final class Bgfx {
 		 * Enable profiler. This causes per-view statistics to be collected, available through {@code Stats.ViewStats}. This is unrelated to the profiler functions in {@code CallbackI}.
 		 */
 		public static final int Profiler = 0x00000010;
+	}
+
+	/**
+	 * Constants for Diagnostic flags.
+	 */
+	@NullMarked
+	public static final class DiagnosticFlags {
+		private DiagnosticFlags() {
+		}
+		/**
+		 * No diagnostics.
+		 */
+		public static final int None = 0x00000000;
+
+		/**
+		 * Report informational debug layer messages, not only warnings and errors.
+		 * Requires {@code Init.debug}.
+		 */
+		public static final int Verbose = 0x00000001;
+
+		/**
+		 * Enable GPU-based validation (D3D12 GPU-based validation, Vulkan GPU-assisted
+		 * validation). Requires {@code Init.debug}.
+		 */
+		public static final int GpuValidation = 0x00000002;
+
+		/**
+		 * Enable queue synchronization validation (D3D12 synchronized command queue
+		 * validation, Vulkan synchronization validation). Requires {@code Init.debug}.
+		 */
+		public static final int SyncValidation = 0x00000004;
+
+		/**
+		 * Wait for the GPU to finish each submitted command buffer before recording
+		 * the next one.
+		 */
+		public static final int Serialize = 0x00000008;
+
+		/**
+		 * Check that the type of every fragment shader output a draw call writes matches
+		 * the frame buffer attachment it's written to. Requires {@code Init.debug}.
+		 */
+		public static final int DrawValidation = 0x00000010;
 	}
 
 	/**
@@ -5255,14 +5302,19 @@ public final class Bgfx {
 		public static final short Apple = (short) 0x106b;
 
 		/**
+		 * ARM adapter.
+		 */
+		public static final short Arm = (short) 0x13b5;
+
+		/**
+		 * Google adapter.
+		 */
+		public static final short Google = (short) 0x1ae0;
+
+		/**
 		 * Intel adapter.
 		 */
 		public static final short Intel = (short) 0x8086;
-
-		/**
-		 * NVIDIA adapter.
-		 */
-		public static final short Nvidia = (short) 0x10de;
 
 		/**
 		 * Microsoft adapter.
@@ -5270,9 +5322,9 @@ public final class Bgfx {
 		public static final short Microsoft = (short) 0x1414;
 
 		/**
-		 * ARM adapter.
+		 * NVIDIA adapter.
 		 */
-		public static final short Arm = (short) 0x13b5;
+		public static final short Nvidia = (short) 0x10de;
 	}
 
 	/**
@@ -6632,6 +6684,48 @@ public final class Bgfx {
 	}
 
 	/**
+	 * View stats type.
+	 */
+	@NullMarked
+	public enum ViewStatsType {
+		/**
+		 * Blits submitted to the view.
+		 */
+		BLIT,
+		/**
+		 * Compute dispatches submitted to the view.
+		 */
+		COMPUTE,
+		/**
+		 * Draw calls submitted to the view.
+		 */
+		DRAW,
+
+		/**
+		 * Number of native enum values.
+		 */
+		COUNT;
+
+		/**
+		 * Native C enum layout.
+		 */
+		public static final ValueLayout.OfInt LAYOUT = ValueLayout.JAVA_INT;
+		private static final ViewStatsType[] VALUES = values();
+
+		/**
+		 * Returns the enum constant for a native C enum value.
+		 * @param value the native enum value
+		 * @return the matching enum constant
+		 */
+		public static ViewStatsType fromValue(int value) {
+			if (value >= 0 && value < VALUES.length) {
+				return VALUES[value];
+			}
+			throw new IllegalArgumentException("Unknown ViewStatsType value: " + value);
+		}
+	}
+
+	/**
 	 * Shading Rate.
 	 */
 	@NullMarked
@@ -7168,8 +7262,8 @@ public final class Bgfx {
 				ValueLayout.JAVA_INT.withName("maxOcclusionQueries"),
 				ValueLayout.JAVA_INT.withName("maxEncoders"),
 				ValueLayout.JAVA_INT.withName("minResourceCbSize"),
-				ValueLayout.JAVA_INT.withName("maxTransientVbSize"),
-				ValueLayout.JAVA_INT.withName("maxTransientIbSize"),
+				ValueLayout.JAVA_INT.withName("minTransientVbSize"),
+				ValueLayout.JAVA_INT.withName("minTransientIbSize"),
 				ValueLayout.JAVA_INT.withName("minUniformBufferSize"),
 				ValueLayout.JAVA_INT.withName("minUniformCacheSize"),
 				ValueLayout.JAVA_INT.withName("blitRowPitchAlign"),
@@ -7222,10 +7316,10 @@ public final class Bgfx {
 				MemoryLayout.PathElement.groupElement("maxEncoders"));
 			private static final VarHandle VH_MINRESOURCECBSIZE = LAYOUT.varHandle(
 				MemoryLayout.PathElement.groupElement("minResourceCbSize"));
-			private static final VarHandle VH_MAXTRANSIENTVBSIZE = LAYOUT.varHandle(
-				MemoryLayout.PathElement.groupElement("maxTransientVbSize"));
-			private static final VarHandle VH_MAXTRANSIENTIBSIZE = LAYOUT.varHandle(
-				MemoryLayout.PathElement.groupElement("maxTransientIbSize"));
+			private static final VarHandle VH_MINTRANSIENTVBSIZE = LAYOUT.varHandle(
+				MemoryLayout.PathElement.groupElement("minTransientVbSize"));
+			private static final VarHandle VH_MINTRANSIENTIBSIZE = LAYOUT.varHandle(
+				MemoryLayout.PathElement.groupElement("minTransientIbSize"));
 			private static final VarHandle VH_MINUNIFORMBUFFERSIZE = LAYOUT.varHandle(
 				MemoryLayout.PathElement.groupElement("minUniformBufferSize"));
 			private static final VarHandle VH_MINUNIFORMCACHESIZE = LAYOUT.varHandle(
@@ -7659,36 +7753,36 @@ public final class Bgfx {
 			}
 
 			/**
-			 * Maximum transient vertex buffer size.
+			 * Minimum transient vertex buffer size, it grows on demand.
 			 * @return the field value
 			 */
-			public @Unsigned int maxTransientVbSize() {
-				return (@Unsigned int) VH_MAXTRANSIENTVBSIZE.get(segment(), 0L);
+			public @Unsigned int minTransientVbSize() {
+				return (@Unsigned int) VH_MINTRANSIENTVBSIZE.get(segment(), 0L);
 			}
 
 			/**
-			 * Sets the native {@code maxTransientVbSize} field and returns {@code this}.
+			 * Sets the native {@code minTransientVbSize} field and returns {@code this}.
 			 * @param value the new field value
 			 */
-			public Limits maxTransientVbSize(@Unsigned int value) {
-				VH_MAXTRANSIENTVBSIZE.set(segment(), 0L, value);
+			public Limits minTransientVbSize(@Unsigned int value) {
+				VH_MINTRANSIENTVBSIZE.set(segment(), 0L, value);
 				return this;
 			}
 
 			/**
-			 * Maximum transient index buffer size.
+			 * Minimum transient index buffer size, it grows on demand.
 			 * @return the field value
 			 */
-			public @Unsigned int maxTransientIbSize() {
-				return (@Unsigned int) VH_MAXTRANSIENTIBSIZE.get(segment(), 0L);
+			public @Unsigned int minTransientIbSize() {
+				return (@Unsigned int) VH_MINTRANSIENTIBSIZE.get(segment(), 0L);
 			}
 
 			/**
-			 * Sets the native {@code maxTransientIbSize} field and returns {@code this}.
+			 * Sets the native {@code minTransientIbSize} field and returns {@code this}.
 			 * @param value the new field value
 			 */
-			public Limits maxTransientIbSize(@Unsigned int value) {
-				VH_MAXTRANSIENTIBSIZE.set(segment(), 0L, value);
+			public Limits minTransientIbSize(@Unsigned int value) {
+				VH_MINTRANSIENTIBSIZE.set(segment(), 0L, value);
 				return this;
 			}
 
@@ -8175,10 +8269,12 @@ public final class Bgfx {
 		 */
 		public static final StructLayout LAYOUT = cStruct("bgfx_init_t",
 			ValueLayout.JAVA_INT.withName("type"),
+			ValueLayout.JAVA_INT.withName("backendType"),
 			ValueLayout.JAVA_SHORT.withName("vendorId"),
 			ValueLayout.JAVA_SHORT.withName("deviceId"),
 			ValueLayout.JAVA_LONG.withName("capabilities"),
 			ValueLayout.JAVA_BOOLEAN.withName("debug"),
+			ValueLayout.JAVA_INT.withName("diagnostics"),
 			ValueLayout.JAVA_BOOLEAN.withName("profile"),
 			ValueLayout.JAVA_BOOLEAN.withName("fallback"),
 			ValueLayout.JAVA_BOOLEAN.withName("videoDecode"),
@@ -8190,6 +8286,8 @@ public final class Bgfx {
 			ValueLayout.ADDRESS.withName("allocator"));
 		private static final VarHandle VH_TYPE = LAYOUT.varHandle(
 			MemoryLayout.PathElement.groupElement("type"));
+		private static final VarHandle VH_BACKENDTYPE = LAYOUT.varHandle(
+			MemoryLayout.PathElement.groupElement("backendType"));
 		private static final VarHandle VH_VENDORID = LAYOUT.varHandle(
 			MemoryLayout.PathElement.groupElement("vendorId"));
 		private static final VarHandle VH_DEVICEID = LAYOUT.varHandle(
@@ -8198,6 +8296,8 @@ public final class Bgfx {
 			MemoryLayout.PathElement.groupElement("capabilities"));
 		private static final VarHandle VH_DEBUG = LAYOUT.varHandle(
 			MemoryLayout.PathElement.groupElement("debug"));
+		private static final VarHandle VH_DIAGNOSTICS = LAYOUT.varHandle(
+			MemoryLayout.PathElement.groupElement("diagnostics"));
 		private static final VarHandle VH_PROFILE = LAYOUT.varHandle(
 			MemoryLayout.PathElement.groupElement("profile"));
 		private static final VarHandle VH_FALLBACK = LAYOUT.varHandle(
@@ -8248,6 +8348,24 @@ public final class Bgfx {
 		 */
 		public Init type(RendererType value) {
 			VH_TYPE.set(segment(), 0L, value.ordinal());
+			return this;
+		}
+
+		/**
+		 * Select native API a layered rendering backend (WebGPU) runs on. When
+		 * set to RendererType.COUNT implementation's default will be selected.
+		 * @return the field value
+		 */
+		public RendererType backendType() {
+			return RendererType.fromValue((int) VH_BACKENDTYPE.get(segment(), 0L));
+		}
+
+		/**
+		 * Sets the native {@code backendType} field and returns {@code this}.
+		 * @param value the new field value
+		 */
+		public Init backendType(RendererType value) {
+			VH_BACKENDTYPE.set(segment(), 0L, value.ordinal());
 			return this;
 		}
 
@@ -8341,6 +8459,23 @@ public final class Bgfx {
 		 */
 		public Init debug(boolean value) {
 			VH_DEBUG.set(segment(), 0L, value);
+			return this;
+		}
+
+		/**
+		 * Diagnostic flags. See: {@code BGFX_DIAGNOSTIC_*}.
+		 * @return the field value
+		 */
+		public @Unsigned int diagnostics() {
+			return (@Unsigned int) VH_DIAGNOSTICS.get(segment(), 0L);
+		}
+
+		/**
+		 * Sets the native {@code diagnostics} field and returns {@code this}.
+		 * @param value the new field value
+		 */
+		public Init diagnostics(@Unsigned int value) {
+			VH_DIAGNOSTICS.set(segment(), 0L, value);
 			return this;
 		}
 
@@ -8518,8 +8653,8 @@ public final class Bgfx {
 				ValueLayout.JAVA_INT.withName("numDrawCallPeakFrames"),
 				ValueLayout.JAVA_INT.withName("minViews"),
 				ValueLayout.JAVA_INT.withName("minResourceCbSize"),
-				ValueLayout.JAVA_INT.withName("maxTransientVbSize"),
-				ValueLayout.JAVA_INT.withName("maxTransientIbSize"),
+				ValueLayout.JAVA_INT.withName("minTransientVbSize"),
+				ValueLayout.JAVA_INT.withName("minTransientIbSize"),
 				ValueLayout.JAVA_INT.withName("minUniformBufferSize"),
 				ValueLayout.JAVA_INT.withName("minUniformCacheSize"));
 			private static final VarHandle VH_MAXENCODERS = LAYOUT.varHandle(
@@ -8532,10 +8667,10 @@ public final class Bgfx {
 				MemoryLayout.PathElement.groupElement("minViews"));
 			private static final VarHandle VH_MINRESOURCECBSIZE = LAYOUT.varHandle(
 				MemoryLayout.PathElement.groupElement("minResourceCbSize"));
-			private static final VarHandle VH_MAXTRANSIENTVBSIZE = LAYOUT.varHandle(
-				MemoryLayout.PathElement.groupElement("maxTransientVbSize"));
-			private static final VarHandle VH_MAXTRANSIENTIBSIZE = LAYOUT.varHandle(
-				MemoryLayout.PathElement.groupElement("maxTransientIbSize"));
+			private static final VarHandle VH_MINTRANSIENTVBSIZE = LAYOUT.varHandle(
+				MemoryLayout.PathElement.groupElement("minTransientVbSize"));
+			private static final VarHandle VH_MINTRANSIENTIBSIZE = LAYOUT.varHandle(
+				MemoryLayout.PathElement.groupElement("minTransientIbSize"));
 			private static final VarHandle VH_MINUNIFORMBUFFERSIZE = LAYOUT.varHandle(
 				MemoryLayout.PathElement.groupElement("minUniformBufferSize"));
 			private static final VarHandle VH_MINUNIFORMCACHESIZE = LAYOUT.varHandle(
@@ -8671,36 +8806,36 @@ public final class Bgfx {
 			}
 
 			/**
-			 * Maximum transient vertex buffer size.
+			 * Minimum transient vertex buffer size, it grows on demand.
 			 * @return the field value
 			 */
-			public @Unsigned int maxTransientVbSize() {
-				return (@Unsigned int) VH_MAXTRANSIENTVBSIZE.get(segment(), 0L);
+			public @Unsigned int minTransientVbSize() {
+				return (@Unsigned int) VH_MINTRANSIENTVBSIZE.get(segment(), 0L);
 			}
 
 			/**
-			 * Sets the native {@code maxTransientVbSize} field and returns {@code this}.
+			 * Sets the native {@code minTransientVbSize} field and returns {@code this}.
 			 * @param value the new field value
 			 */
-			public Limits maxTransientVbSize(@Unsigned int value) {
-				VH_MAXTRANSIENTVBSIZE.set(segment(), 0L, value);
+			public Limits minTransientVbSize(@Unsigned int value) {
+				VH_MINTRANSIENTVBSIZE.set(segment(), 0L, value);
 				return this;
 			}
 
 			/**
-			 * Maximum transient index buffer size.
+			 * Minimum transient index buffer size, it grows on demand.
 			 * @return the field value
 			 */
-			public @Unsigned int maxTransientIbSize() {
-				return (@Unsigned int) VH_MAXTRANSIENTIBSIZE.get(segment(), 0L);
+			public @Unsigned int minTransientIbSize() {
+				return (@Unsigned int) VH_MINTRANSIENTIBSIZE.get(segment(), 0L);
 			}
 
 			/**
-			 * Sets the native {@code maxTransientIbSize} field and returns {@code this}.
+			 * Sets the native {@code minTransientIbSize} field and returns {@code this}.
 			 * @param value the new field value
 			 */
-			public Limits maxTransientIbSize(@Unsigned int value) {
-				VH_MAXTRANSIENTIBSIZE.set(segment(), 0L, value);
+			public Limits minTransientIbSize(@Unsigned int value) {
+				VH_MINTRANSIENTIBSIZE.set(segment(), 0L, value);
 				return this;
 			}
 
@@ -10706,6 +10841,7 @@ public final class Bgfx {
 		public static final StructLayout LAYOUT = cStruct("bgfx_view_stats_t",
 			MemoryLayout.sequenceLayout(256, ValueLayout.JAVA_BYTE).withName("name"),
 			ValueLayout.JAVA_SHORT.withName("view"),
+			ValueLayout.JAVA_INT.withName("type"),
 			ValueLayout.JAVA_LONG.withName("cpuTimeBegin"),
 			ValueLayout.JAVA_LONG.withName("cpuTimeEnd"),
 			ValueLayout.JAVA_LONG.withName("gpuTimeBegin"),
@@ -10715,6 +10851,8 @@ public final class Bgfx {
 			MemoryLayout.PathElement.groupElement("name"));
 		private static final VarHandle VH_VIEW = LAYOUT.varHandle(
 			MemoryLayout.PathElement.groupElement("view"));
+		private static final VarHandle VH_TYPE = LAYOUT.varHandle(
+			MemoryLayout.PathElement.groupElement("type"));
 		private static final VarHandle VH_CPUTIMEBEGIN = LAYOUT.varHandle(
 			MemoryLayout.PathElement.groupElement("cpuTimeBegin"));
 		private static final VarHandle VH_CPUTIMEEND = LAYOUT.varHandle(
@@ -10772,6 +10910,23 @@ public final class Bgfx {
 		 */
 		public ViewStats view(int value) {
 			return view((short)value);
+		}
+
+		/**
+		 * View stats type.
+		 * @return the field value
+		 */
+		public ViewStatsType type() {
+			return ViewStatsType.fromValue((int) VH_TYPE.get(segment(), 0L));
+		}
+
+		/**
+		 * Sets the native {@code type} field and returns {@code this}.
+		 * @param value the new field value
+		 */
+		public ViewStats type(ViewStatsType value) {
+			VH_TYPE.set(segment(), 0L, value.ordinal());
+			return this;
 		}
 
 		/**
@@ -10983,7 +11138,7 @@ public final class Bgfx {
 			ValueLayout.JAVA_SHORT.withName("height"),
 			ValueLayout.JAVA_SHORT.withName("textWidth"),
 			ValueLayout.JAVA_SHORT.withName("textHeight"),
-			ValueLayout.JAVA_SHORT.withName("numViews"),
+			ValueLayout.JAVA_SHORT.withName("numViewStats"),
 			ValueLayout.ADDRESS.withName("viewStats"),
 			ValueLayout.JAVA_BYTE.withName("numEncoders"),
 			ValueLayout.ADDRESS.withName("encoderStats"));
@@ -11077,8 +11232,8 @@ public final class Bgfx {
 			MemoryLayout.PathElement.groupElement("textWidth"));
 		private static final VarHandle VH_TEXTHEIGHT = LAYOUT.varHandle(
 			MemoryLayout.PathElement.groupElement("textHeight"));
-		private static final VarHandle VH_NUMVIEWS = LAYOUT.varHandle(
-			MemoryLayout.PathElement.groupElement("numViews"));
+		private static final VarHandle VH_NUMVIEWSTATS = LAYOUT.varHandle(
+			MemoryLayout.PathElement.groupElement("numViewStats"));
 		private static final VarHandle VH_VIEWSTATS = LAYOUT.varHandle(
 			MemoryLayout.PathElement.groupElement("viewStats"));
 		private static final VarHandle VH_NUMENCODERS = LAYOUT.varHandle(
@@ -11982,28 +12137,29 @@ public final class Bgfx {
 		}
 
 		/**
-		 * Number of view stats.
+		 * Number of view stats. View has one for each type of work
+		 * submitted to it. See: {@code ViewStatsType}
 		 * @return the field value
 		 */
-		public @Unsigned short numViews() {
-			return (@Unsigned short) VH_NUMVIEWS.get(segment(), 0L);
+		public @Unsigned short numViewStats() {
+			return (@Unsigned short) VH_NUMVIEWSTATS.get(segment(), 0L);
 		}
 
 		/**
-		 * Sets the native {@code numViews} field and returns {@code this}.
+		 * Sets the native {@code numViewStats} field and returns {@code this}.
 		 * @param value the new field value
 		 */
-		public Stats numViews(@Unsigned short value) {
-			VH_NUMVIEWS.set(segment(), 0L, value);
+		public Stats numViewStats(@Unsigned short value) {
+			VH_NUMVIEWSTATS.set(segment(), 0L, value);
 			return this;
 		}
 
 		/**
-		 * Sets the native {@code numViews} field and returns {@code this}.
+		 * Sets the native {@code numViewStats} field and returns {@code this}.
 		 * @param value the new field value
 		 */
-		public Stats numViews(int value) {
-			return numViews(NativeObject.toUnsignedShort(value));
+		public Stats numViewStats(int value) {
+			return numViewStats(NativeObject.toUnsignedShort(value));
 		}
 
 		/**
@@ -13075,6 +13231,10 @@ public final class Bgfx {
 		 *   draw commands are executed after blit and compute commands.
 		 * <p>
 		 * <strong>Attention:</strong> Destination texture must be created with {@code BGFX_TEXTURE_BLIT_DST} flag.
+		 * <p>
+		 * <strong>Attention:</strong> A depth texture, or one created with {@code BGFX_TEXTURE_MSAA_SAMPLE}, can only
+		 *   be blitted whole: both sides start at the origin of mips of the same size, and
+		 *   the copy covers the whole mip.
 		 * @param _id View id.
 		 * @param _dst Destination texture region.
 		 * @param _src Source texture region.
